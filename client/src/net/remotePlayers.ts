@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ANIMS, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, type PlayerInfo, type Transform } from '../../../shared/protocol';
+import { ANIMS, FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, type PlayerInfo, type Transform } from '../../../shared/protocol';
 import { damp, dampAngle } from '../core/math';
 import { Avatar } from '../player/avatar';
 
@@ -53,7 +53,7 @@ export class RemotePlayers {
     for (const r of this.map.values()) {
       const p = r.avatar.root.position, [x, y, z, yaw, a] = r.target;
       const dist = Math.hypot(x - p.x, z - p.z);
-      if (dist > 15) p.set(x, y, z); // teleport (e.g. just sat down far away)
+      if (dist > 25) p.set(x, y, z); // teleport (e.g. just sat down far away)
       else {
         const nx = damp(p.x, x, 9, dt), nz = damp(p.z, z, 9, dt);
         r.speed = damp(r.speed, Math.hypot(nx - p.x, nz - p.z) / Math.max(dt, 1e-4), 6, dt);
@@ -65,6 +65,7 @@ export class RemotePlayers {
       const flags = r.target[5];
       r.avatar.setListening((flags & FLAG_LISTENING) !== 0);
       r.avatar.setIncense(flags & FLAG_INCENSE ? (flags & FLAG_INCENSE_LIT ? 2 : 1) : 0);
+      r.avatar.setCloud((flags & FLAG_CLOUD) !== 0);
       r.avatar.setTagVisible(camera.position.distanceTo(p) < 28);
       r.avatar.update(dt, r.speed);
     }

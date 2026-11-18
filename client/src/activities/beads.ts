@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { beadClick, bell } from '../audio/sfx';
+import { bell } from '../audio/sfx';
 import { saveSettings, settings } from '../config/settings';
 import { damp } from '../core/math';
 import { glowTexture } from '../core/textures';
@@ -69,8 +69,7 @@ export class Mala {
   step(dir: 1 | -1) {
     if (Math.abs(this.target + dir - this.offset) > 3) return;
     const before = this.round;
-    this.target += dir;
-    beadClick();
+    this.target += dir; // silent; only completing a round rings the bell
     if (dir > 0 && this.round > before) {
       bell(196, 5);
       settings.beadRounds++;

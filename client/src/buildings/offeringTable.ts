@@ -34,13 +34,14 @@ export function buildOfferingTable(ctx: WorldContext, hallId: string, x: number,
     s.castShadow = false;
     stack.add(s);
   }
-  stack.position.set(x + 0.65, top, z);
+  stack.position.set(x + 0.45, top, z);
   g.add(stack);
 
-  // Candles at both ends with flickering flames
+  // Altar candles at both ends, plus a small lighting candle right beside the incense.
   const flames: THREE.Sprite[] = [];
-  for (const s of [-1, 1]) {
-    const cx = x + s * (length / 2 - 0.35);
+  const candleXs = [x - (length / 2 - 0.35), x + (length / 2 - 0.35)];
+  if (length >= 3) candleXs.push(x + 0.85); // short tables light from the end candle, already close by
+  for (const cx of candleXs) {
     g.add(cylinder(0.12, 0.14, 0.06, bronze, cx, top, z, 12));
     g.add(cylinder(0.05, 0.05, 0.3, mat(0xf4ead2, { roughness: 0.6 }), cx, top + 0.06, z, 10));
     const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffb347, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -50,13 +51,13 @@ export function buildOfferingTable(ctx: WorldContext, hallId: string, x: number,
     flames.push(flame);
   }
 
-  // Empty plates for fruit offerings (future feature)
+  // Plates for fruit offerings
   const slots: { x: number; y: number; z: number }[] = [];
   const nPlates = Math.max(2, plates);
   const span = length - 2.2;
   for (let i = 0; i < nPlates; i++) {
     const px = nPlates === 1 ? x : x - span / 2 + (i * span) / (nPlates - 1);
-    if (Math.abs(px - x) < 0.95) continue; // keep clear of the incense bowl
+    if (Math.abs(px - x) < 1.15) continue; // keep clear of the bowl, incense and lighting candle
     g.add(cylinder(0.2, 0.14, 0.04, bronze, px, top, z + 0.1, 16));
     slots.push({ x: px, y: top + 0.04, z: z + 0.1 });
   }

@@ -26,6 +26,12 @@ export interface OfferingTable {
   z: number;
   length: number;
   slots: { x: number; y: number; z: number }[];
+  /** Where visitors stand to offer incense (default: in front of the table). */
+  stand?: { x: number; z: number };
+  /** Where offered sticks are planted (default: the bowl on the table). */
+  bowl?: { x: number; y: number; z: number; r: number };
+  /** Smoke rises from the bowl even without offerings (the big courtyard burner). */
+  ambientSmoke?: boolean;
 }
 
 /** Shared registries filled while building the world. */

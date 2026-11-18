@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Anim } from '../../../shared/protocol';
 import { damp } from '../core/math';
 import { glowTexture, textTexture } from '../core/textures';
+import { CLOUD_TOP, makeCloud } from '../world/cloud';
 
 /** Joint targets (radians, except hipY in metres). Limbs hang along -Y; +x rotation swings them forward. */
 export interface Pose {
@@ -51,6 +52,7 @@ export const POSES: Record<Anim, Pose> = {
   pKneelUp: { ...STAND, ...HEART, hipY: 0.5, lShin: -1.57, rShin: -1.57 },
   pDown: P_DOWN,
   pUp: { ...P_DOWN, lPalm: H, rPalm: -H },
+  reach: { ...STAND, torso: 0.15, head: 0.2, rArm: 1.0, rArmZ: 0.05, rFore: 0.35 },
 };
 
 const SKIN = 0xd8a982;
@@ -66,6 +68,7 @@ export class Avatar {
   private phase = 0;
   private tag: THREE.Sprite | null = null;
   private phones: THREE.Group | null = null;
+  private cloud: THREE.Mesh | null = null;
   anim: Anim = 'idle';
 
   constructor(color: string, name?: string) {
@@ -166,6 +169,17 @@ export class Avatar {
     this.phones.visible = on;
   }
 
+  /** Standing on a flying cloud (fast travel). */
+  setCloud(on: boolean) {
+    if (!this.cloud) {
+      if (!on) return;
+      this.cloud = makeCloud();
+      this.cloud.position.y = -CLOUD_TOP;
+      this.root.add(this.cloud);
+    }
+    this.cloud.visible = on;
+  }
+
   /** Stick of incense in the right hand: 0 = none, 1 = unlit, 2 = lit (glowing tip). */
   setIncense(state: 0 | 1 | 2) {
     if (!this.incense) {
@@ -198,7 +212,7 @@ export class Avatar {
     // Procedural gait layered on top of the base pose.
     let swing = 0, bob = 0;
     if (this.anim === 'walk' || this.anim === 'run') {
-      this.phase += dt * (this.anim === 'run' ? 11 : 7.5) * Math.min(1.4, Math.max(0.6, speed / 2.6));
+      this.phase += dt * (this.anim === "run" ? 11 : 8) * Math.min(1.4, Math.max(0.6, speed / 3.8));
       const amp = this.anim === 'run' ? 0.75 : 0.5;
       swing = Math.sin(this.phase) * amp;
       bob = Math.abs(Math.cos(this.phase)) * 0.035;

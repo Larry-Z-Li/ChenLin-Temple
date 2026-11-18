@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, SNAPSHOT_HZ } from '../../shared/protocol';
+import { FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, SNAPSHOT_HZ } from '../../shared/protocol';
 import { ChantPanel } from './activities/chantPanel';
 import { Mala } from './activities/beads';
+import { CloudRide } from './activities/cloudRide';
 import { Offerings } from './activities/offerings';
 import { SeatSession } from './activities/seatSession';
 import { SutraReader } from './activities/sutraReader';
@@ -11,6 +12,7 @@ import { unlockAudio } from './audio/sfx';
 import { Soundscape } from './audio/soundscape';
 import { buildBenches } from './buildings/benches';
 import { buildDecor } from './buildings/decor';
+import { buildDecorations } from './buildings/decorations';
 import { buildHall } from './buildings/hall';
 import { PrayerWheels } from './buildings/prayerWheels';
 import { buildStupas } from './buildings/stupas';
@@ -30,6 +32,8 @@ import { LocalPlayer } from './player/localPlayer';
 import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
 import { mountJoystick } from './ui/touch';
+import { buildKoi } from './world/koi';
+import { buildLeaves } from './world/leaves';
 import { buildPrayerFlags } from './world/prayerFlags';
 import { buildSky } from './world/sky';
 import { buildTerrain } from './world/terrain';
@@ -80,6 +84,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   buildStream(ctx);
   const stupas = buildStupas(ctx);
   buildPrayerFlags(ctx, stupas);
+  buildDecorations(ctx, stupas);
+  buildKoi(ctx);
+  buildLeaves(ctx, camera);
   const { orchard } = buildVegetation(ctx);
 
   // High / low graphics: pixel ratio, shadows, grass & flowers.
@@ -145,7 +152,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   });
 
   const seat: SeatSession = new SeatSession({ ctx, net, player, rig, hud, mala, sutra });
-  const offerings = new Offerings(ctx, net, hud, orchard);
+  const offerings = new Offerings(ctx, net, hud, orchard, player);
+  const cloud = new CloudRide(ctx, player, rig, hud);
   const bow = (): void => (seat.seated ? seat.bow() : player.gesture("bow", 2.4));
 
   // Networking
@@ -188,9 +196,10 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
     const dt = Math.min(clock.getDelta(), 0.1);
     const time = clock.elapsedTime;
 
+    cloud.update(dt, time);
     player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground);
 
-    if (!seat.seated) {
+    if (!seat.seated && !cloud.riding && !offerings.busy) {
       const it = ctx.interactions.update(player.pos.x, player.pos.z);
       const p = it?.prompt();
       hud.setPrompt(p?.text ?? null, p?.busy);
@@ -216,7 +225,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
     sendAcc += dt;
     if (sendAcc >= 1 / SNAPSHOT_HZ) {
       sendAcc = 0;
-      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0);
+      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0) | (cloud.riding ? FLAG_CLOUD : 0);
       const tr = player.transform(flags), key = tr.join(',');
       if (key !== lastSent) {
         net.sendMove(tr);
@@ -232,5 +241,5 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   });
 
   // Debug handle for the console during development.
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud };
 }

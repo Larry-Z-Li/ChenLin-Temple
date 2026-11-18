@@ -1,5 +1,5 @@
 import type * as THREE from 'three';
-import { BASIN, HALLS, ORCHARD, PAVED, PLAY_RADIUS, POND, WHEEL_ROWS } from '../config/layout';
+import { BASIN, CLOUD_STATIONS, HALLS, ORCHARD, PAVED, PLAY_RADIUS, POND, WHEEL_ROWS } from '../config/layout';
 import { t } from '../i18n';
 import { h } from './dom';
 
@@ -56,6 +56,14 @@ export class Minimap {
     for (const hall of HALLS) {
       g.fillStyle = hall.kind === 'shrine' ? '#b0473a' : '#8e2b1f';
       g.fillRect(X(hall.x + hall.width / 2), Y(hall.z + hall.depth / 2), hall.width * s, hall.depth * s);
+    }
+
+    // Cloud stations (fast travel)
+    g.fillStyle = 'rgba(255,248,230,0.95)';
+    for (const c of Object.values(CLOUD_STATIONS)) {
+      g.beginPath();
+      g.arc(X(c.x), Y(c.z), 3.2, 0, Math.PI * 2);
+      g.fill();
     }
 
     g.fillStyle = '#fff';

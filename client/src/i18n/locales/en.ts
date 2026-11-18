@@ -27,7 +27,7 @@ const en = {
   'help.chants': 'C: chants (listen anywhere, even while walking)',
   'help.map': 'M: map',
   'help.leave': 'Esc: stand up / close',
-  'help.seated': 'On a cushion: 1 silence · 2 prayer beads · 3 sutras · 5 prostrations. On a bench: 2 prayer beads · 3 sutras',
+  'help.seated': 'On a cushion: 1 prayer beads · 2 sutras · 3 prostrations. On a bench: 1 prayer beads · 2 sutras',
   'help.beads': 'Prayer beads: ← / → move one bead',
 
   'prompt.sit': 'Kneel on cushion',
@@ -35,13 +35,11 @@ const en = {
   'prompt.seatTaken': 'Seat is taken',
   'prompt.spin': 'Turn the prayer wheel (tap again to go faster)',
 
-  'seat.silence': 'Silence',
   'seat.beads': 'Prayer beads',
   'seat.sutras': 'Sutras',
   'seat.stand': 'Stand up',
   'seat.denied': 'Someone just took that seat.',
 
-  'silence.elapsed': 'Sitting in silence · {time}',
 
   'beads.count': '{n} / {total}',
   'beads.rounds': 'Round {n}',
@@ -83,10 +81,10 @@ const en = {
   'prompt.pick': 'Pick {fruit}',
   'prompt.noRipe': 'No ripe fruit right now',
   'prompt.handsFull': 'Your hands are full',
-  'prompt.takeIncense': 'Take a stick of incense',
-  'prompt.lightIncense': 'Light the incense at the candle',
-  'prompt.placeIncense': 'Offer the incense',
+  'prompt.placeIncense': 'Offer incense',
   'prompt.offerFruit': 'Offer fruit',
+  'prompt.cloudToCundi': 'Ride the cloud to the Hall of Cundī',
+  'prompt.cloudToGate': 'Ride the cloud back to the Mountain Gate',
   'pick.got': 'Picked {fruit}',
   'offer.noFruit': 'You have no fruit to offer. Pick some in the orchard first.',
   'offer.full': 'The offering table is full for today.',

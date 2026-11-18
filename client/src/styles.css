@@ -24,7 +24,6 @@ kbd { display: inline-grid; place-items: center; min-width: 1.7em; height: 1.7em
 /* ---------- HUD ---------- */
 .hud { position: fixed; inset: 0; pointer-events: none; transition: opacity 1.2s; }
 .hud > * { pointer-events: auto; }
-.hud.quiet .topbar, .hud.quiet .toasts { opacity: 0.15; }
 .topbar { position: absolute; top: 12px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; transition: opacity 1.2s; }
 .topbar > * { pointer-events: auto; }
 .brand .title { font: 600 20px var(--serif); letter-spacing: 0.04em; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
@@ -70,7 +69,7 @@ body.reading .minimap { display: none; }
 .sutra-text h2, .sutra-text h3 { font-size: 1.1em; margin: 1.4em 0 0.4em; }
 .sutra-text p { margin: 0 0 1em; }
 
-.chant-panel { left: 16px; bottom: 96px; width: min(340px, calc(100vw - 32px)); max-height: 50vh; }
+.chant-panel { left: 16px; bottom: 112px; width: min(340px, calc(100vw - 32px)); max-height: 50vh; }
 .transport { display: flex; gap: 6px; align-items: center; padding: 10px; border-top: 1px solid var(--panel-border); }
 .transport input[type='range'] { flex: 1; min-width: 60px; accent-color: var(--accent); }
 
@@ -103,7 +102,8 @@ body.reading .minimap { display: none; }
 .seg-btn.active { background: var(--accent); color: var(--accent-ink); }
 
 /* ---------- Bow, fruit, beads ---------- */
-.bow-btn { position: absolute; left: 16px; bottom: 16px; height: 44px; padding: 0 16px; font-family: var(--serif); }
+.quick-actions { position: absolute; left: 16px; bottom: 16px; display: flex; gap: 8px; }
+.quick-actions .icon-btn { height: 44px; padding: 0 16px; font-family: var(--serif); }
 .inventory { position: absolute; left: 16px; bottom: 70px; display: flex; flex-wrap: wrap; gap: 6px; max-width: 50vw; }
 .fruit-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border); font-size: 13px; }
 .fruit-dot { width: 10px; height: 10px; border-radius: 50%; }
@@ -113,9 +113,9 @@ body.reading .minimap { display: none; }
 /* ---------- Touch ---------- */
 .joystick { position: fixed; left: 24px; bottom: 24px; width: 120px; height: 120px; border-radius: 50%; background: rgba(28, 20, 16, 0.35); border: 1px solid var(--panel-border); touch-action: none; display: grid; place-items: center; }
 .joy-knob { width: 52px; height: 52px; border-radius: 50%; background: rgba(217, 164, 65, 0.75); pointer-events: none; }
-body.touch .bow-btn { bottom: 160px; left: 24px; }
+body.touch .quick-actions { bottom: 160px; left: 24px; }
 body.touch .inventory { bottom: 212px; left: 24px; }
-body.touch .chant-panel { bottom: 160px; left: 160px; }
+body.touch .chant-panel { bottom: 252px; left: 24px; }
 body.touch .seatbar { bottom: 16px; }
 
 @media (max-width: 640px) {
@@ -124,6 +124,5 @@ body.touch .seatbar { bottom: 16px; }
   .topbar .row { flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 62vw; }
   .icon-btn { min-width: 34px; height: 34px; padding: 0 8px; font-size: 14px; }
   .brand .title { font-size: 16px; }
-  body.touch .chant-panel { left: 16px; bottom: 160px; }
   .bead-btns { gap: 48px; }
 }

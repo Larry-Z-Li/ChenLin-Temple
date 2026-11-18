@@ -261,7 +261,7 @@ export class Soundscape {
     // Footsteps: one per stride (effects volume, independent of the ambience toggle).
     if (speed > 0.4) {
       this.stride += speed * dt;
-      const strideLen = speed > 4 ? 1.1 : 0.75;
+      const strideLen = speed > 4.9 ? 1.25 : 0.95;
       if (this.stride >= strideLen) {
         this.stride -= strideLen;
         this.step(this.surfaceAt(listener));

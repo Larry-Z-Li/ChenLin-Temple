@@ -61,6 +61,12 @@ const MIME: Record<string, string> = {
 
 // ---------- Static hosting of the built client (production) ----------
 const server = http.createServer((req, res) => {
+  // Headcount only (no names), e.g. curl https://<host>/api/status
+  if (req.url === '/api/status') {
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ present: [...clients.values()].filter((c) => c.info).length }));
+    return;
+  }
   if (!fs.existsSync(STATIC_DIR)) {
     res.writeHead(200, { 'content-type': 'text/plain' });
     res.end('Temple server running. Build the client (npm run build) to serve it from here.');

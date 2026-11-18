@@ -5,8 +5,8 @@ import { LOCALES, getLocale, setLocale, t, type I18nKey } from '../i18n';
 import type { NetStatus } from '../net/netClient';
 import { h } from './dom';
 
-export type Focus = 'none' | 'silence' | 'beads' | 'sutra' | 'prostrate';
-export type SeatAction = 'silence' | 'beads' | 'sutra' | 'prostrate' | 'stand';
+export type Focus = 'none' | 'beads' | 'sutra' | 'prostrate';
+export type SeatAction = 'beads' | 'sutra' | 'prostrate' | 'stand';
 
 export interface HudCallbacks {
   onMusic(on: boolean): void;
@@ -94,7 +94,6 @@ export class Hud {
       h(
         'div',
         { class: 'row' },
-        h('button', { class: 'icon-btn', i18n: 'hud.chants', onclick: () => cb.onChants() }),
         this.musicBtn,
         h('button', { class: 'icon-btn', i18nTitle: 'hud.map', onclick: () => cb.onMap() }, '◫'),
         h('button', { class: 'icon-btn', i18nTitle: 'hud.settings', onclick: () => this.toggleSettings() }, '⚙'),
@@ -114,10 +113,9 @@ export class Hud {
     this.seatBar = h(
       'nav',
       { class: 'seatbar hidden' },
-      mk('silence', '1', 'seat.silence'),
-      mk('beads', '2', 'seat.beads'),
-      mk('sutra', '3', 'seat.sutras'),
-      mk('prostrate', '5', 'seat.prostrate'),
+      mk('beads', '1', 'seat.beads'),
+      mk('sutra', '2', 'seat.sutras'),
+      mk('prostrate', '3', 'seat.prostrate'),
       mk('stand', 'Esc', 'seat.stand'),
     );
     this.beadBtns = h(
@@ -127,9 +125,15 @@ export class Hud {
       h('button', { class: 'icon-btn big', i18nTitle: 'beads.next', onclick: () => cb.onBeadStep(1) }, '▶'),
     );
     this.inventory = h('div', { class: 'inventory hidden' });
-    const bow = h('button', { class: 'icon-btn bow-btn', i18n: 'bow.button', onclick: () => cb.onBow() });
+    // Bottom-left: bow and chants, always within reach.
+    const quick = h(
+      'div',
+      { class: 'quick-actions' },
+      h('button', { class: 'icon-btn', i18n: 'bow.button', onclick: () => cb.onBow() }),
+      h('button', { class: 'icon-btn', i18n: 'hud.chants', onclick: () => cb.onChants() }),
+    );
 
-    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, bow, this.toasts, this.help, this.settingsPanel);
+    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, quick, this.toasts, this.help, this.settingsPanel);
     parent.append(this.root);
     this.renderMusic();
     this.renderGraphics();
@@ -196,10 +200,9 @@ export class Hud {
     if (text) this.info.textContent = text;
   }
 
-  /** Seat bar: cushions offer everything; benches offer prayer beads and sutras. null hides it. */
+  /** Seat bar: cushions offer beads, sutras and prostrations; benches offer beads and sutras. null hides it. */
   showSeatBar(kind: 'cushion' | 'bench' | null) {
     this.seatBar.classList.toggle('hidden', !kind);
-    this.seatBtns.silence.classList.toggle('hidden', kind === 'bench');
     this.seatBtns.prostrate.classList.toggle('hidden', kind === 'bench');
     if (!kind) this.showBeadButtons(false);
   }
@@ -222,11 +225,6 @@ export class Hud {
         h('span', { class: 'fruit-chip', title: t(FRUIT_TYPES[f].nameKey as I18nKey) }, h('span', { class: 'fruit-dot', style: `background:#${FRUIT_TYPES[f].color.toString(16).padStart(6, '0')}` }), `${t(FRUIT_TYPES[f].nameKey as I18nKey)} ×${n}`),
       ),
     );
-  }
-
-  /** Dim chrome while sitting in silence. */
-  setQuiet(v: boolean) {
-    this.root.classList.toggle('quiet', v);
   }
 
   toast(msg: string, ms = 2800) {

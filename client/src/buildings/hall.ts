@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { DEITIES } from '../config/deities';
 import { PLATFORM_H, type HallDef } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
-import { textTexture } from '../core/textures';
+import { ceilingTexture, textTexture, verticalTextTexture } from '../core/textures';
 import type { ThangkaEntry } from '../content/manifest';
 import { inscription, onLocaleChange, t, type I18nKey } from '../i18n';
 import { box, cylinder, hipRoofGeometry, mat } from './materials';
@@ -78,7 +79,11 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
     wallZ(back, front, hx + hw);
 
     // Ceiling
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(width, depth).rotateX(Math.PI / 2), mat(THEME.ceiling, { side: THREE.DoubleSide }));
+    // Painted coffered ceiling
+    const ceilTex = ceilingTexture().clone();
+    ceilTex.repeat.set(width / 2.4, depth / 2.4);
+    ceilTex.needsUpdate = true;
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(width, depth).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 0.8, side: THREE.DoubleSide }));
     ceil.position.set(hx, F + H - 0.02, hz);
     g.add(blocker(ceil));
   }
@@ -103,6 +108,20 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
       ctx.collisions.addCircle(cx, cz, 0.3);
     }
 
+  // Column couplets (楹聯) on the two columns flanking the door: 上聯 right (east), 下聯 left (west).
+  if (def.couplet && !isShrine) {
+    const xs = Array.from({ length: nCols }, (_, i) => hx - hw + 0.4 + (i * (width - 0.8)) / (nCols - 1));
+    const right = Math.min(...xs.filter((v) => v > hx)), left = Math.max(...xs.filter((v) => v < hx));
+    def.couplet.forEach((text, i) => {
+      const board = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.42, 2.9),
+        new THREE.MeshStandardMaterial({ map: verticalTextTexture(text, { bg: '#2a120c', border: '#c9a24a' }), roughness: 0.55 }),
+      );
+      board.position.set(i === 0 ? right : left, F + 2.35, front + 1.0 + 0.29);
+      g.add(board);
+    });
+  }
+
   // ---- Roof ----
   const eave = isShrine ? 1.6 : 2.4;
   const roofMat = mat(THEME.roof, { roughness: 0.75, side: THREE.DoubleSide, flatShading: true });
@@ -126,6 +145,28 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
     g.add(box(width * 0.74 + 0.3, 0.6, depth * 0.62 + 0.3, beamMat, hx, cy + 1.2, hz));
     addRoof(width * 0.74 + eave * 2, depth * 0.62 + eave * 2, RH * 0.55, cy + 1.8);
   } else addRoof(W, D, D * (isShrine ? 0.42 : 0.4), F + H);
+
+  // ---- Red lanterns under the front eave, wind bells at the eave corners (gently swaying) ----
+  const swaying: { obj: THREE.Object3D; amp: number; speed: number; phase: number }[] = [];
+  const lanternXs = isShrine ? [-2.4, 2.4] : width > 40 ? [-12, -4, 4, 12] : [-4.2, 4.2];
+  for (const lx of lanternXs) {
+    const l = buildRedLantern();
+    l.position.set(hx + lx, F + H - 0.1, isShrine ? front + 0.9 : front + 1.85);
+    g.add(l);
+    swaying.push({ obj: l, amp: 0.04, speed: 1.1, phase: lx });
+  }
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const b = buildWindBell();
+    b.position.set(hx + sx * (hw + eave - 0.3), F + H - 0.02, hz + sz * (hd + eave - 0.3));
+    g.add(b);
+    swaying.push({ obj: b, amp: 0.14, speed: 2.3, phase: sx * 3 + sz });
+  }
+  ctx.updaters.push((_dt, time) => {
+    for (const s of swaying) {
+      s.obj.rotation.z = Math.sin(time * s.speed + s.phase) * s.amp;
+      s.obj.rotation.x = Math.sin(time * s.speed * 0.7 + s.phase * 1.3) * s.amp * 0.6;
+    }
+  });
 
   // ---- Name plaque over the door (re-rendered on language change) ----
   const plaqueMat = new THREE.MeshStandardMaterial({ roughness: 0.6 });
@@ -152,9 +193,25 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
   g.add(box(altarW + 0.2, 0.1, altarD + 0.2, mat(THEME.altarTrim, { metalness: 0.7, roughness: 0.35 }), hx, F + altarH, altarZ));
   ctx.collisions.addBoxCentered(hx, altarZ, altarW + 0.2, altarD + 0.2);
 
+  // Offering water bowls: seven in a row before each statue.
+  const bowlMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.075, 0.055, 0.07, 14).translate(0, 0.035, 0), mat(0xc9a24a, { metalness: 0.8, roughness: 0.3 }), n * 7);
+  const waterMesh = new THREE.InstancedMesh(new THREE.CircleGeometry(0.066, 14).rotateX(-Math.PI / 2), mat(0x9fd3e8, { roughness: 0.1 }), n * 7);
+  const bm = new THREE.Matrix4();
+
   def.deities.forEach((id, i) => {
     const sx = hx - altarW / 2 + (i + 0.5) * (altarW / n);
     g.add(buildStatueSlot(id, sx, F + altarH + 0.1, altarZ - 0.2, models[id]));
+    for (let k = 0; k < 7; k++) {
+      const bx = sx + (k - 3) * 0.27, by = F + altarH + 0.1, bz = altarZ + 0.95;
+      bowlMesh.setMatrixAt(i * 7 + k, bm.makeTranslation(bx, by, bz));
+      waterMesh.setMatrixAt(i * 7 + k, bm.makeTranslation(bx, by + 0.06, bz));
+    }
+    // Hanging canopy (華蓋) above the statue.
+    if (!isShrine) {
+      const c = buildCanopy();
+      c.position.set(sx, F + H - 1.1, altarZ - 0.2);
+      g.add(c);
+    }
     // Name plate on the altar front
     const plateMat = new THREE.MeshStandardMaterial({ roughness: 0.6 });
     const drawPlate = () => {
@@ -168,6 +225,8 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
     plate.position.set(sx, F + altarH * 0.55, altarZ + altarD / 2 + 0.01);
     g.add(plate);
   });
+
+  g.add(bowlMesh, waterMesh);
 
   // ---- Offering table ----
   const tableZ = altarZ + altarD / 2 + (isShrine ? 0.9 : 1.4);
@@ -232,4 +291,58 @@ function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: numb
   body.receiveShadow = top.receiveShadow = true;
   body.castShadow = true;
   g.add(body, top);
+}
+
+/** Red silk lantern hanging from a cord; origin at the top of the cord (pivot for swaying). */
+export function buildRedLantern(cord = 0.55) {
+  const g = new THREE.Group();
+  const gold = mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 });
+  g.add(cylinder(0.012, 0.012, cord, mat(0x2a1a10), 0, -cord, 0, 5));
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 12).scale(1, 1.12, 1), mat(0xc8231c, { roughness: 0.6, emissive: 0xff3a1a, emissiveIntensity: 0.35 }));
+  body.position.y = -cord - 0.38;
+  g.add(body);
+  g.add(cylinder(0.15, 0.15, 0.07, gold, 0, -cord - 0.05, 0, 14));
+  g.add(cylinder(0.15, 0.15, 0.07, gold, 0, -cord - 0.78, 0, 14));
+  g.add(cylinder(0.025, 0.05, 0.32, mat(0xb81d18, { roughness: 0.9 }), 0, -cord - 1.12, 0, 8));
+  return g;
+}
+
+/** Bronze wind bell (風鈴) with a clapper and wind-catcher plate; origin at the hook. */
+function buildWindBell() {
+  const g = new THREE.Group();
+  const bronze = mat(0x5f7a5a, { metalness: 0.6, roughness: 0.45 });
+  g.add(cylinder(0.008, 0.008, 0.22, mat(0x2a1a10), 0, -0.22, 0, 4));
+  const bell = new THREE.Mesh(
+    new THREE.LatheGeometry([[0.001, 0], [0.05, -0.01], [0.075, -0.06], [0.1, -0.16], [0.12, -0.22]].map(([r, y]) => new THREE.Vector2(r, y)), 16),
+    bronze,
+  );
+  (bell.material as THREE.Material).side = THREE.DoubleSide;
+  bell.position.y = -0.22;
+  g.add(bell);
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.17, 0.008), bronze);
+  plate.position.y = -0.58;
+  g.add(plate);
+  g.add(cylinder(0.005, 0.005, 0.2, mat(0x2a1a10), 0, -0.5, 0, 4));
+  return g;
+}
+
+/** Hanging canopy (華蓋): gilded top, red skirt with fringe, on a rod from the ceiling. */
+function buildCanopy() {
+  const g = new THREE.Group();
+  const gold = mat(THEME.goldLeaf, { metalness: 0.75, roughness: 0.3 });
+  g.add(cylinder(0.02, 0.02, 1.1, gold, 0, 0.3, 0, 6)); // rod to the ceiling
+  g.add(cylinder(0.25, 1.1, 0.3, gold, 0, 0.05, 0, 24)); // domed top
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, 0.42, 32, 1, true), mat(0xa01c18, { roughness: 0.7, side: THREE.DoubleSide }));
+  skirt.position.y = -0.16;
+  g.add(skirt);
+  const trim = new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.03, 6, 40).rotateX(Math.PI / 2), gold);
+  trim.position.y = -0.37;
+  g.add(trim);
+  const tassels: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 28; i++) {
+    const a = (i / 28) * Math.PI * 2;
+    tassels.push(new THREE.BoxGeometry(0.035, 0.22, 0.012).translate(Math.cos(a) * 1.12, -0.48, Math.sin(a) * 1.12).toNonIndexed());
+  }
+  g.add(new THREE.Mesh(mergeGeometries(tassels), gold));
+  return g;
 }

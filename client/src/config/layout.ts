@@ -44,6 +44,11 @@ export interface HallDef {
   /** Thangkas per side wall. */
   thangkas: number;
   roofTiers: 1 | 2;
+  /**
+   * Column couplet (楹聯) beside the door: [right column (上聯), left column (下聯)], read top to bottom.
+   * Placeholder compositions; replace with your lineage's texts.
+   */
+  couplet?: [string, string];
 }
 
 export const HALLS: HallDef[] = [
@@ -51,6 +56,7 @@ export const HALLS: HallDef[] = [
     id: 'south', kind: 'hall', nameKey: 'hall.south',
     x: 0, z: 62, width: 26, depth: 24, wallHeight: 6.5,
     deities: ['manjushri'], frontDoor: true, backDoor: true, seats: 40, thangkas: 3, roofTiers: 1,
+    couplet: ['妙德慈光開智慧', '吉祥法雨潤群生'],
   },
   {
     id: 'marici', kind: 'shrine', nameKey: 'hall.marici',
@@ -63,21 +69,25 @@ export const HALLS: HallDef[] = [
     // ⚠ Placeholder ordering — confirm with your lineage's arrangement.
     deities: ['amitabha', 'amoghasiddhi', 'vairocana', 'ratnasambhava', 'akshobhya'],
     frontDoor: true, backDoor: true, seats: 40, thangkas: 4, roofTiers: 2,
+    couplet: ['五智圓明周法界', '一心清淨即蓮邦'],
   },
   {
     id: 'northwest', kind: 'hall', nameKey: 'hall.northwest',
     x: -44, z: -50, width: 24, depth: 24, wallHeight: 6.5,
     deities: ['cintamanicakra'], frontDoor: true, backDoor: false, seats: 40, thangkas: 3, roofTiers: 1,
+    couplet: ['寶珠如意隨心滿', '慈航普渡出迷津'],
   },
   {
     id: 'north', kind: 'hall', nameKey: 'hall.north',
     x: 0, z: -50, width: 24, depth: 24, wallHeight: 6.5,
     deities: ['cundi'], frontDoor: true, backDoor: false, seats: 40, thangkas: 3, roofTiers: 1,
+    couplet: ['準提神咒消災障', '佛母慈心護眾生'],
   },
   {
     id: 'northeast', kind: 'hall', nameKey: 'hall.northeast',
     x: 44, z: -50, width: 24, depth: 24, wallHeight: 6.5,
     deities: ['daikokuten'], frontDoor: true, backDoor: false, seats: 40, thangkas: 3, roofTiers: 1,
+    couplet: ['福德莊嚴資道業', '慈悲護法佑僧伽'],
   },
 ];
 
@@ -101,7 +111,7 @@ export const PAVED: Rect[] = [
   { minX: 15, maxX: 39, minZ: 19, maxZ: 23 }, // to the orchard
 ];
 
-export const MOUNTAIN_GATE = { x: 0, z: 100, width: 8, height: 6 };
+export const MOUNTAIN_GATE = { x: 0, z: 100, width: 8, height: 6, couplet: ['佛日增輝光普照', '法輪常轉道恆昌'] as [string, string] };
 
 export const POND = { x: -54, z: 21, radius: 15 };
 
@@ -200,3 +210,45 @@ export const FLAG_LINES: [FlagAnchor, FlagAnchor][] = [
   [pole(-29.5, -35, 5), pole(-14.5, -35, 5)],
   [pole(14.5, -35, 5), pole(29.5, -35, 5)],
 ];
+
+/**
+ * Cloud rides: a cloud bobs to the right of the entrance and another just right of the
+ * Cundī hall's front steps; each carries you to the other along a scenic route.
+ */
+export const CLOUD_STATIONS = {
+  gate: { x: 6, z: 103.5 },
+  cundi: { x: 9, z: -31.5 },
+};
+
+/**
+ * Fast travel (~5 s): waypoints (x, height, z) from the gate to Cundī; the return flies it backwards.
+ * One swooping arc that peaks over the courtyard for a view of the whole temple, pond and waterfall.
+ */
+export const CLOUD_ROUTE: [number, number, number][] = [
+  [8.5, 8, 99], // lift off beside the mountain gate
+  [0, 24, 76], // over the Hall of Mañjuśrī
+  [-12, 40, 46],
+  [-14, 46, 10], // peak above the courtyard
+  [-4, 32, -16], // over the Hall of the Five Tathāgatas
+  [6, 12, -25], // glide down to Cundī
+];
+export const CLOUD_RIDE_SECONDS = 5;
+
+/** Stone lanterns (石燈籠) along the paths. */
+export const STONE_LANTERNS: [number, number][] = [
+  [-3.8, 77], [3.8, 77], [-3.8, 81], [3.8, 81], [-3.8, 98], [3.8, 98], // approach
+  [-14.3, 26], [14.3, 26], [-14.3, 34], [14.3, 34], // Marīcī courtyard
+  [-5.5, 17.6], [5.5, 17.6], // before the Hall of the Five Tathāgatas
+  [-20, 24.3], [-32, 24.3], [20, 24.3], [32, 24.3], // paths to the pond and orchard
+  [-36, -26.6], [-8, -26.6], [8, -26.6], [36, -26.6], // north path
+  [-87.7, 13.6], [-84.3, 28.4], // ends of the stream bridge
+];
+
+/** Large bronze incense burner (香爐) on the axis between the Hall of Mañjuśrī and the Marīcī shrine, with its incense table. */
+export const INCENSE_BURNER = { x: 0, z: 41.4, tableZ: 43.4, standZ: 44.4 };
+
+/** Arched stone bridge over the stream (runs north–south across it). */
+export const BRIDGE = { x: -86, z0: 15, z1: 27, width: 2.6, rise: 1.15 };
+
+/** Stone tablet (石碑) at the mountain gate, facing arriving visitors. */
+export const STELE = { x: -7, z: 104 };

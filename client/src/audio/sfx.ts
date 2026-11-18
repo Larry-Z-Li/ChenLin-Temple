@@ -10,20 +10,24 @@ export function unlockAudio() {
   void ctx().resume();
 }
 
-/** Soft wooden click for a prayer bead. */
-export function beadClick() {
+/** Soft rush of air (cloud take-off / landing). */
+export function whoosh(strength = 1, length = 1.6) {
   const a = ctx(), t = a.currentTime;
-  const osc = a.createOscillator(), gain = a.createGain(), filter = a.createBiquadFilter();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(1400 + Math.random() * 200, t);
-  osc.frequency.exponentialRampToValueAtTime(500, t + 0.04);
-  filter.type = 'bandpass';
-  filter.frequency.value = 1200;
-  gain.gain.setValueAtTime(0.25 * settings.sfxVolume, t);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
-  osc.connect(filter).connect(gain).connect(a.destination);
-  osc.start(t);
-  osc.stop(t + 0.08);
+  const buf = a.createBuffer(1, Math.floor(a.sampleRate * length), a.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  src.buffer = buf;
+  f.type = 'bandpass';
+  f.Q.value = 0.8;
+  f.frequency.setValueAtTime(300, t);
+  f.frequency.exponentialRampToValueAtTime(1400, t + length * 0.45);
+  f.frequency.exponentialRampToValueAtTime(380, t + length);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.22 * strength * Math.max(0.01, settings.sfxVolume), t + length * 0.4);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + length);
+  src.connect(f).connect(g).connect(a.destination);
+  src.start(t);
 }
 
 /** Singing-bowl-like bell: a few inharmonic partials with long decay. */

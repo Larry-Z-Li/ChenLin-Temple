@@ -1,6 +1,6 @@
 # 九宮寺 · Nine Palace Temple
 
-A browser-based 3D temple where people can practise together online: walk the grounds, kneel on a cushion, sit in silence, count prayer beads, read sutras, listen to chants, turn prayer wheels, offer incense and fruit, and do prostrations.
+A browser-based 3D temple where people can practise together online: walk the grounds, kneel on a cushion in silence, count prayer beads, read sutras, listen to chants, turn prayer wheels, offer incense and fruit, and do prostrations.
 
 Live: https://nine-palace-temple.onrender.com (Render, see `render.yaml`).
 
@@ -24,7 +24,7 @@ Production: `npm run build && npm start` serves everything from http://localhost
 | WASD / arrows | walk (Shift = faster) |
 | drag / scroll | look around / zoom |
 | E | kneel on a cushion · sit on a bench · pick fruit · take / light / offer incense · offer fruit · tap repeatedly beside a prayer wheel to spin it faster |
-| 1 / 2 / 3 / 5 | on a cushion: silence · prayer beads · sutras · three prostrations. On a bench: 2 beads · 3 sutras |
+| 1 / 2 / 3 | on a cushion: prayer beads · sutras · three prostrations. On a bench: 1 beads · 2 sutras |
 | B | bow with palms together (合掌) |
 | C | chants (listen anywhere, even while walking) |
 | ← → | move prayer beads one bead |
@@ -74,7 +74,7 @@ Default is Traditional Chinese (`zh-Hant`), with English selectable. Every UI st
 ## Practice features
 
 - **Offerings:** pick fruit in the orchard (regrows after 10 min, carry up to 5). At any hall's table: take incense, light it at a candle, place it in the bowl (burns 30 min); offer fruit on the plates. Offerings are shared and clear at midnight in `TEMPLE_TZ` (default Asia/Taipei).
-- **Prostrations:** on a cushion press 5: stand, palms to crown / mouth / heart, kneel, forehead to floor, palms up, rise; three times, then stay kneeling.
+- **Prostrations:** on a cushion press 3: stand, palms to crown / mouth / heart, kneel, forehead to floor, palms up, rise; three times, then stay kneeling.
 - **Soundscape:** wind, the waterfall and stream (louder as you approach), birdsong, an occasional wind chime, footsteps by surface, and a temple bell on the hour. Synthesized by default; drop recordings into `client/public/assets/sfx/index.json` to replace any of them.
 - **Graphics:** ⚙ settings has High / Low (Low is the default on phones), plus ambient and effects volume.
 

@@ -1,5 +1,4 @@
 import type { Anim } from '../../../shared/protocol';
-import { bell } from '../audio/sfx';
 import type { Seat, WorldContext } from '../core/context';
 import { t } from '../i18n';
 import type { NetClient } from '../net/netClient';
@@ -12,13 +11,13 @@ import type { SutraReader } from './sutraReader';
 /** What each kind of seat offers, and the pose for each activity. (Chants are global, not seat-bound.) */
 const SEAT_KINDS: Record<Seat['kind'], { focuses: Focus[]; anim: Record<Focus, Anim>; bow: Anim; camPitch: number; camDist: number }> = {
   cushion: {
-    focuses: ['silence', 'beads', 'sutra', 'prostrate'],
-    anim: { none: 'kneel', silence: 'kneel', beads: 'beads', sutra: 'read', prostrate: 'kneel' },
+    focuses: ['beads', 'sutra', 'prostrate'],
+    anim: { none: 'kneel', beads: 'beads', sutra: 'read', prostrate: 'kneel' },
     bow: 'kneelBow', camPitch: 0.18, camDist: 3.4,
   },
   bench: {
     focuses: ['beads', 'sutra'],
-    anim: { none: 'sit', silence: 'sit', beads: 'sitBeads', sutra: 'sitRead', prostrate: 'sit' },
+    anim: { none: 'sit', beads: 'sitBeads', sutra: 'sitRead', prostrate: 'sit' },
     bow: 'sitBow', camPitch: 0.25, camDist: 4,
   },
 };
@@ -34,11 +33,6 @@ const PROSTRATION: [Anim, number][] = [
 ];
 const PROSTRATION_REPS = 3;
 
-const fmt = (sec: number) => {
-  const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
-  return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-};
-
 interface Deps {
   ctx: WorldContext;
   net: NetClient;
@@ -50,14 +44,13 @@ interface Deps {
 }
 
 /**
- * Sitting down (cushion or bench) and the seated activities:
- * cushions → silence, prayer beads, sutras; benches → sutras.
+ * Sitting down (cushion or bench) and the seated activities. Simply kneeling is sitting in silence;
+ * cushions add prayer beads, sutras and prostrations; benches add prayer beads and sutras.
  */
 export class SeatSession {
   seat: Seat | null = null;
   focus: Focus = 'none';
   private pending: string | null = null;
-  private silenceStart = 0;
   private prost: { rep: number; step: number; t: number } | null = null;
   private bowLeft = 0;
 
@@ -144,20 +137,14 @@ export class SeatSession {
     const kind = SEAT_KINDS[this.seat?.kind ?? 'cushion'];
     if (f !== 'none' && !kind.focuses.includes(f)) return;
     if (f !== 'none' && this.focus === f) f = 'none'; // toggle off
-    const prev = this.focus;
     this.focus = f;
     mala.show(f === 'beads');
     void sutra.show(f === 'sutra');
     hud.showBeadButtons(f === 'beads');
     this.prost = f === 'prostrate' ? { rep: 0, step: 0, t: 0 } : null;
     this.bowLeft = 0;
-    hud.setQuiet(f === 'silence');
-    if (f === 'silence' && prev !== 'silence') {
-      this.silenceStart = performance.now();
-      bell(174, 7);
-    }
     if (f === 'beads') this.renderBeads(mala.count, mala.round);
-    if (f !== 'beads' && f !== 'silence' && f !== 'prostrate') hud.setInfo(null);
+    if (f !== 'beads' && f !== 'prostrate') hud.setInfo(null);
     player.setAnchorAnim(kind.anim[f]);
     hud.setSeatState(f);
   }
@@ -185,10 +172,9 @@ export class SeatSession {
     if (!this.seat) return false;
     if (this.focus === 'sutra' && this.d.sutra.handleKey(e)) return true;
     switch (e.code) {
-      case 'Digit1': this.action('silence'); return true;
-      case 'Digit2': this.action('beads'); return true;
-      case 'Digit3': this.action('sutra'); return true;
-      case 'Digit5': this.action('prostrate'); return true;
+      case 'Digit1': this.action('beads'); return true;
+      case 'Digit2': this.action('sutra'); return true;
+      case 'Digit3': this.action('prostrate'); return true;
       case 'KeyB': if (!e.repeat) this.bow(); return true;
       case 'Escape':
       case 'KeyE':
@@ -205,7 +191,6 @@ export class SeatSession {
   }
 
   update(dt: number) {
-    if (this.focus === 'silence') this.d.hud.setInfo(t('silence.elapsed', { time: fmt((performance.now() - this.silenceStart) / 1000) }));
     if (this.bowLeft > 0 && (this.bowLeft -= dt) <= 0 && this.seat) this.d.player.setAnchorAnim(SEAT_KINDS[this.seat.kind].anim[this.focus]);
     const p = this.prost;
     if (p) {

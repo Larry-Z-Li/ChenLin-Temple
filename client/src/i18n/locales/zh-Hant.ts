@@ -29,7 +29,7 @@ const zhHant: Record<I18nKey, string> = {
   'help.chants': 'C：梵唄（隨處可聽，行走時亦可）',
   'help.map': 'M：地圖',
   'help.leave': 'Esc：起身／關閉',
-  'help.seated': '蒲團上：1 靜坐 · 2 念珠 · 3 經文 · 5 大禮拜。長椅上：2 念珠 · 3 經文',
+  'help.seated': '蒲團上：1 念珠 · 2 經文 · 3 大禮拜。長椅上：1 念珠 · 2 經文',
   'help.beads': '念珠：← / → 撥動一顆',
 
   'prompt.sit': '跪坐蒲團',
@@ -37,13 +37,11 @@ const zhHant: Record<I18nKey, string> = {
   'prompt.seatTaken': '此座已有人',
   'prompt.spin': '轉動轉經輪（再按可加速）',
 
-  'seat.silence': '靜坐',
   'seat.beads': '念珠',
   'seat.sutras': '經文',
   'seat.stand': '起身',
   'seat.denied': '此座剛被他人坐下。',
 
-  'silence.elapsed': '靜坐中 · {time}',
 
   'beads.count': '{n} / {total}',
   'beads.rounds': '第 {n} 圈',
@@ -85,10 +83,10 @@ const zhHant: Record<I18nKey, string> = {
   'prompt.pick': '摘{fruit}',
   'prompt.noRipe': '目前沒有成熟的果實',
   'prompt.handsFull': '手上已經拿滿了',
-  'prompt.takeIncense': '取一炷香',
-  'prompt.lightIncense': '就燭點香',
   'prompt.placeIncense': '上香',
   'prompt.offerFruit': '供果',
+  'prompt.cloudToCundi': '乘雲前往準提殿',
+  'prompt.cloudToGate': '乘雲返回山門',
   'pick.got': '摘到{fruit}',
   'offer.noFruit': '您沒有水果可供養，請先到果園摘取。',
   'offer.full': '今日供桌已滿。',

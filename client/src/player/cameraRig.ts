@@ -16,6 +16,7 @@ export class CameraRig {
   /** Active touches, for pinch-to-zoom. */
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchDist = 0;
+  private lastUserLook = 0;
   /** When set, the camera eases toward this yaw until the user drags. */
   private yawGoal: number | null = null;
 
@@ -33,10 +34,12 @@ export class CameraRig {
       if (this.pointers.size === 2) {
         const d = this.spread();
         if (this.pinchDist > 0 && d > 0) this.targetDist = clamp(this.targetDist * (this.pinchDist / d), 1.8, 16);
+        this.lastUserLook = performance.now();
         this.pinchDist = d;
         return;
       }
       if (!this.dragging) return;
+      this.lastUserLook = performance.now();
       this.yaw -= (e.clientX - this.last.x) * 0.005;
       this.pitch = clamp(this.pitch + (e.clientY - this.last.y) * 0.004, -0.25, 1.25);
       this.last = { x: e.clientX, y: e.clientY };
@@ -53,10 +56,16 @@ export class CameraRig {
       'wheel',
       (e) => {
         this.targetDist = clamp(this.targetDist * (e.deltaY > 0 ? 1.12 : 0.89), 1.8, 16);
+        this.lastUserLook = performance.now();
         e.preventDefault();
       },
       { passive: false },
     );
+  }
+
+  /** True if the user moved the camera in the last couple of seconds (don't fight them). */
+  userLooking() {
+    return performance.now() - this.lastUserLook < 2000;
   }
 
   private spread() {

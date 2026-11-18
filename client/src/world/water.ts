@@ -13,7 +13,7 @@ export function buildPond(ctx: WorldContext) {
   const rng = mulberry32(777);
   const water = new THREE.Mesh(
     new THREE.CircleGeometry(POND.radius + 1.5, 64).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0x2f6f73, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.9 }),
+    new THREE.MeshStandardMaterial({ color: 0x3a7f84, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.72 }), // clear enough to see the koi
   );
   water.position.set(POND.x, WATER_Y, POND.z);
   water.receiveShadow = true;

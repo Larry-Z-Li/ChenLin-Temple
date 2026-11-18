@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { MOUNTAIN_GATE, PAVED } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
-import { stoneTexture, textTexture } from '../core/textures';
+import { stoneTexture, textTexture, verticalTextTexture } from '../core/textures';
+import { buildRedLantern } from './hall';
 import { inscription, onLocaleChange, t } from '../i18n';
 import { box, cylinder, hipRoofGeometry, mat } from './materials';
 
@@ -21,7 +22,7 @@ export function buildDecor(ctx: WorldContext) {
   });
 
   // Mountain gate (simple paifang-style arch)
-  const { x, z, width: W, height: H } = MOUNTAIN_GATE;
+  const { x, z, width: W, height: H, couplet } = MOUNTAIN_GATE;
   const g = new THREE.Group();
   const col = mat(THEME.column, { roughness: 0.55 });
   for (const s of [-1, 1]) {
@@ -48,5 +49,19 @@ export function buildDecor(ctx: WorldContext) {
   const plaque = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), plaqueMat);
   plaque.position.set(x, H - 1.95, z + 0.3);
   g.add(plaque);
+
+  // Couplet on the gate columns (上聯 on the right as you enter) and red lanterns under the beam.
+  couplet.forEach((text, i) => {
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 3.0), new THREE.MeshStandardMaterial({ map: verticalTextTexture(text, { bg: '#2a120c', border: '#c9a24a' }), roughness: 0.55 }));
+    board.position.set(x + (i === 0 ? 1 : -1) * (W / 2), 2.4, z + 0.37);
+    g.add(board);
+  });
+  const lanterns = [-2.4, 2.4].map((lx) => {
+    const l = buildRedLantern(0.35);
+    l.position.set(x + lx, H - 1.4, z);
+    g.add(l);
+    return l;
+  });
+  ctx.updaters.push((_dt, time) => lanterns.forEach((l, i) => (l.rotation.z = Math.sin(time * 1.1 + i * 2) * 0.05)));
   ctx.scene.add(g);
 }

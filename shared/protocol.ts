@@ -10,6 +10,7 @@ export const ANIMS = [
   'sitBeads', 'bow', 'kneelBow', 'sitBow',
   // Prostration keyframes: palms at crown / mouth / heart, kneel upright, forehead down (palms down), palms up
   'pCrown', 'pMouth', 'pHeart', 'pKneelUp', 'pDown', 'pUp',
+  'reach', // reaching to the offering table (incense)
 ] as const;
 export type Anim = (typeof ANIMS)[number];
 
@@ -20,6 +21,7 @@ export type Transform = [number, number, number, number, number, number];
 export const FLAG_LISTENING = 1; // playing chants → headphones
 export const FLAG_INCENSE = 2; // holding a stick of incense
 export const FLAG_INCENSE_LIT = 4; // …and it is lit
+export const FLAG_CLOUD = 8; // riding a cloud
 
 export interface PlayerInfo {
   id: string;

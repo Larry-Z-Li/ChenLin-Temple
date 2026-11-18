@@ -7,9 +7,9 @@ import type { Input } from '../core/input';
 import { damp, dampAngle } from '../core/math';
 import { Avatar } from './avatar';
 
-const WALK = 2.6, RUN = 5.2, RADIUS = 0.32;
+const WALK = 3.8, RUN = 6.0, RADIUS = 0.32;
 
-export type PlayerMode = 'free' | 'seated';
+export type PlayerMode = 'free' | 'seated' | 'riding' | 'ritual';
 
 export class LocalPlayer {
   readonly avatar: Avatar;

@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { FRUIT_REGROW_MS, INCENSE_BURN_MS, INVENTORY_MAX, type Fruit, type Offering } from '../../../shared/protocol';
+import { FRUIT_REGROW_MS, INCENSE_BURN_MS, INVENTORY_MAX, type Anim, type Fruit, type Offering } from '../../../shared/protocol';
 import { FRUIT_TYPES } from '../config/theme';
 import type { OfferingTable, WorldContext } from '../core/context';
 import { glowTexture } from '../core/textures';
 import { t, type I18nKey } from '../i18n';
 import type { NetClient } from '../net/netClient';
+import type { LocalPlayer } from '../player/localPlayer';
 import type { Hud } from '../ui/hud';
 import type { FruitSpot, Orchard } from '../world/vegetation';
 
@@ -19,6 +20,18 @@ const PILE = ([[0.11, 0, 7], [0.06, 0.1, 4], [0.03, 0.19, 2], [0, 0.27, 1], [0, 
 );
 
 interface Stick { mesh: THREE.Mesh; tip: THREE.Sprite; at: number; emit: number }
+
+/**
+ * Offering incense is one action: take a stick, light it at the candle, bow with it, plant it.
+ * `incense` is what the hand holds during that step (others see it via the transform flags).
+ */
+const RITUAL: { anim: Anim; seconds: number; incense: IncenseState }[] = [
+  { anim: 'reach', seconds: 0.9, incense: 0 }, // reach for a stick
+  { anim: 'reach', seconds: 0.9, incense: 1 }, // hold it to the candle
+  { anim: 'bow', seconds: 1.7, incense: 2 }, // bow with the lit incense
+  { anim: 'reach', seconds: 0.9, incense: 2 }, // plant it in the ash
+  { anim: 'idle', seconds: 0.35, incense: 0 },
+];
 interface TableVisual { table: OfferingTable; sticks: Map<string, Stick>; fruits: Map<string, THREE.Mesh>; order: string[] }
 
 /**
@@ -33,6 +46,7 @@ export class Offerings {
   private spots = new Map<string, FruitSpot>();
   private tables = new Map<string, TableVisual>();
   private regrowAcc = 0;
+  private ritual: { table: OfferingTable; step: number; t: number } | null = null;
   private zero = new THREE.Matrix4().makeScale(0, 0, 0);
   private m = new THREE.Matrix4();
   private stickGeo = new THREE.CylinderGeometry(0.0045, 0.0045, 0.3, 5).translate(0, 0.15, 0);
@@ -47,7 +61,7 @@ export class Offerings {
   private sLife: Float32Array;
   private sNext = 0;
 
-  constructor(private ctx: WorldContext, private net: NetClient, private hud: Hud, private orchard: Orchard) {
+  constructor(private ctx: WorldContext, private net: NetClient, private hud: Hud, private orchard: Orchard, private player: LocalPlayer) {
     for (const tree of orchard.trees) for (const s of tree.spots) this.spots.set(s.id, s);
 
     orchard.trees.forEach((tree, i) =>
@@ -114,27 +128,55 @@ export class Offerings {
     net.on('newDay', () => this.clearOfferings());
   }
 
+  get busy() {
+    return !!this.ritual;
+  }
+
   private addTable(table: OfferingTable) {
     const vis: TableVisual = { table, sticks: new Map(), fruits: new Map(), order: [] };
     this.tables.set(table.hallId, vis);
     const front = table.z + 1.0; // visitors stand on the south side
-    const add = (key: string, x: number, prompt: () => { text: string } | null, act: () => void) =>
-      this.ctx.interactions.add({ id: `${table.hallId}-${key}`, x, z: front, radius: 1.0, prompt, onInteract: act });
+    const add = (key: string, x: number, z: number, prompt: () => { text: string } | null, act: () => void) =>
+      this.ctx.interactions.add({ id: `${table.hallId}-${key}`, x, z, radius: 1.0, prompt, onInteract: act });
 
-    add('stack', table.x + 0.65, () => (this.incense === 0 ? { text: t('prompt.takeIncense') } : null), () => (this.incense = 1));
-    for (const s of [-1, 1])
-      add(`candle${s}`, table.x + s * (table.length / 2 - 0.35), () => (this.incense === 1 ? { text: t('prompt.lightIncense') } : null), () => (this.incense = 2));
-    add('bowl', table.x, () => (this.incense === 2 ? { text: t('prompt.placeIncense') } : null), () => {
-      this.incense = 0;
-      this.net.offerIncense(table.hallId);
-    });
+    const stand = table.stand ?? { x: table.x, z: front };
+    add('incense', stand.x, stand.z, () => (this.ritual ? null : { text: t('prompt.placeIncense') }), () => this.startRitual(table));
     table.slots.forEach((slot, i) =>
-      add(`plate${i}`, slot.x, () => ({ text: t('prompt.offerFruit') }), () => {
+      add(`plate${i}`, slot.x, front, () => ({ text: t('prompt.offerFruit') }), () => {
         // Required: a clear message when there's nothing to offer.
         if (!this.inventory.length) return this.hud.toast(t('offer.noFruit'));
         this.net.offerFruit(table.hallId, this.inventory[0]);
       }),
     );
+  }
+
+  private startRitual(table: OfferingTable) {
+    if (this.ritual || this.player.mode !== 'free') return;
+    const stand = table.stand ?? { x: table.x, z: table.z + 1.0 };
+    const bowl = table.bowl ?? { x: table.x, z: table.z };
+    const yaw = Math.atan2(-(bowl.x - stand.x), -(bowl.z - stand.z));
+    this.player.anchor(stand.x, this.ctx.ground.heightAt(stand.x, stand.z), stand.z, yaw, 'ritual', RITUAL[0].anim);
+    this.ctx.interactions.enabled = false;
+    this.ritual = { table, step: 0, t: 0 };
+  }
+
+  private updateRitual(dt: number) {
+    const r = this.ritual;
+    if (!r) return;
+    r.t += dt;
+    if (r.t >= RITUAL[r.step].seconds) {
+      r.t = 0;
+      if (RITUAL[r.step].incense === 2 && RITUAL[r.step + 1]?.incense === 0) this.net.offerIncense(r.table.hallId); // planted
+      if (++r.step >= RITUAL.length) {
+        this.ritual = null;
+        this.incense = 0;
+        this.player.release();
+        this.ctx.interactions.enabled = true;
+        return;
+      }
+    }
+    this.incense = RITUAL[r.step].incense;
+    this.player.setAnchorAnim(RITUAL[r.step].anim);
   }
 
   private hide(id: string, at: number) {
@@ -157,13 +199,13 @@ export class Offerings {
     const vis = this.tables.get(hall);
     if (!vis) return;
     const { table } = vis;
-    const top = table.y;
     if (o.kind === 'incense') {
       if (o.ago >= INCENSE_BURN_MS || vis.sticks.has(o.id)) return;
+      const bowl = table.bowl ?? { x: table.x, y: table.y + 0.2, z: table.z, r: 0.21 };
       const i = vis.sticks.size + vis.order.length; // spread sticks around the bowl
-      const a = i * 2.39996, r = 0.04 + 0.17 * Math.sqrt((i % 40) / 40);
+      const a = i * 2.39996, r = 0.04 + (bowl.r - 0.04) * Math.sqrt((i % 40) / 40);
       const mesh = new THREE.Mesh(this.stickGeo, this.stickMat);
-      mesh.position.set(table.x + Math.cos(a) * r, top + 0.2, table.z + Math.sin(a) * r);
+      mesh.position.set(bowl.x + Math.cos(a) * r, bowl.y, bowl.z + Math.sin(a) * r);
       mesh.rotation.set((Math.random() - 0.5) * 0.12, 0, (Math.random() - 0.5) * 0.12);
       const tip = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xff7a2a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
       tip.scale.setScalar(0.05);
@@ -194,8 +236,22 @@ export class Offerings {
     }
   }
 
+  private ambientAcc = 0;
+
   update(dt: number) {
     const now = Date.now();
+    this.updateRitual(dt);
+    // The big courtyard burner always smoulders a little.
+    this.ambientAcc += dt * 5;
+    while (this.ambientAcc >= 1) {
+      this.ambientAcc -= 1;
+      for (const vis of this.tables.values()) {
+        const b = vis.table.bowl;
+        if (!vis.table.ambientSmoke || !b) continue;
+        const a = Math.random() * Math.PI * 2, r = Math.random() * b.r * 0.8;
+        this.puff(new THREE.Vector3(b.x + Math.cos(a) * r, b.y + 0.1, b.z + Math.sin(a) * r));
+      }
+    }
     // Regrow fruit (checked about once a second).
     this.regrowAcc += dt;
     if (this.regrowAcc > 1) {
