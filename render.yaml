@@ -1,0 +1,17 @@
+# Render Blueprint: one Node web service that serves the built client and the WebSocket server.
+# Create it in Render: Dashboard → New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: vajra-temple
+    runtime: node
+    # Free instances sleep after ~15 min idle (slow first load). Switch to "starter" to keep it always on.
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: MAX_PLAYERS
+        value: "150"

@@ -1,0 +1,57 @@
+import { DEFAULT_LOCALE } from '../i18n';
+
+/** Per-device user preferences, persisted to localStorage (best-effort). */
+export interface Settings {
+  name: string;
+  color: string;
+  lang: string;
+  /** True once the visitor picks a language themselves; until then the default locale applies. */
+  langChosen: boolean;
+  musicOn: boolean;
+  musicVolume: number;
+  chantVolume: number;
+  sfxVolume: number;
+  beadRounds: number;
+}
+
+const KEY = 'temple.settings.v1';
+
+const DEFAULTS: Settings = {
+  name: '',
+  color: '#8e2b1f',
+  lang: DEFAULT_LOCALE,
+  langChosen: false,
+  musicOn: true,
+  musicVolume: 0.5,
+  chantVolume: 0.8,
+  sfxVolume: 0.6,
+  beadRounds: 0,
+};
+
+function load(): Settings {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const s: Settings = { ...DEFAULTS, ...JSON.parse(raw) };
+      if (!s.langChosen) s.lang = DEFAULTS.lang;
+      return s;
+    }
+  } catch {
+    /* storage unavailable */
+  }
+  return { ...DEFAULTS };
+}
+
+export const settings: Settings = load();
+
+let saveTimer = 0;
+export function saveSettings() {
+  clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(settings));
+    } catch {
+      /* ignore */
+    }
+  }, 300);
+}

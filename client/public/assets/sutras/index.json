@@ -1,0 +1,5 @@
+{
+  "items": [
+    { "id": "example", "group": "example", "lang": "en", "title": { "en": "Example text (replace me)", "zh-Hant": "範例文本（請替換）" }, "file": "example.en.md" }
+  ]
+}
