@@ -39,4 +39,6 @@ export interface WorldContext {
   seats: Map<string, Seat>;
   offeringTables: OfferingTable[];
   updaters: ((dt: number, time: number) => void)[];
+  /** Small decorative meshes (grass, flowers) hidden on the low graphics setting. */
+  detailMeshes: THREE.Object3D[];
 }

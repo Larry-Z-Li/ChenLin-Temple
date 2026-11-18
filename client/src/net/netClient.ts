@@ -1,22 +1,35 @@
-import { PROTOCOL_VERSION, type ClientMsg, type PlayerInfo, type ServerMsg, type Transform } from '../../../shared/protocol';
+import {
+  PROTOCOL_VERSION,
+  type ClientMsg,
+  type Fruit,
+  type Offering,
+  type PlayerInfo,
+  type ServerMsg,
+  type Transform,
+  type WelcomeMsg,
+} from '../../../shared/protocol';
 
 export type NetStatus = 'connecting' | 'online' | 'offline';
 
 export interface NetEvents {
   status: (s: NetStatus) => void;
-  /** `wheels`: speeds (rev/s) of wheels still turning when we joined. */
-  welcome: (players: (PlayerInfo & { tr: Transform })[], seats: Record<string, string>, wheels: Record<string, number>) => void;
+  welcome: (msg: WelcomeMsg) => void;
   join: (p: PlayerInfo & { tr: Transform }) => void;
   leave: (id: string) => void;
   snap: (tr: Record<string, Transform>) => void;
   seat: (seat: string, by: string | null) => void;
   seatDenied: (seat: string) => void;
   push: (wheel: string, by: string, speed: number) => void;
+  picked: (fruit: string, by: string) => void;
+  pickDenied: (fruit: string, reason: 'gone' | 'full') => void;
+  offered: (hall: string, offering: Offering, by: string) => void;
+  offerDenied: (reason: 'noFruit' | 'full') => void;
+  newDay: () => void;
 }
 
 /**
  * WebSocket client. When the server is unreachable it falls back to offline mode and
- * echoes seat/wheel requests locally, so the temple is always usable.
+ * answers requests locally, so the temple is always usable.
  */
 export class NetClient {
   id = 'local';
@@ -25,6 +38,7 @@ export class NetClient {
   private handlers = new Map<keyof NetEvents, Function[]>();
   private retry = 1000;
   private hello: ClientMsg | null = null;
+  private localSeq = 0;
 
   on<K extends keyof NetEvents>(ev: K, fn: NetEvents[K]) {
     if (!this.handlers.has(ev)) this.handlers.set(ev, []);
@@ -87,14 +101,18 @@ export class NetClient {
       case 'welcome':
         this.id = msg.id;
         this.setStatus('online');
-        this.emit('welcome', msg.players, msg.seats, msg.wheels);
-        break;
+        return this.emit('welcome', msg);
       case 'join': return this.emit('join', msg.player);
       case 'leave': return this.emit('leave', msg.id);
       case 'snap': return this.emit('snap', msg.tr);
       case 'seat': return this.emit('seat', msg.seat, msg.by);
       case 'seatDenied': return this.emit('seatDenied', msg.seat);
       case 'push': return this.emit('push', msg.wheel, msg.by, msg.speed);
+      case 'picked': return this.emit('picked', msg.fruit, msg.by);
+      case 'pickDenied': return this.emit('pickDenied', msg.fruit, msg.reason);
+      case 'offered': return this.emit('offered', msg.hall, msg.offering, msg.by);
+      case 'offerDenied': return this.emit('offerDenied', msg.reason);
+      case 'newDay': return this.emit('newDay');
       case 'full': console.warn('[net] server full'); break;
     }
   }
@@ -121,5 +139,18 @@ export class NetClient {
   /** The push is already applied locally; offline there's nothing else to do. */
   pushWheel(wheel: string) {
     this.send({ t: 'push', wheel });
+  }
+
+  /** Callers check inventory space first; offline the pick is granted locally. */
+  pickFruit(fruit: string) {
+    if (!this.send({ t: 'pick', fruit })) this.emit('picked', fruit, this.id);
+  }
+
+  offerIncense(hall: string) {
+    if (!this.send({ t: 'offer', hall, kind: 'incense' })) this.emit('offered', hall, { id: `l${++this.localSeq}`, kind: 'incense', ago: 0 }, this.id);
+  }
+
+  offerFruit(hall: string, fruit: Fruit) {
+    if (!this.send({ t: 'offer', hall, kind: 'fruit', fruit })) this.emit('offered', hall, { id: `l${++this.localSeq}`, kind: 'fruit', fruit, ago: 0 }, this.id);
   }
 }

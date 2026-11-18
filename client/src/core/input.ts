@@ -5,6 +5,8 @@ type Handler = (e: KeyboardEvent) => boolean | void;
 export class Input {
   private down = new Set<string>();
   private handlers: Handler[] = [];
+  /** Analog movement from the touch joystick: x = right, y = back (−1..1). */
+  readonly stick = { x: 0, y: 0 };
 
   constructor() {
     window.addEventListener('keydown', (e) => {

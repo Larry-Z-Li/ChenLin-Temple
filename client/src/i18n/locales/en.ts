@@ -1,6 +1,6 @@
 /** English strings. Other locales mirror these keys (missing keys fall back to English). */
 const en = {
-  'app.title': 'Vajra Temple',
+  'app.title': 'Nine Palace Temple',
   'app.subtitle': 'A quiet place to practice together',
 
   'entry.name': 'Your name',
@@ -23,11 +23,11 @@ const en = {
   'help.move': 'WASD / arrow keys: walk',
   'help.run': 'Shift: walk faster',
   'help.look': 'Drag mouse: look around · Scroll: zoom',
-  'help.interact': 'E: kneel on a cushion or sit on a bench · tap repeatedly beside a prayer wheel to spin it faster',
+  'help.interact': 'E: kneel on a cushion or sit on a bench · pick fruit · offer incense and fruit at the altar table · tap repeatedly beside a prayer wheel to spin it faster',
   'help.chants': 'C: chants (listen anywhere, even while walking)',
   'help.map': 'M: map',
   'help.leave': 'Esc: stand up / close',
-  'help.seated': 'On a cushion: 1 silence · 2 prayer beads · 3 sutras. On a bench: 3 sutras',
+  'help.seated': 'On a cushion: 1 silence · 2 prayer beads · 3 sutras · 5 prostrations. On a bench: 2 prayer beads · 3 sutras',
   'help.beads': 'Prayer beads: ← / → move one bead',
 
   'prompt.sit': 'Kneel on cushion',
@@ -63,6 +63,35 @@ const en = {
   'chant.prev': 'Previous',
   'chant.loop': 'Repeat',
   'chant.volume': 'Volume',
+
+  'hud.settings': 'Settings',
+  'settings.graphics': 'Graphics',
+  'settings.high': 'High',
+  'settings.low': 'Low',
+  'settings.ambientVolume': 'Ambient volume',
+  'settings.effectsVolume': 'Effects volume',
+
+  'help.bow': 'B: bow with palms together',
+  'help.touch': 'Touch: joystick to walk · drag to look · pinch to zoom · tap the prompt to interact',
+
+  'seat.prostrate': 'Prostrations',
+  'prostrate.progress': 'Prostration {n} of {total}',
+  'bow.button': 'Bow',
+  'beads.prev': 'Previous bead',
+  'beads.next': 'Next bead',
+
+  'prompt.pick': 'Pick {fruit}',
+  'prompt.noRipe': 'No ripe fruit right now',
+  'prompt.handsFull': 'Your hands are full',
+  'prompt.takeIncense': 'Take a stick of incense',
+  'prompt.lightIncense': 'Light the incense at the candle',
+  'prompt.placeIncense': 'Offer the incense',
+  'prompt.offerFruit': 'Offer fruit',
+  'pick.got': 'Picked {fruit}',
+  'offer.noFruit': 'You have no fruit to offer. Pick some in the orchard first.',
+  'offer.full': 'The offering table is full for today.',
+  'offer.fruitDone': 'Offered {fruit}',
+  'offer.incenseDone': 'Incense offered',
 
   'common.close': 'Close',
 

@@ -19,6 +19,9 @@ export class LocalPlayer {
   speed = 0;
   private vel = new THREE.Vector2();
   private anchorAnim: Anim = 'kneel';
+  /** A short gesture (e.g. a bow) that plays while standing still. */
+  private gestureAnim: Anim | null = null;
+  private gestureLeft = 0;
 
   constructor(color: string, name: string) {
     this.avatar = new Avatar(color); // own name tag hidden
@@ -47,6 +50,12 @@ export class LocalPlayer {
     this.mode = 'free';
   }
 
+  /** Play a gesture for `seconds`; walking cancels it. */
+  gesture(anim: Anim, seconds: number) {
+    this.gestureAnim = anim;
+    this.gestureLeft = seconds;
+  }
+
   update(dt: number, input: Input, camYaw: number, collisions: CollisionWorld, ground: Ground) {
     if (this.mode !== 'free') {
       this.avatar.anim = this.anchorAnim;
@@ -58,13 +67,21 @@ export class LocalPlayer {
     if (input.isDown('KeyS', 'ArrowDown')) mz += 1;
     if (input.isDown('KeyA', 'ArrowLeft')) mx -= 1;
     if (input.isDown('KeyD', 'ArrowRight')) mx += 1;
+    // Keyboard is full speed; the touch joystick is analog (pushed to the edge = faster walk).
+    let mag = mx || mz ? 1 : 0;
+    if (!mag && (input.stick.x || input.stick.y)) {
+      mx = input.stick.x;
+      mz = input.stick.y;
+      mag = Math.min(1, Math.hypot(mx, mz));
+    }
 
-    const running = input.isDown('ShiftLeft', 'ShiftRight');
+    const running = input.isDown('ShiftLeft', 'ShiftRight') || (mag > 0.95 && !(mx % 1 === 0 && mz % 1 === 0));
     const target = new THREE.Vector2();
-    if (mx || mz) {
+    if (mag > 0.05) {
       // Camera-relative: forward = (-sin θ, -cos θ), right = (cos θ, -sin θ)
       const s = Math.sin(camYaw), c = Math.cos(camYaw);
-      target.set(-s * -mz + c * mx, -c * -mz - s * mx).normalize().multiplyScalar(running ? RUN : WALK);
+      target.set(-s * -mz + c * mx, -c * -mz - s * mx).normalize().multiplyScalar((running ? RUN : WALK) * Math.min(1, mag));
+      this.gestureAnim = null;
     }
     this.vel.x = damp(this.vel.x, target.x, 10, dt);
     this.vel.y = damp(this.vel.y, target.y, 10, dt);
@@ -83,7 +100,9 @@ export class LocalPlayer {
     this.pos.y = damp(this.pos.y, ground.heightAt(p.x, p.z), 14, dt);
 
     if (this.speed > 0.3) this.yaw = dampAngle(this.yaw, Math.atan2(-this.vel.x, -this.vel.y), 10, dt);
-    this.avatar.anim = this.speed > 0.3 ? (this.speed > (WALK + RUN) / 2 ? 'run' : 'walk') : 'idle';
+    this.gestureLeft -= dt;
+    if (this.gestureAnim && this.gestureLeft <= 0) this.gestureAnim = null;
+    this.avatar.anim = this.speed > 0.3 ? (this.speed > (WALK + RUN) / 2 ? 'run' : 'walk') : (this.gestureAnim ?? 'idle');
     this.sync(dt);
   }
 

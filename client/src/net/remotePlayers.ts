@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ANIMS, FLAG_LISTENING, type PlayerInfo, type Transform } from '../../../shared/protocol';
+import { ANIMS, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, type PlayerInfo, type Transform } from '../../../shared/protocol';
 import { damp, dampAngle } from '../core/math';
 import { Avatar } from '../player/avatar';
 
@@ -62,7 +62,9 @@ export class RemotePlayers {
       r.yaw = dampAngle(r.yaw, yaw, 10, dt);
       r.avatar.root.rotation.y = r.yaw;
       r.avatar.anim = ANIMS[a] ?? 'idle';
-      r.avatar.setListening((r.target[5] & FLAG_LISTENING) !== 0);
+      const flags = r.target[5];
+      r.avatar.setListening((flags & FLAG_LISTENING) !== 0);
+      r.avatar.setIncense(flags & FLAG_INCENSE ? (flags & FLAG_INCENSE_LIT ? 2 : 1) : 0);
       r.avatar.setTagVisible(camera.position.distanceTo(p) < 28);
       r.avatar.update(dt, r.speed);
     }

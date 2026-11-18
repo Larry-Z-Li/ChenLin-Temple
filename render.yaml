@@ -2,7 +2,7 @@
 # Create it in Render: Dashboard → New → Blueprint → pick this repo.
 services:
   - type: web
-    name: vajra-temple
+    name: nine-palace-temple
     runtime: node
     # Free instances sleep after ~15 min idle (slow first load). Switch to "starter" to keep it always on.
     plan: free
@@ -15,3 +15,6 @@ services:
         value: "22"
       - key: MAX_PLAYERS
         value: "150"
+      # Offerings (incense, fruit) clear at midnight in this time zone.
+      - key: TEMPLE_TZ
+        value: Asia/Taipei

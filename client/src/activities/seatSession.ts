@@ -10,10 +10,29 @@ import { BEAD_COUNT, type Mala } from './beads';
 import type { SutraReader } from './sutraReader';
 
 /** What each kind of seat offers, and the pose for each activity. (Chants are global, not seat-bound.) */
-const SEAT_KINDS: Record<Seat['kind'], { focuses: Focus[]; anim: Record<Focus, Anim>; camPitch: number; camDist: number }> = {
-  cushion: { focuses: ['silence', 'beads', 'sutra'], anim: { none: 'kneel', silence: 'kneel', beads: 'beads', sutra: 'read' }, camPitch: 0.18, camDist: 3.4 },
-  bench: { focuses: ['sutra'], anim: { none: 'sit', silence: 'sit', beads: 'sit', sutra: 'sitRead' }, camPitch: 0.25, camDist: 4 },
+const SEAT_KINDS: Record<Seat['kind'], { focuses: Focus[]; anim: Record<Focus, Anim>; bow: Anim; camPitch: number; camDist: number }> = {
+  cushion: {
+    focuses: ['silence', 'beads', 'sutra', 'prostrate'],
+    anim: { none: 'kneel', silence: 'kneel', beads: 'beads', sutra: 'read', prostrate: 'kneel' },
+    bow: 'kneelBow', camPitch: 0.18, camDist: 3.4,
+  },
+  bench: {
+    focuses: ['beads', 'sutra'],
+    anim: { none: 'sit', silence: 'sit', beads: 'sitBeads', sutra: 'sitRead', prostrate: 'sit' },
+    bow: 'sitBow', camPitch: 0.25, camDist: 4,
+  },
 };
+
+/**
+ * One full prostration: stand, palms together at the crown, mouth and heart, kneel upright,
+ * forehead to the floor with palms down beside the head, turn the palms up, rise.
+ * Done three times; after the third the practitioner stays kneeling.
+ */
+const PROSTRATION: [Anim, number][] = [
+  ['idle', 1.0], ['pCrown', 1.0], ['pMouth', 0.8], ['pHeart', 0.9],
+  ['pKneelUp', 1.1], ['pDown', 1.8], ['pUp', 1.3], ['pKneelUp', 1.0],
+];
+const PROSTRATION_REPS = 3;
 
 const fmt = (sec: number) => {
   const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
@@ -39,6 +58,8 @@ export class SeatSession {
   focus: Focus = 'none';
   private pending: string | null = null;
   private silenceStart = 0;
+  private prost: { rep: number; step: number; t: number } | null = null;
+  private bowLeft = 0;
 
   constructor(private d: Deps) {
     for (const s of d.ctx.seats.values()) {
@@ -55,8 +76,8 @@ export class SeatSession {
         d.hud.toast(t('seat.denied'));
       }
     });
-    d.net.on('welcome', (_p, seats) => {
-      for (const s of d.ctx.seats.values()) s.occupiedBy = seats[s.id] ?? null;
+    d.net.on('welcome', (msg) => {
+      for (const s of d.ctx.seats.values()) s.occupiedBy = msg.seats[s.id] ?? null;
       // Reconnected while seated: re-claim the seat.
       if (this.seat) d.net.requestSeat(this.seat.id, null);
     });
@@ -127,13 +148,16 @@ export class SeatSession {
     this.focus = f;
     mala.show(f === 'beads');
     void sutra.show(f === 'sutra');
+    hud.showBeadButtons(f === 'beads');
+    this.prost = f === 'prostrate' ? { rep: 0, step: 0, t: 0 } : null;
+    this.bowLeft = 0;
     hud.setQuiet(f === 'silence');
     if (f === 'silence' && prev !== 'silence') {
       this.silenceStart = performance.now();
       bell(174, 7);
     }
     if (f === 'beads') this.renderBeads(mala.count, mala.round);
-    if (f !== 'beads' && f !== 'silence') hud.setInfo(null);
+    if (f !== 'beads' && f !== 'silence' && f !== 'prostrate') hud.setInfo(null);
     player.setAnchorAnim(kind.anim[f]);
     hud.setSeatState(f);
   }
@@ -142,6 +166,13 @@ export class SeatSession {
     if (!this.seat) return;
     if (a === 'stand') return this.stand();
     this.setFocus(a);
+  }
+
+  /** Seated bow (合掌). Not during prostrations, which already include bowing. */
+  bow() {
+    if (!this.seat || this.focus === 'prostrate') return;
+    this.bowLeft = 2.4;
+    this.d.player.setAnchorAnim(SEAT_KINDS[this.seat.kind].bow);
   }
 
   private renderBeads(n: number, round: number) {
@@ -157,6 +188,8 @@ export class SeatSession {
       case 'Digit1': this.action('silence'); return true;
       case 'Digit2': this.action('beads'); return true;
       case 'Digit3': this.action('sutra'); return true;
+      case 'Digit5': this.action('prostrate'); return true;
+      case 'KeyB': if (!e.repeat) this.bow(); return true;
       case 'Escape':
       case 'KeyE':
         if (e.repeat) return true;
@@ -171,7 +204,21 @@ export class SeatSession {
     return false;
   }
 
-  update() {
+  update(dt: number) {
     if (this.focus === 'silence') this.d.hud.setInfo(t('silence.elapsed', { time: fmt((performance.now() - this.silenceStart) / 1000) }));
+    if (this.bowLeft > 0 && (this.bowLeft -= dt) <= 0 && this.seat) this.d.player.setAnchorAnim(SEAT_KINDS[this.seat.kind].anim[this.focus]);
+    const p = this.prost;
+    if (p) {
+      p.t += dt;
+      if (p.t >= PROSTRATION[p.step][1]) {
+        p.t = 0;
+        if (++p.step >= PROSTRATION.length) {
+          p.step = 0;
+          if (++p.rep >= PROSTRATION_REPS) return this.setFocus('none'); // remain kneeling
+        }
+      }
+      this.d.player.setAnchorAnim(PROSTRATION[p.step][0]);
+      this.d.hud.setInfo(t('prostrate.progress', { n: p.rep + 1, total: PROSTRATION_REPS }));
+    }
   }
 }

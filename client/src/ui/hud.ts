@@ -1,17 +1,23 @@
-import { saveSettings, settings } from '../config/settings';
+import type { Fruit } from '../../../shared/protocol';
+import { graphicsLevel, saveSettings, settings } from '../config/settings';
+import { FRUIT_TYPES } from '../config/theme';
 import { LOCALES, getLocale, setLocale, t, type I18nKey } from '../i18n';
 import type { NetStatus } from '../net/netClient';
 import { h } from './dom';
 
-export type Focus = 'none' | 'silence' | 'beads' | 'sutra';
-
-export type SeatAction = 'silence' | 'beads' | 'sutra' | 'stand';
+export type Focus = 'none' | 'silence' | 'beads' | 'sutra' | 'prostrate';
+export type SeatAction = 'silence' | 'beads' | 'sutra' | 'prostrate' | 'stand';
 
 export interface HudCallbacks {
   onMusic(on: boolean): void;
   onSeatAction(action: SeatAction): void;
   onChants(): void;
   onMap(): void;
+  /** Tapping the interaction prompt = pressing E (touch-friendly; tap repeatedly for wheels). */
+  onPrompt(): void;
+  onBow(): void;
+  onBeadStep(dir: 1 | -1): void;
+  onGraphics(): void;
 }
 
 export class Hud {
@@ -24,11 +30,25 @@ export class Hud {
   private seatBtns: Record<string, HTMLButtonElement> = {};
   private musicBtn: HTMLButtonElement;
   private help: HTMLElement;
+  private settingsPanel: HTMLElement;
+  private gfxBtns: Record<'high' | 'low', HTMLButtonElement>;
+  private inventory: HTMLElement;
+  private beadBtns: HTMLElement;
   private lastStatus: { s: NetStatus; n: number } = { s: 'connecting', n: 0 };
 
   constructor(parent: HTMLElement, private cb: HudCallbacks) {
     this.status = h('div', { class: 'status' });
     this.musicBtn = h('button', { class: 'icon-btn', i18nTitle: 'hud.music', onclick: () => this.toggleMusic() });
+
+    const close = (fn: () => void) => h('button', { class: 'icon-btn', i18nTitle: 'common.close', onclick: fn }, '✕');
+    this.help = h(
+      'div',
+      { class: 'panel help hidden' },
+      h('div', { class: 'panel-head' }, h('div', { class: 'panel-title', i18n: 'help.title' }), close(() => this.toggleHelp(false))),
+      h('ul', { class: 'help-list' }, ...(['help.move', 'help.run', 'help.look', 'help.interact', 'help.chants', 'help.bow', 'help.map', 'help.leave', 'help.seated', 'help.beads', 'help.touch'] as I18nKey[]).map((k) => h('li', { i18n: k }))),
+    );
+
+    // Settings: graphics, volumes, language.
     const lang = h('select', { class: 'lang-select', i18nTitle: 'hud.language' }, ...Object.entries(LOCALES).map(([code, l]) => h('option', { value: code, selected: code === getLocale() }, l.label)));
     lang.addEventListener('change', () => {
       settings.lang = lang.value;
@@ -36,24 +56,54 @@ export class Hud {
       saveSettings();
       void setLocale(lang.value);
     });
-    if (Object.keys(LOCALES).length < 2) lang.disabled = true;
-
-    this.help = h(
+    const slider = (key: 'musicVolume' | 'sfxVolume') => {
+      const el = h('input', { type: 'range', min: '0', max: '1', step: '0.01', value: String(settings[key]) }) as HTMLInputElement;
+      el.addEventListener('input', () => {
+        settings[key] = Number(el.value);
+        saveSettings();
+      });
+      return el;
+    };
+    const gfx = (level: 'high' | 'low', key: I18nKey) =>
+      h('button', { class: 'seg-btn', i18n: key, onclick: () => {
+        settings.graphics = level;
+        saveSettings();
+        this.renderGraphics();
+        cb.onGraphics();
+      } });
+    this.gfxBtns = { high: gfx('high', 'settings.high'), low: gfx('low', 'settings.low') };
+    const row = (label: I18nKey, ...ctl: HTMLElement[]) => h('label', { class: 'setting-row' }, h('span', { i18n: label }), ...ctl);
+    this.settingsPanel = h(
       'div',
-      { class: 'panel help hidden' },
-      h('div', { class: 'panel-head' }, h('div', { class: 'panel-title', i18n: 'help.title' }), h('button', { class: 'icon-btn', i18nTitle: 'common.close', onclick: () => this.toggleHelp(false) }, '✕')),
-      h('ul', { class: 'help-list' }, ...(['help.move', 'help.run', 'help.look', 'help.interact', 'help.chants', 'help.map', 'help.leave', 'help.seated', 'help.beads'] as I18nKey[]).map((k) => h('li', { i18n: k }))),
+      { class: 'panel settings hidden' },
+      h('div', { class: 'panel-head' }, h('div', { class: 'panel-title', i18n: 'hud.settings' }), close(() => this.toggleSettings(false))),
+      h(
+        'div',
+        { class: 'settings-body' },
+        row('settings.graphics', h('div', { class: 'seg' }, this.gfxBtns.high, this.gfxBtns.low)),
+        row('settings.ambientVolume', slider('musicVolume')),
+        row('settings.effectsVolume', slider('sfxVolume')),
+        row('hud.language', lang),
+      ),
     );
 
     const top = h(
       'header',
       { class: 'topbar' },
       h('div', { class: 'brand' }, h('div', { class: 'title', i18n: 'app.title' }), this.status),
-      h('div', { class: 'row' }, h('button', { class: 'icon-btn', i18n: 'hud.chants', onclick: () => cb.onChants() }), this.musicBtn, h('button', { class: 'icon-btn', i18nTitle: 'hud.map', onclick: () => cb.onMap() }, '◫'), h('button', { class: 'icon-btn', i18nTitle: 'hud.help', onclick: () => this.toggleHelp() }, '?'), lang),
+      h(
+        'div',
+        { class: 'row' },
+        h('button', { class: 'icon-btn', i18n: 'hud.chants', onclick: () => cb.onChants() }),
+        this.musicBtn,
+        h('button', { class: 'icon-btn', i18nTitle: 'hud.map', onclick: () => cb.onMap() }, '◫'),
+        h('button', { class: 'icon-btn', i18nTitle: 'hud.settings', onclick: () => this.toggleSettings() }, '⚙'),
+        h('button', { class: 'icon-btn', i18nTitle: 'hud.help', onclick: () => this.toggleHelp() }, '?'),
+      ),
     );
 
     this.info = h('div', { class: 'info hidden' });
-    this.prompt = h('div', { class: 'prompt hidden' });
+    this.prompt = h('button', { class: 'prompt hidden', onclick: () => cb.onPrompt() });
     this.toasts = h('div', { class: 'toasts' });
 
     const mk = (action: SeatAction, key: string, label: I18nKey) => {
@@ -67,12 +117,22 @@ export class Hud {
       mk('silence', '1', 'seat.silence'),
       mk('beads', '2', 'seat.beads'),
       mk('sutra', '3', 'seat.sutras'),
+      mk('prostrate', '5', 'seat.prostrate'),
       mk('stand', 'Esc', 'seat.stand'),
     );
+    this.beadBtns = h(
+      'div',
+      { class: 'bead-btns hidden' },
+      h('button', { class: 'icon-btn big', i18nTitle: 'beads.prev', onclick: () => cb.onBeadStep(-1) }, '◀'),
+      h('button', { class: 'icon-btn big', i18nTitle: 'beads.next', onclick: () => cb.onBeadStep(1) }, '▶'),
+    );
+    this.inventory = h('div', { class: 'inventory hidden' });
+    const bow = h('button', { class: 'icon-btn bow-btn', i18n: 'bow.button', onclick: () => cb.onBow() });
 
-    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.toasts, this.help);
+    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, bow, this.toasts, this.help, this.settingsPanel);
     parent.append(this.root);
     this.renderMusic();
+    this.renderGraphics();
     this.setStatus('connecting', 0);
   }
 
@@ -87,12 +147,28 @@ export class Hud {
     this.musicBtn.title = available ? t('hud.music') : t('hud.noAmbient');
   }
 
+  private renderGraphics() {
+    const level = graphicsLevel();
+    this.gfxBtns.high.classList.toggle('active', level === 'high');
+    this.gfxBtns.low.classList.toggle('active', level === 'low');
+  }
+
   toggleHelp(v?: boolean) {
     this.help.classList.toggle('hidden', v === undefined ? undefined : !v);
+    if (this.helpOpen) this.toggleSettings(false);
+  }
+
+  toggleSettings(v?: boolean) {
+    this.settingsPanel.classList.toggle('hidden', v === undefined ? undefined : !v);
+    if (!this.settingsPanel.classList.contains('hidden')) this.help.classList.add('hidden');
   }
 
   get helpOpen() {
     return !this.help.classList.contains('hidden');
+  }
+
+  get settingsOpen() {
+    return !this.settingsPanel.classList.contains('hidden');
   }
 
   setStatus(s: NetStatus, n: number) {
@@ -110,6 +186,8 @@ export class Hud {
     if (!text) return this.prompt.classList.add('hidden');
     this.prompt.classList.remove('hidden');
     this.prompt.classList.toggle('busy', busy);
+    if (this.prompt.dataset.text === `${busy}|${text}`) return; // avoid rebuilding every frame (keeps taps reliable)
+    this.prompt.dataset.text = `${busy}|${text}`;
     this.prompt.replaceChildren(...(busy ? [] : [h('kbd', {}, 'E')]), h('span', {}, text));
   }
 
@@ -118,15 +196,32 @@ export class Hud {
     if (text) this.info.textContent = text;
   }
 
-  /** Show the seat bar for a cushion (all activities) or bench (sutras only); null hides it. */
+  /** Seat bar: cushions offer everything; benches offer prayer beads and sutras. null hides it. */
   showSeatBar(kind: 'cushion' | 'bench' | null) {
     this.seatBar.classList.toggle('hidden', !kind);
     this.seatBtns.silence.classList.toggle('hidden', kind === 'bench');
-    this.seatBtns.beads.classList.toggle('hidden', kind === 'bench');
+    this.seatBtns.prostrate.classList.toggle('hidden', kind === 'bench');
+    if (!kind) this.showBeadButtons(false);
+  }
+
+  showBeadButtons(v: boolean) {
+    this.beadBtns.classList.toggle('hidden', !v);
   }
 
   setSeatState(focus: Focus) {
     for (const [k, b] of Object.entries(this.seatBtns)) b.classList.toggle('active', k === focus);
+  }
+
+  /** Fruit being carried, grouped by kind. */
+  setInventory(fruits: Fruit[]) {
+    this.inventory.classList.toggle('hidden', !fruits.length);
+    const counts = new Map<Fruit, number>();
+    for (const f of fruits) counts.set(f, (counts.get(f) ?? 0) + 1);
+    this.inventory.replaceChildren(
+      ...[...counts].map(([f, n]) =>
+        h('span', { class: 'fruit-chip', title: t(FRUIT_TYPES[f].nameKey as I18nKey) }, h('span', { class: 'fruit-dot', style: `background:#${FRUIT_TYPES[f].color.toString(16).padStart(6, '0')}` }), `${t(FRUIT_TYPES[f].nameKey as I18nKey)} ×${n}`),
+      ),
+    );
   }
 
   /** Dim chrome while sitting in silence. */

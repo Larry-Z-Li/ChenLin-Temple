@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { POND, WATERFALL } from '../config/layout';
+import { POND, STREAM, WATERFALL } from '../config/layout';
 import type { WorldContext } from '../core/context';
-import { mulberry32, range } from '../core/math';
+import { mulberry32, range, smoothstep } from '../core/math';
 import { glowTexture, waterfallTexture } from '../core/textures';
+import { STREAM_LENGTH } from './stream';
 import { terrainHeight } from './terrain';
 
 const WATER_Y = -0.45;
@@ -19,22 +20,25 @@ export function buildPond(ctx: WorldContext) {
   ctx.scene.add(water);
   ctx.collisions.addCircle(POND.x, POND.z, POND.radius - 0.8);
 
-  // Shore stones
+  // Shore stones (with a gap where the stream flows in from the west)
   const stoneGeo = new THREE.DodecahedronGeometry(0.6, 0);
   const n = 70;
   const stones = new THREE.InstancedMesh(stoneGeo, new THREE.MeshStandardMaterial({ color: 0x8d8a80, roughness: 1, flatShading: true }), n);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  let used = 0;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + range(rng, -0.03, 0.03), r = POND.radius + range(rng, -0.6, 0.4);
+    if (Math.abs(a - Math.PI) < 0.16) continue; // stream mouth
     const x = POND.x + Math.cos(a) * r, z = POND.z + Math.sin(a) * r, s = range(rng, 0.5, 1.2);
-    stones.setMatrixAt(i, m.compose(new THREE.Vector3(x, terrainHeight(x, z) - 0.1, z), q.setFromEuler(e.set(rng(), rng() * 6, rng())), new THREE.Vector3(s * 1.3, s * 0.6, s)));
+    stones.setMatrixAt(used++, m.compose(new THREE.Vector3(x, terrainHeight(x, z) - 0.1, z), q.setFromEuler(e.set(rng(), rng() * 6, rng())), new THREE.Vector3(s * 1.3, s * 0.6, s)));
   }
+  stones.count = used;
   stones.castShadow = stones.receiveShadow = true;
   ctx.scene.add(stones);
 
   // Lotus pads (a disc with a notch)
   const padGeo = new THREE.CircleGeometry(0.55, 14, 0.3, Math.PI * 2 - 0.45).rotateX(-Math.PI / 2);
-  const padCount = 90;
+  const padCount = 70;
   const pads = new THREE.InstancedMesh(padGeo, new THREE.MeshStandardMaterial({ color: 0x3f7f3a, roughness: 0.6, side: THREE.DoubleSide }), padCount);
   const up = new THREE.Vector3(0, 1, 0);
   const padPos: THREE.Vector3[] = [];
@@ -59,7 +63,7 @@ export function buildPond(ctx: WorldContext) {
   }
   const flowerGeo = mergeGeometries(petals);
   const podGeo = new THREE.CylinderGeometry(0.05, 0.035, 0.05, 8).translate(0, 0.08, 0);
-  const flowerCount = 34;
+  const flowerCount = 30;
   const flowers = new THREE.InstancedMesh(flowerGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }), flowerCount);
   const pods = new THREE.InstancedMesh(podGeo, new THREE.MeshStandardMaterial({ color: 0xe5c74a, roughness: 0.6 }), flowerCount);
   const pink = new THREE.Color(0xf29bb8), whiteC = new THREE.Color(0xfdf3f3);
@@ -74,11 +78,17 @@ export function buildPond(ctx: WorldContext) {
   ctx.scene.add(flowers, pods);
 }
 
+/** Waterfall on the western mountains, facing east toward the temple, feeding the stream. */
 export function buildWaterfall(ctx: WorldContext) {
   const { x, z, width, height } = WATERFALL;
-  const baseY = terrainHeight(x, z + 8) - 1;
+  const baseY = terrainHeight(STREAM[0][0], STREAM[0][1]) - 0.6;
 
-  // Rock face the water falls over.
+  // Built facing +Z, then turned to face east (+X).
+  const g = new THREE.Group();
+  g.position.set(x, baseY, z);
+  g.rotation.y = Math.PI / 2;
+  ctx.scene.add(g);
+
   const rockMat = new THREE.MeshStandardMaterial({ color: 0x6f6c66, roughness: 1, flatShading: true });
   const rng = mulberry32(31);
   for (let i = 0; i < 14; i++) {
@@ -86,36 +96,37 @@ export function buildWaterfall(ctx: WorldContext) {
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), rockMat);
     const side = i % 2 ? 1 : -1;
     rock.scale.set(s * range(rng, 0.6, 1.0), s * range(rng, 1.2, 2.2), s * 0.45);
-    // Flank the falls on both sides and sit behind the water plane, never in front of it.
-    rock.position.set(x + side * (width / 2 + s * 0.55 + range(rng, 0, 6)), baseY + range(rng, 0, height * 0.9), z - s * 0.45 - range(rng, 1, 5));
+    // Flank the falls on both sides and sit behind the water, never in front of it.
+    rock.position.set(side * (width / 2 + s * 0.55 + range(rng, 0, 6)), range(rng, 0, height * 0.9), -s * 0.45 - range(rng, 1, 5));
     rock.rotation.set(rng(), rng() * 6, rng());
-    ctx.scene.add(rock);
+    g.add(rock);
   }
   const cliff = new THREE.Mesh(new THREE.BoxGeometry(width + 10, height + 8, 8, 4, 8, 2), rockMat);
-  cliff.position.set(x, baseY + height / 2, z - 4.5);
-  ctx.scene.add(cliff);
+  cliff.position.set(0, height / 2, -4.5);
+  g.add(cliff);
 
   const tex = waterfallTexture();
   tex.repeat.set(1.5, 3);
-  const fallMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.92, color: 0xe6f2f8, depthWrite: false });
-  const fall = new THREE.Mesh(new THREE.PlaneGeometry(width, height, 1, 1), fallMat);
-  fall.position.set(x, baseY + height / 2, z);
-  ctx.scene.add(fall);
+  const fall = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height, 1, 1),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.92, color: 0xe6f2f8, depthWrite: false }),
+  );
+  fall.position.set(0, height / 2, 0);
+  g.add(fall);
 
   const pool = new THREE.Mesh(
-    new THREE.CircleGeometry(width * 1.2, 32).rotateX(-Math.PI / 2),
+    new THREE.CircleGeometry(width * 0.75, 32).rotateX(-Math.PI / 2),
     new THREE.MeshStandardMaterial({ color: 0x3a7d86, roughness: 0.1, transparent: true, opacity: 0.9 }),
   );
-  pool.position.set(x, baseY + 0.4, z + width * 0.8);
-  ctx.scene.add(pool);
+  pool.position.set(0, 0.5, width * 0.45);
+  g.add(pool);
 
-  // Mist at the base
   const mists: THREE.Sprite[] = [];
   for (let i = 0; i < 6; i++) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false }));
-    s.position.set(x + (i - 2.5) * 2.4, baseY + 2, z + 2);
+    s.position.set((i - 2.5) * 2.2, 2, 2);
     s.scale.setScalar(9);
-    ctx.scene.add(s);
+    g.add(s);
     mists.push(s);
   }
 
@@ -125,5 +136,50 @@ export function buildWaterfall(ctx: WorldContext) {
       s.material.opacity = 0.25 + 0.12 * Math.sin(time * 0.8 + i);
       s.scale.setScalar(8 + Math.sin(time * 0.6 + i * 2) * 1.5);
     });
+  });
+}
+
+/** The stream as a flowing ribbon laid on the carved channel, from the falls into the lotus pond. */
+export function buildStream(ctx: WorldContext) {
+  const curve = new THREE.CatmullRomCurve3(STREAM.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+  const N = Math.ceil(STREAM_LENGTH);
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  const p = new THREE.Vector3(), tan = new THREE.Vector3();
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    curve.getPointAt(u, p);
+    curve.getTangentAt(u, tan);
+    const s = u * STREAM_LENGTH;
+    // Narrow mountain stream that widens where it meets the pond.
+    const half = 1.5 + 0.9 * smoothstep(STREAM_LENGTH - 14, STREAM_LENGTH, s);
+    const nx = -tan.z, nz = tan.x, nl = Math.hypot(nx, nz) || 1;
+    const lx = p.x + (nx / nl) * half, lz = p.z + (nz / nl) * half;
+    const rx = p.x - (nx / nl) * half, rz = p.z - (nz / nl) * half;
+    // Sit just above the highest of centre/banks so the bed never pokes through.
+    const y = Math.max(terrainHeight(p.x, p.z), terrainHeight(lx, lz), terrainHeight(rx, rz)) + 0.12;
+    pos.push(lx, y, lz, rx, y, rz);
+    uv.push(0, s / 4, 1, s / 4);
+    if (i < N) {
+      const a = i * 2;
+      idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+
+  const tex = waterfallTexture();
+  tex.repeat.set(1, 1);
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex, color: 0x8fc6d4, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.88,
+    depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
+  const ribbon = new THREE.Mesh(geo, mat);
+  ribbon.receiveShadow = true;
+  ctx.scene.add(ribbon);
+  ctx.updaters.push((dt) => {
+    tex.offset.y -= dt * 0.55; // flows from the falls toward the pond
   });
 }

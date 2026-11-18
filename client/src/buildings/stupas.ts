@@ -1,10 +1,13 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BASIN, STUPA_RIDGE } from '../config/layout';
+import { BASIN, STUPA_RIDGE, WATERFALL } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { lerp, mulberry32, range } from '../core/math';
+import { nearestOnStream, nearStream } from '../world/stream';
 import { terrainHeight } from '../world/terrain';
+
+export interface StupaSpot { x: number; z: number; y: number; yaw: number; s: number }
 import { mat } from './materials';
 
 const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
@@ -44,7 +47,7 @@ export function buildStupas(ctx: WorldContext) {
   const rng = mulberry32(seed);
   const at = (az: number, r: number) => ({ x: BASIN.x + Math.sin(az) * r, z: BASIN.z + Math.cos(az) * r });
 
-  const spots: { x: number; z: number; y: number; yaw: number; s: number }[] = [];
+  const spots: StupaSpot[] = [];
   let az = bearingFrom, prevR: number | null = null;
   while (spots.length < count && az < bearingTo) {
     // Best knoll along this bearing: highest point once the general outward rise is discounted.
@@ -57,6 +60,11 @@ export function buildStupas(ctx: WorldContext) {
     const r: number = prevR === null ? bestR : lerp(prevR, bestR, 0.55) + range(rng, -7, 7);
     prevR = r;
     const p = at(az + range(rng, -0.01, 0.01), r);
+    // Keep clear of the waterfall and its ravine.
+    if (Math.hypot(p.x - WATERFALL.x, p.z - WATERFALL.z) < 32 || (nearStream(p.x, p.z) && nearestOnStream(p.x, p.z).d < 16)) {
+      az += 14 / r;
+      continue;
+    }
     // Sit on the lowest corner so the base never floats; the foundation hides the uphill side.
     let y = Infinity;
     for (const [dx, dz] of [[0, 0], [3, 3], [-3, 3], [3, -3], [-3, -3]]) y = Math.min(y, terrainHeight(p.x + dx, p.z + dz));
@@ -82,5 +90,5 @@ export function buildStupas(ctx: WorldContext) {
     mesh.computeBoundingSphere();
     ctx.scene.add(mesh);
   }
-  return spots.length;
+  return spots;
 }

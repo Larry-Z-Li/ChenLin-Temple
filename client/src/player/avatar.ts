@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Anim } from '../../../shared/protocol';
 import { damp } from '../core/math';
-import { textTexture } from '../core/textures';
+import { glowTexture, textTexture } from '../core/textures';
 
 /** Joint targets (radians, except hipY in metres). Limbs hang along -Y; +x rotation swings them forward. */
 export interface Pose {
@@ -12,20 +12,25 @@ export interface Pose {
   lArm: number; rArm: number;
   lArmZ: number; rArmZ: number;
   lFore: number; rFore: number;
+  /** Hand twist about the forearm: 0 = palms facing the body; ±π/2 turns them down/up. */
+  lPalm: number; rPalm: number;
   head: number;
 }
 
-const STAND: Pose = { hipY: 0.92, torso: 0, lThigh: 0, rThigh: 0, lShin: 0, rShin: 0, lArm: 0.05, rArm: 0.05, lArmZ: -0.08, rArmZ: 0.08, lFore: 0.15, rFore: 0.15, head: 0 };
+const STAND: Pose = { hipY: 0.92, torso: 0, lThigh: 0, rThigh: 0, lShin: 0, rShin: 0, lArm: 0.05, rArm: 0.05, lArmZ: -0.08, rArmZ: 0.08, lFore: 0.15, rFore: 0.15, lPalm: 0, rPalm: 0, head: 0 };
 // Seiza: knees forward on the cushion, shins folded back underneath, hands resting in the lap.
 const KNEEL: Pose = { ...STAND, hipY: 0.42, torso: 0.04, lThigh: 1.2, rThigh: 1.2, lShin: -2.7, rShin: -2.7, lArm: 0.35, rArm: 0.35, lArmZ: -0.1, rArmZ: 0.1, lFore: 1.25, rFore: 1.25, head: 0.08 };
 
 // Sitting on a bench: thighs level, shins hanging, hands resting on the knees.
 const SIT: Pose = { ...STAND, hipY: 0.53, torso: 0.02, lThigh: 1.57, rThigh: 1.57, lShin: -1.57, rShin: -1.57, lArm: 0.3, rArm: 0.3, lArmZ: -0.1, rArmZ: 0.1, lFore: 0.9, rFore: 0.9, head: 0.05 };
 
-/**
- * Named poses. Add the prostration keyframes here later (stand+hands at crown → mouth → heart →
- * kneel → forehead to floor → rise) and play them as a sequence; the blend system already handles it.
- */
+// Palms pressed together at the heart (合掌).
+const HEART = { lArm: 0.6, rArm: 0.6, lArmZ: 0.45, rArmZ: -0.45, lFore: 1.5, rFore: 1.5 };
+const H = Math.PI / 2;
+// Prostration: forehead to the floor, hips raised, hands flat on the floor beside the head.
+const P_DOWN: Pose = { ...STAND, hipY: 0.5, torso: 2.0, head: 0.35, lThigh: 0.3, rThigh: 0.3, lShin: -1.87, rShin: -1.87, lArm: 3.15, rArm: 3.15, lArmZ: -0.35, rArmZ: 0.35, lFore: 0.2, rFore: 0.2, lPalm: -H, rPalm: H };
+
+/** Named poses; the avatar blends smoothly toward whichever is current. Sequences just step through them. */
 export const POSES: Record<Anim, Pose> = {
   idle: STAND,
   walk: STAND,
@@ -35,6 +40,17 @@ export const POSES: Record<Anim, Pose> = {
   read: { ...KNEEL, lArm: 0.45, rArm: 0.45, lArmZ: -0.04, rArmZ: 0.04, lFore: 1.55, rFore: 1.55, head: 0.35 },
   sit: SIT,
   sitRead: { ...SIT, lArm: 0.45, rArm: 0.45, lArmZ: -0.04, rArmZ: 0.04, lFore: 1.55, rFore: 1.55, head: 0.35 },
+  sitBeads: { ...SIT, rArm: 0.5, rArmZ: 0.05, rFore: 1.7, head: 0.18 },
+  bow: { ...STAND, ...HEART, torso: 0.55, head: 0.25 },
+  kneelBow: { ...KNEEL, ...HEART, torso: 0.6, head: 0.25 },
+  sitBow: { ...SIT, ...HEART, torso: 0.45, head: 0.25 },
+  // Prostration keyframes: palms together at crown → mouth → heart, kneel upright, forehead down, palms up.
+  pCrown: { ...STAND, lArm: 2.75, rArm: 2.75, lArmZ: 0.45, rArmZ: -0.45, lFore: 0.6, rFore: 0.6, head: -0.05 },
+  pMouth: { ...STAND, lArm: 1.3, rArm: 1.3, lArmZ: 0.45, rArmZ: -0.45, lFore: 1.5, rFore: 1.5 },
+  pHeart: { ...STAND, ...HEART },
+  pKneelUp: { ...STAND, ...HEART, hipY: 0.5, lShin: -1.57, rShin: -1.57 },
+  pDown: P_DOWN,
+  pUp: { ...P_DOWN, lPalm: H, rPalm: -H },
 };
 
 const SKIN = 0xd8a982;
@@ -44,7 +60,8 @@ export class Avatar {
   private hips = new THREE.Group();
   private torso = new THREE.Group();
   private head = new THREE.Group();
-  private joints: Record<'lThigh' | 'rThigh' | 'lShin' | 'rShin' | 'lArm' | 'rArm' | 'lFore' | 'rFore', THREE.Group>;
+  private joints: Record<'lThigh' | 'rThigh' | 'lShin' | 'rShin' | 'lArm' | 'rArm' | 'lFore' | 'rFore' | 'lHand' | 'rHand', THREE.Group>;
+  private incense: { stick: THREE.Mesh; tip: THREE.Sprite } | null = null;
   private pose: Pose = { ...STAND };
   private phase = 0;
   private tag: THREE.Sprite | null = null;
@@ -55,7 +72,7 @@ export class Avatar {
     const robe = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.85 });
     const under = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.6), roughness: 0.9 });
     const skin = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.7 });
-    const mk = (geo: THREE.BufferGeometry, m: THREE.Material) => {
+    const mk = (geo: THREE.BufferGeometry, m: THREE.Material | THREE.Material[]) => {
       const mesh = new THREE.Mesh(geo, m);
       mesh.castShadow = true;
       return mesh;
@@ -101,11 +118,17 @@ export class Avatar {
     rArm.add(limb(0.31, 0.06, robe), rFore);
     lFore.add(limb(0.27, 0.05, robe));
     rFore.add(limb(0.27, 0.05, robe));
-    lFore.add(mk(new THREE.SphereGeometry(0.045, 8, 6).translate(0, -0.29, 0), skin));
-    rFore.add(mk(new THREE.SphereGeometry(0.045, 8, 6).translate(0, -0.29, 0), skin));
+    // Flat hands with a lighter palm, so turning the palms up/down reads clearly.
+    const palm = new THREE.MeshStandardMaterial({ color: 0xffe6d4, roughness: 0.75 });
+    const handGeo = new THREE.BoxGeometry(0.035, 0.1, 0.075).translate(0, -0.05, 0);
+    const lHand = joint(0, -0.27, 0), rHand = joint(0, -0.27, 0);
+    lHand.add(mk(handGeo, [palm, skin, skin, skin, skin, skin])); // palm faces +X (toward the body)
+    rHand.add(mk(handGeo, [skin, palm, skin, skin, skin, skin])); // palm faces −X
+    lFore.add(lHand);
+    rFore.add(rHand);
     this.torso.add(lArm, rArm);
 
-    this.joints = { lThigh, rThigh, lShin, rShin, lArm, rArm, lFore, rFore };
+    this.joints = { lThigh, rThigh, lShin, rShin, lArm, rArm, lFore, rFore, lHand, rHand };
     if (name) this.setName(name);
   }
 
@@ -143,6 +166,24 @@ export class Avatar {
     this.phones.visible = on;
   }
 
+  /** Stick of incense in the right hand: 0 = none, 1 = unlit, 2 = lit (glowing tip). */
+  setIncense(state: 0 | 1 | 2) {
+    if (!this.incense) {
+      if (!state) return;
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.36, 5), new THREE.MeshStandardMaterial({ color: 0x9c4a2a, roughness: 0.9 }));
+      stick.rotation.x = -Math.PI / 2 + 0.4; // held forward and a little up
+      stick.position.set(0, -0.06 + 0.07, -0.17);
+      const tip = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xff7a2a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      tip.scale.setScalar(0.06);
+      tip.position.set(0, 0.18, 0);
+      stick.add(tip);
+      this.joints.rHand.add(stick);
+      this.incense = { stick, tip };
+    }
+    this.incense.stick.visible = state > 0;
+    this.incense.tip.visible = state === 2;
+  }
+
   /** Hide name tags beyond a distance to reduce clutter. */
   setTagVisible(v: boolean) {
     if (this.tag) this.tag.visible = v;
@@ -177,6 +218,8 @@ export class Avatar {
     j.rArm.rotation.z = p.rArmZ;
     j.lFore.rotation.x = p.lFore;
     j.rFore.rotation.x = p.rFore;
+    j.lHand.rotation.y = p.lPalm;
+    j.rHand.rotation.y = p.rPalm;
   }
 
   dispose() {

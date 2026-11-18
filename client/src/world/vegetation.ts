@@ -5,7 +5,7 @@ import { FRUIT_TYPES, type FruitType } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32, pick, range, type Rng } from '../core/math';
 import { terrainHeight } from './terrain';
-import { basinDist, inWaterfallVista, isReserved } from './zones';
+import { basinDist, inStreamVista, isReserved } from './zones';
 
 // ---------- Instancing helper ----------
 
@@ -127,6 +127,12 @@ export interface FruitSpot {
   index: number;
 }
 
+export interface Orchard {
+  /** One InstancedMesh per fruit type. */
+  meshes: Record<FruitType, THREE.InstancedMesh>;
+  trees: { x: number; z: number; type: FruitType; spots: FruitSpot[] }[];
+}
+
 export function buildVegetation(ctx: WorldContext) {
   const rng = mulberry32(20261117);
   const sp = { pine: pine(), broad: broadleaf(), cypress: cypress(), cherry: broadleaf(), maple: broadleaf(), bamboo: bamboo(), bush: bush() };
@@ -141,7 +147,7 @@ export function buildVegetation(ctx: WorldContext) {
     const a = rng() * Math.PI * 2;
     const r = BASIN.radius - 18 + Math.pow(rng(), 1.4) * 170;
     const x = BASIN.x + Math.sin(a) * r, z = BASIN.z + Math.cos(a) * r;
-    if (isReserved(x, z, 3) || inWaterfallVista(x, z)) continue;
+    if (isReserved(x, z, 3) || inStreamVista(x, z)) continue;
     const h = terrainHeight(x, z);
     if (h > 140) continue;
     const roll = rng();
@@ -155,7 +161,7 @@ export function buildVegetation(ctx: WorldContext) {
   for (let i = 0; i < 260; i++) {
     const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * (BASIN.radius - 12);
     const x = BASIN.x + Math.sin(a) * r, z = BASIN.z + Math.cos(a) * r;
-    if (isReserved(x, z, 4) || inWaterfallVista(x, z)) continue;
+    if (isReserved(x, z, 4) || inStreamVista(x, z)) continue;
     const roll = rng();
     if (roll < 0.3) place(sp.cherry, x, z, range(rng, 0.8, 1.1), pick(rng, BLOSSOM));
     else if (roll < 0.45) place(sp.maple, x, z, range(rng, 0.8, 1.1), pick(rng, MAPLE));
@@ -177,7 +183,7 @@ export function buildVegetation(ctx: WorldContext) {
   for (const [gx, gz] of GROVES)
     for (let k = 0; k < 8; k++) {
       const x = gx + range(rng, -8, 8), z = gz + range(rng, -8, 8);
-      if (isReserved(x, z, 2.5) || inWaterfallVista(x, z)) continue;
+      if (isReserved(x, z, 2.5) || inStreamVista(x, z)) continue;
       const roll = rng();
       if (roll < 0.3) place(sp.cherry, x, z, range(rng, 0.8, 1.15), pick(rng, BLOSSOM));
       else if (roll < 0.45) place(sp.maple, x, z, range(rng, 0.8, 1.15), pick(rng, MAPLE));
@@ -194,12 +200,12 @@ export function buildVegetation(ctx: WorldContext) {
 
   Object.values(sp).forEach((s) => s.build(ctx.scene));
 
-  const fruits = buildOrchard(ctx, rng);
+  const orchard = buildOrchard(ctx, rng);
   buildFlowers(ctx, rng);
-  return { fruits };
+  return { orchard };
 }
 
-function buildOrchard(ctx: WorldContext, rng: Rng): FruitSpot[] {
+function buildOrchard(ctx: WorldContext, rng: Rng): Orchard {
   const types = Object.keys(FRUIT_TYPES) as FruitType[];
   const trees = new Species([
     { geo: trunkGeo(1.6, 0.16), mat: BARK },
@@ -207,6 +213,7 @@ function buildOrchard(ctx: WorldContext, rng: Rng): FruitSpot[] {
   ]);
   const fruitPos: Record<FruitType, THREE.Vector3[]> = Object.fromEntries(types.map((t) => [t, []])) as never;
   const spots: FruitSpot[] = [];
+  const treeList: Orchard['trees'] = [];
   let row = 0;
   for (let z = ORCHARD.minZ; z <= ORCHARD.maxZ; z += ORCHARD.spacing, row++) {
     const type = types[row % types.length]; // one fruit per row
@@ -214,10 +221,14 @@ function buildOrchard(ctx: WorldContext, rng: Rng): FruitSpot[] {
       const y = terrainHeight(x, z);
       trees.add(x, y, z, 1, rng() * 6, pick(rng, GREENS));
       ctx.collisions.addCircle(x, z, 0.3);
+      const tree: Orchard['trees'][number] = { x, z, type, spots: [] };
+      treeList.push(tree);
       for (let k = 0; k < 9; k++) {
         const a = rng() * Math.PI * 2, e = range(rng, -0.4, 0.6);
         const p = new THREE.Vector3(x + Math.cos(a) * Math.cos(e) * 1.45, y + 2.6 + Math.sin(e) * 1.2, z + Math.sin(a) * Math.cos(e) * 1.45);
-        spots.push({ id: `fruit-${type}-${spots.length}`, type, position: p, index: fruitPos[type].length });
+        const spot = { id: `fruit-${type}-${spots.length}`, type, position: p, index: fruitPos[type].length };
+        spots.push(spot);
+        tree.spots.push(spot);
         fruitPos[type].push(p);
       }
     }
@@ -226,6 +237,7 @@ function buildOrchard(ctx: WorldContext, rng: Rng): FruitSpot[] {
 
   const fruitGeo = new THREE.SphereGeometry(0.13, 8, 6);
   const m = new THREE.Matrix4();
+  const meshes = {} as Orchard['meshes'];
   for (const t of types) {
     const list = fruitPos[t];
     const mesh = new THREE.InstancedMesh(fruitGeo, new THREE.MeshStandardMaterial({ color: FRUIT_TYPES[t].color, roughness: 0.5 }), list.length);
@@ -233,8 +245,9 @@ function buildOrchard(ctx: WorldContext, rng: Rng): FruitSpot[] {
     mesh.castShadow = true;
     mesh.name = `fruit-${t}`;
     ctx.scene.add(mesh);
+    meshes[t] = mesh;
   }
-  return spots;
+  return { meshes, trees: treeList };
 }
 
 function buildFlowers(ctx: WorldContext, rng: Rng) {
@@ -284,6 +297,7 @@ function buildFlowers(ctx: WorldContext, rng: Rng) {
       mesh.setColorAt(k, colors[i][k]);
     });
     ctx.scene.add(mesh);
+    ctx.detailMeshes.push(mesh);
   });
 
   // Leafy tufts under flowers + loose grass clumps everywhere
@@ -306,4 +320,5 @@ function buildFlowers(ctx: WorldContext, rng: Rng) {
     tuftMesh.setColorAt(i, tuftColors[i]);
   });
   ctx.scene.add(tuftMesh);
+  ctx.detailMeshes.push(tuftMesh);
 }

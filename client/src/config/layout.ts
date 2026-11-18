@@ -10,10 +10,9 @@
  *               [ prayer wheels ]
  *               SOUTH HALL (Mañjuśrī)
  *                 MARĪCĪ SHRINE
- *  ORCHARD (E)    CENTER HALL     LOTUS POND (W)
+ *  ORCHARD (E)    CENTER HALL     LOTUS POND (W) ~~ stream ~~ waterfall (W mountains)
  *              (Five Tathāgatas)
  *   NE Daikokuten   N Cundī   NW Cintāmaṇicakra
- *                 ~ waterfall ~
  */
 import type { DeityId } from './deities';
 
@@ -110,8 +109,16 @@ export const ORCHARD: Rect & { spacing: number } = { minX: 41, maxX: 64, minZ: -
 
 export const BODHI_TREE = { x: -24, z: 38 };
 
-/** `ravineFrom`: z where the valley floor starts dipping into the ravine below the falls. */
-export const WATERFALL = { x: -24, z: -148, width: 11, height: 55, ravineFrom: -76 };
+/** Waterfall in the western mountains, facing east toward the temple. */
+export const WATERFALL = { x: -146, z: 18, width: 10, height: 48 };
+
+/**
+ * Stream from the foot of the falls down to the lotus pond (x, z), first point at the falls.
+ * Terrain is carved along it: a ravine through the slope, then a shallow swale across the valley.
+ */
+export const STREAM: [number, number][] = [
+  [-144, 18], [-131, 21], [-119, 16], [-107, 19], [-95, 24], [-83, 20], [-73, 21], [-66.5, 21],
+];
 
 export interface WheelRowDef {
   id: string;
@@ -159,8 +166,8 @@ export const BENCHES: BenchDef[] = [
   { x: -22, z: -25, face: N }, { x: 22, z: -25, face: N },
   // orchard edge
   { x: 37.5, z: 10, face: E }, { x: 37.5, z: 30, face: E },
-  // around the lotus pond (the path arrives from the east, angle 0)
-  ...ring(POND.x, POND.z, POND.radius + 3.5, [0.75, 1.57, 2.4, 3.14, 3.9, 4.71, 5.5]),
+  // around the lotus pond (path arrives from the east at angle 0, the stream from the west at π)
+  ...ring(POND.x, POND.z, POND.radius + 3.5, [0.75, 1.57, 2.3, 3.95, 4.71, 5.5]),
 ];
 
 /**
@@ -169,3 +176,27 @@ export const BENCHES: BenchDef[] = [
  * with irregular spacing so it reads as natural rather than planned.
  */
 export const STUPA_RIDGE = { count: 15, bearingFrom: -2.35, bearingTo: -0.75, rMin: 150, rMax: 225, seed: 108 };
+
+/** A prayer-flag anchor: (x, z) and height above the ground there; `pole` puts a wooden pole under it. */
+export interface FlagAnchor { x: number; z: number; h: number; pole?: boolean }
+
+const pole = (x: number, z: number, h = 5): FlagAnchor => ({ x, z, h, pole: true });
+const pondPoles = [0.4, 1.95, 2.75, 3.55, 4.3, 5.9].map((a) => pole(POND.x + Math.cos(a) * (POND.radius + 6.5), POND.z + Math.sin(a) * (POND.radius + 6.5), 5.5));
+
+/** Strings of prayer flags in the temple grounds (the ridge strings between stupas are added automatically). */
+export const FLAG_LINES: [FlagAnchor, FlagAnchor][] = [
+  // across the approach just inside the mountain gate
+  [pole(-9.6, 97), pole(9.6, 97)],
+  // a ring around the lotus pond, crossing the path and the stream
+  ...pondPoles.map((p, i) => [p, pondPoles[(i + 1) % pondPoles.length]] as [FlagAnchor, FlagAnchor]),
+  // radiating from the Marīcī shrine roof to the courtyard corners
+  ...[pole(-14.5, 20, 4.5), pole(14.5, 20, 4.5), pole(-14.5, 40, 4.5), pole(14.5, 40, 4.5)].map((p) => [{ x: 0, z: 30, h: 9.6 }, p] as [FlagAnchor, FlagAnchor]),
+  // from the Bodhi tree's crown
+  [{ x: BODHI_TREE.x, z: BODHI_TREE.z, h: 6.5 }, pole(BODHI_TREE.x - 7, BODHI_TREE.z + 7, 4.5)],
+  [{ x: BODHI_TREE.x, z: BODHI_TREE.z, h: 6.5 }, pole(BODHI_TREE.x - 7, BODHI_TREE.z - 7, 4.5)],
+  // across the ravine below the waterfall
+  [pole(WATERFALL.x + 16, WATERFALL.z - 14, 6), pole(WATERFALL.x + 16, WATERFALL.z + 16, 6)],
+  // along the north path between the northern halls
+  [pole(-29.5, -35, 5), pole(-14.5, -35, 5)],
+  [pole(14.5, -35, 5), pole(29.5, -35, 5)],
+];

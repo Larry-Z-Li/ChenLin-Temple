@@ -19,13 +19,14 @@ export class InteractionSystem {
     this.items.push(item);
   }
 
+  /** Nearest item in range that currently has something to offer (null prompts are skipped). */
   update(x: number, z: number) {
     this.current = null;
     if (!this.enabled) return null;
     let best = Infinity;
     for (const it of this.items) {
       const d = Math.hypot(it.x - x, it.z - z);
-      if (d < it.radius && d < best) {
+      if (d < it.radius && d < best && it.prompt()) {
         best = d;
         this.current = it;
       }

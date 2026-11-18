@@ -3,6 +3,8 @@ import { settings } from '../config/settings';
 /** Tiny synthesized sound effects (no asset files needed). Replace with samples later if desired. */
 let ac: AudioContext | null = null;
 const ctx = () => (ac ??= new AudioContext());
+/** Shared AudioContext (created lazily; resumed by unlockAudio on the entry click). */
+export const audioCtx = ctx;
 
 export function unlockAudio() {
   void ctx().resume();

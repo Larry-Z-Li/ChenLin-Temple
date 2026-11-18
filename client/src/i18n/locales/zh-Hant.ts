@@ -2,7 +2,7 @@ import type { I18nKey } from './en';
 
 /** 繁體中文 (default locale). Must cover every key in en.ts. */
 const zhHant: Record<I18nKey, string> = {
-  'app.title': '金剛寺',
+  'app.title': '九宮寺',
   'app.subtitle': '一同修行的寧靜之處',
 
   'entry.name': '您的名字',
@@ -25,11 +25,11 @@ const zhHant: Record<I18nKey, string> = {
   'help.move': 'WASD／方向鍵：行走',
   'help.run': 'Shift：快走',
   'help.look': '拖曳滑鼠：環顧 · 滾輪：縮放',
-  'help.interact': 'E：跪坐蒲團或坐上長椅 · 在轉經輪旁連續輕按可加速轉動',
+  'help.interact': 'E：跪坐蒲團或坐上長椅 · 摘果 · 在供桌上香供果 · 在轉經輪旁連續輕按可加速轉動',
   'help.chants': 'C：梵唄（隨處可聽，行走時亦可）',
   'help.map': 'M：地圖',
   'help.leave': 'Esc：起身／關閉',
-  'help.seated': '蒲團上：1 靜坐 · 2 念珠 · 3 經文。長椅上：3 經文',
+  'help.seated': '蒲團上：1 靜坐 · 2 念珠 · 3 經文 · 5 大禮拜。長椅上：2 念珠 · 3 經文',
   'help.beads': '念珠：← / → 撥動一顆',
 
   'prompt.sit': '跪坐蒲團',
@@ -65,6 +65,35 @@ const zhHant: Record<I18nKey, string> = {
   'chant.prev': '上一首',
   'chant.loop': '重複播放',
   'chant.volume': '音量',
+
+  'hud.settings': '設定',
+  'settings.graphics': '畫質',
+  'settings.high': '高',
+  'settings.low': '低',
+  'settings.ambientVolume': '環境音量',
+  'settings.effectsVolume': '音效音量',
+
+  'help.bow': 'B：合掌問訊',
+  'help.touch': '觸控：搖桿行走 · 拖曳環顧 · 雙指縮放 · 點擊提示互動',
+
+  'seat.prostrate': '大禮拜',
+  'prostrate.progress': '大禮拜 · 第 {n} / {total} 拜',
+  'bow.button': '合掌',
+  'beads.prev': '上一顆',
+  'beads.next': '下一顆',
+
+  'prompt.pick': '摘{fruit}',
+  'prompt.noRipe': '目前沒有成熟的果實',
+  'prompt.handsFull': '手上已經拿滿了',
+  'prompt.takeIncense': '取一炷香',
+  'prompt.lightIncense': '就燭點香',
+  'prompt.placeIncense': '上香',
+  'prompt.offerFruit': '供果',
+  'pick.got': '摘到{fruit}',
+  'offer.noFruit': '您沒有水果可供養，請先到果園摘取。',
+  'offer.full': '今日供桌已滿。',
+  'offer.fruitDone': '已供上{fruit}',
+  'offer.incenseDone': '已上香',
 
   'common.close': '關閉',
 

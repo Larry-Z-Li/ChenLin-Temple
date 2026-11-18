@@ -13,23 +13,39 @@ export class CameraRig {
   private ray = new THREE.Raycaster();
   private dragging = false;
   private last = { x: 0, y: 0 };
+  /** Active touches, for pinch-to-zoom. */
+  private pointers = new Map<number, { x: number; y: number }>();
+  private pinchDist = 0;
   /** When set, the camera eases toward this yaw until the user drags. */
   private yawGoal: number | null = null;
 
   constructor(private camera: THREE.PerspectiveCamera, dom: HTMLElement) {
     dom.addEventListener('pointerdown', (e) => {
-      this.dragging = true;
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      this.dragging = this.pointers.size === 1;
       this.yawGoal = null;
       this.last = { x: e.clientX, y: e.clientY };
+      if (this.pointers.size === 2) this.pinchDist = this.spread();
       dom.setPointerCapture(e.pointerId);
     });
     dom.addEventListener('pointermove', (e) => {
+      if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pointers.size === 2) {
+        const d = this.spread();
+        if (this.pinchDist > 0 && d > 0) this.targetDist = clamp(this.targetDist * (this.pinchDist / d), 1.8, 16);
+        this.pinchDist = d;
+        return;
+      }
       if (!this.dragging) return;
       this.yaw -= (e.clientX - this.last.x) * 0.005;
       this.pitch = clamp(this.pitch + (e.clientY - this.last.y) * 0.004, -0.25, 1.25);
       this.last = { x: e.clientX, y: e.clientY };
     });
-    const end = () => (this.dragging = false);
+    const end = (e: PointerEvent) => {
+      this.pointers.delete(e.pointerId);
+      this.dragging = false;
+      this.pinchDist = 0;
+    };
     dom.addEventListener('pointerup', end);
     dom.addEventListener('pointercancel', end);
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -41,6 +57,11 @@ export class CameraRig {
       },
       { passive: false },
     );
+  }
+
+  private spread() {
+    const [a, b] = [...this.pointers.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
   }
 
   /** Smoothly turn to look along `yaw` (e.g. toward the altar when kneeling). */

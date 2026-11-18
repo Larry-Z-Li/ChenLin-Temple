@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { BASIN, POND, TERRAIN_SIZE, WATERFALL } from '../config/layout';
-import { clamp, fbm, lerp, noise2, smoothstep } from '../core/math';
+import { BASIN, POND, TERRAIN_SIZE } from '../config/layout';
+import { fbm, lerp, noise2, smoothstep } from '../core/math';
+import { nearestOnStream, nearStream } from './stream';
 
 /**
  * Valley floor is flat; the ring of mountains rises beyond BASIN.radius.
@@ -22,15 +23,15 @@ export function terrainHeight(x: number, z: number) {
   h += rise * southOpen * (18 + 120 * ridge * ridge + 30 * ridge);
   h += Math.max(0, r - (BASIN.radius + 95)) * 0.32 * southOpen;
 
-  // Ravine leading up to the waterfall, so it's visible from the valley.
-  const wz = WATERFALL.z;
-  const z0 = WATERFALL.ravineFrom;
-  if (z < z0 && z > wz - 20) {
-    const t = clamp((z0 - z) / (z0 - wz), 0, 1);
-    const cx = lerp(WATERFALL.x * 0.5, WATERFALL.x, t);
-    const w = 13 + t * 5;
-    const k = Math.exp(-((x - cx) ** 2) / (2 * w * w)) * smoothstep(wz - 5, wz + 3, z);
-    h = lerp(h, Math.min(h, t * 9 + noise2(x * 0.1, z * 0.1)), k);
+  // Stream from the waterfall down to the pond: a ravine through the western slope
+  // (so the falls are visible from the valley), then a shallow swale across the valley floor.
+  if (nearStream(x, z)) {
+    const q = nearestOnStream(x, z);
+    const ravine = 1 - smoothstep(18, 46, q.s);
+    const w = 4.5 + ravine * 8;
+    const bed = 7.5 * (1 - smoothstep(0, 44, q.s)) - 0.35;
+    const k = Math.exp(-(q.d * q.d) / (2 * w * w)) * smoothstep(-6, 0, q.behind);
+    if (k > 0.001) h = lerp(h, Math.min(h, bed + noise2(x * 0.1, z * 0.1) * 0.4 * ravine), k);
   }
 
   // Lotus pond depression

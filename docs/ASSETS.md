@@ -9,6 +9,7 @@ All content lives in `client/public/assets/`. Each folder has an `index.json` ma
 | `ambient/` | `.mp3`, `.m4a`, `.ogg` | `{ "id", "title", "file" }` (shuffled, looped) |
 | `thangkas/` | `.jpg`, `.webp`, `.png` (portrait, ≤ 2048 px tall) | `{ "file", "hall"? }`: `hall` pins it to one hall id |
 | `models/` | `.glb` | `{ "manjushri": "manjushri.glb", … }` (deity id → file) |
+| `sfx/` | `.mp3`, `.m4a`, `.ogg` | `{ "waterfall", "stream", "bell": file, "birds": [files], "chimes": [files] }` (each optional; synthesized when absent) |
 
 Deity ids: `manjushri`, `cintamanicakra`, `cundi`, `daikokuten`, `marici`, `vairocana`, `akshobhya`, `ratnasambhava`, `amitabha`, `amoghasiddhi`. Hall ids: `south`, `marici`, `center`, `northwest`, `north`, `northeast`.
 

@@ -7,6 +7,8 @@ export interface Settings {
   lang: string;
   /** True once the visitor picks a language themselves; until then the default locale applies. */
   langChosen: boolean;
+  /** 'auto' = low on phones/tablets, high elsewhere. */
+  graphics: 'auto' | 'high' | 'low';
   musicOn: boolean;
   musicVolume: number;
   chantVolume: number;
@@ -21,6 +23,7 @@ const DEFAULTS: Settings = {
   color: '#8e2b1f',
   lang: DEFAULT_LOCALE,
   langChosen: false,
+  graphics: 'auto',
   musicOn: true,
   musicVolume: 0.5,
   chantVolume: 0.8,
@@ -54,4 +57,10 @@ export function saveSettings() {
       /* ignore */
     }
   }, 300);
+}
+
+export const isTouchDevice = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+
+export function graphicsLevel(): 'high' | 'low' {
+  return settings.graphics === 'auto' ? (isTouchDevice ? 'low' : 'high') : settings.graphics;
 }

@@ -38,7 +38,8 @@ kbd { display: inline-grid; place-items: center; min-width: 1.7em; height: 1.7em
 .lang-select { height: 38px; border-radius: 10px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--ink); padding: 0 8px; }
 
 .info { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); padding: 8px 16px; border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border); font: 15px var(--serif); white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
-.prompt { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 10px 16px; border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border); font-size: 15px; }
+.prompt { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 10px 16px; border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border); font-size: 15px; cursor: pointer; touch-action: manipulation; user-select: none; }
+.prompt:active { transform: translateX(-50%) scale(0.97); }
 .prompt.busy { opacity: 0.7; font-style: italic; }
 
 .seatbar { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; padding: 8px; border-radius: 16px; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(8px); max-width: calc(100vw - 32px); overflow-x: auto; }
@@ -92,7 +93,37 @@ body.reading .minimap { display: none; }
 .primary-btn:hover { filter: brightness(1.08); }
 .entry-hint { font-size: 13px; color: var(--muted); }
 
+/* ---------- Settings ---------- */
+.settings { top: 64px; right: 16px; width: min(340px, calc(100vw - 32px)); }
+.settings-body { display: grid; gap: 14px; padding: 14px 16px 18px; }
+.setting-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; font-size: 14px; }
+.setting-row input[type='range'] { width: 150px; accent-color: var(--accent); }
+.seg { display: inline-flex; border: 1px solid var(--panel-border); border-radius: 10px; overflow: hidden; }
+.seg-btn { padding: 6px 14px; background: transparent; border: 0; cursor: pointer; }
+.seg-btn.active { background: var(--accent); color: var(--accent-ink); }
+
+/* ---------- Bow, fruit, beads ---------- */
+.bow-btn { position: absolute; left: 16px; bottom: 16px; height: 44px; padding: 0 16px; font-family: var(--serif); }
+.inventory { position: absolute; left: 16px; bottom: 70px; display: flex; flex-wrap: wrap; gap: 6px; max-width: 50vw; }
+.fruit-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border); font-size: 13px; }
+.fruit-dot { width: 10px; height: 10px; border-radius: 50%; }
+.bead-btns { position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%); display: flex; gap: 72px; }
+.icon-btn.big { min-width: 56px; height: 56px; font-size: 20px; border-radius: 50%; }
+
+/* ---------- Touch ---------- */
+.joystick { position: fixed; left: 24px; bottom: 24px; width: 120px; height: 120px; border-radius: 50%; background: rgba(28, 20, 16, 0.35); border: 1px solid var(--panel-border); touch-action: none; display: grid; place-items: center; }
+.joy-knob { width: 52px; height: 52px; border-radius: 50%; background: rgba(217, 164, 65, 0.75); pointer-events: none; }
+body.touch .bow-btn { bottom: 160px; left: 24px; }
+body.touch .inventory { bottom: 212px; left: 24px; }
+body.touch .chant-panel { bottom: 160px; left: 160px; }
+body.touch .seatbar { bottom: 16px; }
+
 @media (max-width: 640px) {
   .minimap { width: 120px; height: 120px; }
   .seat-btn span { display: none; }
+  .topbar .row { flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 62vw; }
+  .icon-btn { min-width: 34px; height: 34px; padding: 0 8px; font-size: 14px; }
+  .brand .title { font-size: 16px; }
+  body.touch .chant-panel { left: 16px; bottom: 160px; }
+  .bead-btns { gap: 48px; }
 }
