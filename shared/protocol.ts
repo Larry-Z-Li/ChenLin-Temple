@@ -3,6 +3,8 @@
 export const PROTOCOL_VERSION = 4;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
+/** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
+export const DEFAULT_TEMPLE_TZ = 'Asia/Taipei';
 
 /** Animation states sent over the wire (by index, to keep packets small). Append only. */
 export const ANIMS = [
@@ -79,6 +81,8 @@ export type ServerMsg =
   | {
       t: 'welcome';
       id: string;
+      /** The temple's time zone (sky and the midnight reset follow it). */
+      tz: string;
       players: (PlayerInfo & { tr: Transform })[];
       seats: Record<string, string>;
       /** wheelId -> current speed (rev/s), only wheels still turning */

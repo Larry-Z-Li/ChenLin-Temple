@@ -3,6 +3,7 @@ import { graphicsLevel, saveSettings, settings } from '../config/settings';
 import { FRUIT_TYPES } from '../config/theme';
 import { LOCALES, getLocale, setLocale, t, type I18nKey } from '../i18n';
 import type { NetStatus } from '../net/netClient';
+import { refreshSky } from '../world/sky';
 import { h } from './dom';
 
 export type Focus = 'none' | 'beads' | 'sutra' | 'prostrate';
@@ -32,6 +33,7 @@ export class Hud {
   private help: HTMLElement;
   private settingsPanel: HTMLElement;
   private gfxBtns: Record<'high' | 'low', HTMLButtonElement>;
+  private todBtns: Record<'temple' | 'day', HTMLButtonElement>;
   private inventory: HTMLElement;
   private beadBtns: HTMLElement;
   private lastStatus: { s: NetStatus; n: number } = { s: 'connecting', n: 0 };
@@ -72,6 +74,14 @@ export class Hud {
         cb.onGraphics();
       } });
     this.gfxBtns = { high: gfx('high', 'settings.high'), low: gfx('low', 'settings.low') };
+    const tod = (v: 'temple' | 'day', key: I18nKey) =>
+      h('button', { class: 'seg-btn', i18n: key, onclick: () => {
+        settings.timeOfDay = v;
+        saveSettings();
+        this.renderTimeOfDay();
+        refreshSky();
+      } });
+    this.todBtns = { temple: tod('temple', 'settings.templeTime'), day: tod('day', 'settings.alwaysDay') };
     const row = (label: I18nKey, ...ctl: HTMLElement[]) => h('label', { class: 'setting-row' }, h('span', { i18n: label }), ...ctl);
     this.settingsPanel = h(
       'div',
@@ -81,6 +91,7 @@ export class Hud {
         'div',
         { class: 'settings-body' },
         row('settings.graphics', h('div', { class: 'seg' }, this.gfxBtns.high, this.gfxBtns.low)),
+        row('settings.timeOfDay', h('div', { class: 'seg' }, this.todBtns.temple, this.todBtns.day)),
         row('settings.ambientVolume', slider('musicVolume')),
         row('settings.effectsVolume', slider('sfxVolume')),
         row('hud.language', lang),
@@ -137,6 +148,7 @@ export class Hud {
     parent.append(this.root);
     this.renderMusic();
     this.renderGraphics();
+    this.renderTimeOfDay();
     this.setStatus('connecting', 0);
   }
 
@@ -155,6 +167,11 @@ export class Hud {
     const level = graphicsLevel();
     this.gfxBtns.high.classList.toggle('active', level === 'high');
     this.gfxBtns.low.classList.toggle('active', level === 'low');
+  }
+
+  private renderTimeOfDay() {
+    this.todBtns.temple.classList.toggle('active', settings.timeOfDay === 'temple');
+    this.todBtns.day.classList.toggle('active', settings.timeOfDay === 'day');
   }
 
   toggleHelp(v?: boolean) {

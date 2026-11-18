@@ -35,7 +35,7 @@ import { mountJoystick } from './ui/touch';
 import { buildKoi } from './world/koi';
 import { buildLeaves } from './world/leaves';
 import { buildPrayerFlags } from './world/prayerFlags';
-import { buildSky } from './world/sky';
+import { buildSky, setDebugHours, setTempleTimeZone } from './world/sky';
 import { buildTerrain } from './world/terrain';
 import { buildVegetation } from './world/vegetation';
 import { buildPond, buildStream, buildWaterfall } from './world/water';
@@ -159,6 +159,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   // Networking
   net.on('status', (s) => hud.setStatus(s, remotes.count + 1));
   net.on('welcome', (msg) => {
+    setTempleTimeZone(msg.tz);
     remotes.reset(msg.players);
     hud.setStatus('online', remotes.count + 1);
   });
@@ -220,6 +221,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
     soundscape.update(dt, player.pos, rig.yaw, player.mode === 'free' ? player.speed : 0);
 
     rig.update(dt, player.pos, seat.seated ? 1.0 : 1.55, ctx.cameraBlockers, ctx.ground);
+    sky.update(dt);
     sky.follow(player.pos);
 
     sendAcc += dt;
@@ -241,5 +243,5 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   });
 
   // Debug handle for the console during development.
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, setDebugHours };
 }

@@ -10,6 +10,7 @@ import { inscription, onLocaleChange, t, type I18nKey } from '../i18n';
 import { box, cylinder, hipRoofGeometry, mat } from './materials';
 import { buildOfferingTable } from './offeringTable';
 import { buildStatueSlot } from './statue';
+import { nightGlow } from '../world/nightGlow';
 import { buildThangka } from './thangka';
 
 const T = 0.4; // wall thickness
@@ -298,9 +299,13 @@ export function buildRedLantern(cord = 0.55) {
   const g = new THREE.Group();
   const gold = mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 });
   g.add(cylinder(0.012, 0.012, cord, mat(0x2a1a10), 0, -cord, 0, 5));
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 12).scale(1, 1.12, 1), mat(0xc8231c, { roughness: 0.6, emissive: 0xff3a1a, emissiveIntensity: 0.35 }));
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 12).scale(1, 1.12, 1), nightGlow.lanternBody);
   body.position.y = -cord - 0.38;
   g.add(body);
+  const halo = new THREE.Sprite(nightGlow.lanternHalo); // glows after dark
+  halo.scale.setScalar(1.9);
+  halo.position.y = -cord - 0.38;
+  g.add(halo);
   g.add(cylinder(0.15, 0.15, 0.07, gold, 0, -cord - 0.05, 0, 14));
   g.add(cylinder(0.15, 0.15, 0.07, gold, 0, -cord - 0.78, 0, 14));
   g.add(cylinder(0.025, 0.05, 0.32, mat(0xb81d18, { roughness: 0.9 }), 0, -cord - 1.12, 0, 8));

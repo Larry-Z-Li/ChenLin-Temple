@@ -6,6 +6,7 @@ import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
 import { glowTexture, verticalTextTexture } from '../core/textures';
 import zhHant from '../i18n/locales/zh-Hant';
+import { nightGlow } from '../world/nightGlow';
 import { terrainHeight } from '../world/terrain';
 import type { StupaSpot } from './stupas';
 import { box, cylinder, hipRoofGeometry, mat } from './materials';
@@ -34,13 +35,17 @@ function buildStoneLanterns(ctx: WorldContext) {
   ]);
   const windowGeo = new THREE.BoxGeometry(0.372, 0.2, 0.372).translate(0, 1.16, 0);
   const stones = new THREE.InstancedMesh(stoneGeo, mat(STONE, { roughness: 1, flatShading: true }), STONE_LANTERNS.length);
-  const glow = new THREE.InstancedMesh(windowGeo, new THREE.MeshStandardMaterial({ color: 0xffd08a, emissive: 0xffb54a, emissiveIntensity: 0.9 }), STONE_LANTERNS.length);
+  const glow = new THREE.InstancedMesh(windowGeo, nightGlow.stoneWindow, STONE_LANTERNS.length);
   const m = new THREE.Matrix4();
   STONE_LANTERNS.forEach(([x, z], i) => {
     m.makeTranslation(x, ctx.ground.heightAt(x, z), z);
     stones.setMatrixAt(i, m);
     glow.setMatrixAt(i, m);
     ctx.collisions.addCircle(x, z, 0.35);
+    const halo = new THREE.Sprite(nightGlow.stoneHalo); // pool of light after dark
+    halo.position.set(x, ctx.ground.heightAt(x, z) + 1.16, z);
+    halo.scale.setScalar(2.2);
+    ctx.scene.add(halo);
   });
   stones.castShadow = stones.receiveShadow = true;
   ctx.scene.add(stones, glow);

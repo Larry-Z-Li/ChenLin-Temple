@@ -4,6 +4,7 @@ import { POND, STREAM, WATERFALL } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range, smoothstep } from '../core/math';
 import { glowTexture, waterfallTexture } from '../core/textures';
+import { lighting } from './sky';
 import { STREAM_LENGTH } from './stream';
 import { terrainHeight } from './terrain';
 
@@ -107,10 +108,9 @@ export function buildWaterfall(ctx: WorldContext) {
 
   const tex = waterfallTexture();
   tex.repeat.set(1.5, 3);
-  const fall = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, height, 1, 1),
-    new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.92, color: 0xe6f2f8, depthWrite: false }),
-  );
+  const fallMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.92, color: 0xe6f2f8, depthWrite: false });
+  const fall = new THREE.Mesh(new THREE.PlaneGeometry(width, height, 1, 1), fallMat);
+  const dayWater = new THREE.Color(0xe6f2f8), nightWater = new THREE.Color(0x46566e);
   fall.position.set(0, height / 2, 0);
   g.add(fall);
 
@@ -132,8 +132,9 @@ export function buildWaterfall(ctx: WorldContext) {
 
   ctx.updaters.push((dt, time) => {
     tex.offset.y += dt * 0.9;
+    fallMat.color.copy(nightWater).lerp(dayWater, lighting.daylight); // unlit material: dim it by hand at night
     mists.forEach((s, i) => {
-      s.material.opacity = 0.25 + 0.12 * Math.sin(time * 0.8 + i);
+      s.material.opacity = (0.25 + 0.12 * Math.sin(time * 0.8 + i)) * (0.35 + 0.65 * lighting.daylight);
       s.scale.setScalar(8 + Math.sin(time * 0.6 + i * 2) * 1.5);
     });
   });

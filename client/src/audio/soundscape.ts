@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { HALLS, PAVED, PLATFORM_H, WATERFALL } from '../config/layout';
 import { settings } from '../config/settings';
 import { assetUrl } from '../content/manifest';
+import { lighting } from '../world/sky';
 import { nearestOnStream, nearStream } from '../world/stream';
 import { audioCtx } from './sfx';
 
@@ -38,6 +39,7 @@ export class Soundscape {
   private files: { birds: AudioBuffer[]; chimes: AudioBuffer[]; bell?: AudioBuffer } = { birds: [], chimes: [] };
   private chimePoints: THREE.Vector3[] = [];
   private nextBird = 4;
+  private nextCricket = 2;
   private nextChime = 30 + Math.random() * 40;
   private lastBellHour = -1;
   private level = 0;
@@ -191,6 +193,25 @@ export class Soundscape {
     }
   }
 
+  private cricket(gain: number, panV: number) {
+    const ac = audioCtx(), pan = ac.createStereoPanner();
+    pan.pan.value = panV;
+    pan.connect(this.master);
+    const f = 4100 + Math.random() * 600;
+    let t = ac.currentTime + 0.02;
+    for (let i = 0, n = 3 + Math.floor(Math.random() * 3); i < n; i++) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.022);
+      o.connect(g).connect(pan);
+      o.start(t);
+      o.stop(t + 0.03);
+      t += 0.045;
+    }
+  }
+
   /** A single soft tinkle (sometimes two), not a tune. */
   private chime(gain: number, panV: number) {
     if (this.files.chimes.length) return this.oneShot(this.files.chimes[Math.floor(Math.random() * this.files.chimes.length)], gain * 3, panV);
@@ -293,10 +314,17 @@ export class Soundscape {
     if (this.nextBird <= 0) {
       this.nextBird = 2.5 + Math.random() * 6;
       const near = this.birdPoints.filter((p) => Math.hypot(p.x - listener.x, p.z - listener.z) < 45);
-      if (near.length && !indoors) {
+      if (near.length && !indoors && lighting.daylight > 0.35) {
         const p = near[Math.floor(Math.random() * near.length)], d = Math.hypot(p.x - listener.x, p.z - listener.z);
         this.chirp(0.07 * clamp01(1 - d / 45), this.panFor(listener, camYaw, p.x, p.z));
       }
+    }
+
+    // Crickets after dark.
+    this.nextCricket -= dt;
+    if (this.nextCricket <= 0) {
+      this.nextCricket = 0.5 + Math.random() * 1.6;
+      if (lighting.night > 0.5 && !indoors) this.cricket(0.022 * lighting.night, (Math.random() - 0.5) * 1.6);
     }
 
     // Wind chimes on the nearest eaves.

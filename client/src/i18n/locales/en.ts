@@ -66,6 +66,9 @@ const en = {
   'settings.graphics': 'Graphics',
   'settings.high': 'High',
   'settings.low': 'Low',
+  'settings.timeOfDay': 'Time of day',
+  'settings.templeTime': 'Temple clock',
+  'settings.alwaysDay': 'Always day',
   'settings.ambientVolume': 'Ambient volume',
   'settings.effectsVolume': 'Effects volume',
 

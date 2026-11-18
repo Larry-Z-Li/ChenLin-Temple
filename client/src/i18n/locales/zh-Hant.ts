@@ -68,6 +68,9 @@ const zhHant: Record<I18nKey, string> = {
   'settings.graphics': '畫質',
   'settings.high': '高',
   'settings.low': '低',
+  'settings.timeOfDay': '時間',
+  'settings.templeTime': '寺院時間',
+  'settings.alwaysDay': '永遠白天',
   'settings.ambientVolume': '環境音量',
   'settings.effectsVolume': '音效音量',
 

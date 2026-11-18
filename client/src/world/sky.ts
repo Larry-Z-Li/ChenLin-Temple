@@ -1,17 +1,66 @@
 import * as THREE from 'three';
-import { THEME } from '../config/theme';
+import { DEFAULT_TEMPLE_TZ } from '../../../shared/protocol';
+import { settings } from '../config/settings';
+import { lerp, mulberry32, smoothstep } from '../core/math';
+import { glowTexture } from '../core/textures';
+import { nightGlow } from './nightGlow';
 
-/** Afternoon sun from the south-west so the south-facing façades are lit. */
-export const SUN_DIR = new THREE.Vector3(-0.45, 0.8, 0.65).normalize();
+/** Shared lighting state read by other systems (lantern glow, birdsong vs crickets). */
+export const lighting = { daylight: 1, night: 0 };
+
+let templeTz = DEFAULT_TEMPLE_TZ;
+/** Use the server's time zone so everyone shares the temple's day (and offerings reset at its midnight). */
+export function setTempleTimeZone(tz: string) {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+    templeTz = tz;
+  } catch {
+    /* keep default */
+  }
+}
+
+let debugHours: number | null = null;
+let refresh = true;
+/** Development: force a time of day (null = follow the clock). */
+export const setDebugHours = (h: number | null) => {
+  debugHours = h;
+  refresh = true;
+};
+/** Re-read the clock / setting on the next frame (e.g. after toggling "Always day"). */
+export const refreshSky = () => (refresh = true);
+
+/** Hours (0–24, fractional) at the temple right now. */
+export function templeHours(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: templeTz, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(date);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  return get('hour') + get('minute') / 60;
+}
+
+const ALWAYS_DAY_HOURS = 14.5; // a gentle afternoon
+
+/** Sun path: rises in the east (+X), crosses the southern sky (+Z), sets in the west. */
+function sunDirection(h: number, out: THREE.Vector3) {
+  const th = ((h - 6) / 12) * Math.PI; // 0 at 06:00, π at 18:00
+  return out.set(Math.cos(th), Math.sin(th) * 0.85, 0.35 + Math.sin(th) * 0.45).normalize();
+}
+
+const C = (hex: number) => new THREE.Color(hex);
+const PALETTE = {
+  day: { top: C(0x5d97d3), horizon: C(0xd7e6ee) },
+  dusk: { top: C(0x4a5a8c), horizon: C(0xf0a070) },
+  night: { top: C(0x0a1330), horizon: C(0x22345a) },
+};
 
 export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     uniforms: {
-      top: { value: new THREE.Color(THEME.skyTop) },
-      horizon: { value: new THREE.Color(THEME.skyHorizon) },
-      sunDir: { value: SUN_DIR },
+      top: { value: PALETTE.day.top.clone() },
+      horizon: { value: PALETTE.day.horizon.clone() },
+      glowDir: { value: new THREE.Vector3(0, 1, 0) },
+      glowColor: { value: new THREE.Color(1, 0.92, 0.75) },
+      glowStrength: { value: 1 },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -21,14 +70,14 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
         gl_Position.z = gl_Position.w; // keep at far plane
       }`,
     fragmentShader: /* glsl */ `
-      uniform vec3 top; uniform vec3 horizon; uniform vec3 sunDir;
+      uniform vec3 top; uniform vec3 horizon; uniform vec3 glowDir; uniform vec3 glowColor; uniform float glowStrength;
       varying vec3 vDir;
       void main() {
         vec3 d = normalize(vDir);
         float h = clamp(d.y, 0.0, 1.0);
         vec3 col = mix(horizon, top, pow(h, 0.55));
-        float s = max(dot(d, sunDir), 0.0);
-        col += vec3(1.0, 0.92, 0.75) * (pow(s, 600.0) * 2.0 + pow(s, 12.0) * 0.18);
+        float s = max(dot(d, glowDir), 0.0);
+        col += glowColor * glowStrength * (pow(s, 600.0) * 2.0 + pow(s, 12.0) * 0.18);
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
       }`,
@@ -38,7 +87,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
   dome.renderOrder = -1;
   scene.add(dome);
 
-  // Image-based lighting from the sky, so metals (gold statues) read properly.
+  // Image-based lighting from the daytime sky (dimmed at night).
   const envScene = new THREE.Scene();
   envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), skyMat.clone()));
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -46,7 +95,30 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
   scene.environmentIntensity = 0.55;
   pmrem.dispose();
 
-  scene.fog = new THREE.FogExp2(THEME.skyHorizon, 0.0019);
+  const fog = new THREE.FogExp2(PALETTE.day.horizon.getHex(), 0.0019);
+  scene.fog = fog;
+
+  // Stars (upper sky) and the moon.
+  const rng = mulberry32(7);
+  const starPos: number[] = [], starCol: number[] = [];
+  while (starPos.length < 1800 * 3) {
+    const v = new THREE.Vector3(rng() * 2 - 1, rng(), rng() * 2 - 1);
+    if (v.lengthSq() > 1 || v.y < 0.06) continue;
+    v.normalize().multiplyScalar(1400);
+    starPos.push(v.x, v.y, v.z);
+    const b = 0.5 + rng() * 0.5;
+    starCol.push(b, b, b * (0.9 + rng() * 0.1));
+  }
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+  starGeo.setAttribute('color', new THREE.Float32BufferAttribute(starCol, 3));
+  const starMat = new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false });
+  const stars = new THREE.Points(starGeo, starMat);
+  stars.frustumCulled = false;
+  scene.add(stars);
+  const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xeef2ff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  moon.scale.setScalar(90);
+  scene.add(moon);
 
   const hemi = new THREE.HemisphereLight(0xdcecff, 0x55703a, 1.1);
   scene.add(hemi);
@@ -60,10 +132,60 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
   sun.shadow.normalBias = 0.03;
   scene.add(sun, sun.target);
 
+  const sunDir = new THREE.Vector3(), moonDir = new THREE.Vector3(), lightDir = new THREE.Vector3(0, 1, 0);
+  const top = new THREE.Color(), horizon = new THREE.Color(), tmp = new THREE.Color();
+  let hours = ALWAYS_DAY_HOURS, clockAcc = 99;
+
+  function update(dt: number) {
+    clockAcc += dt;
+    if (clockAcc > 1 || refresh) {
+      clockAcc = 0;
+      refresh = false;
+      hours = debugHours ?? (settings.timeOfDay === 'day' ? ALWAYS_DAY_HOURS : templeHours());
+    }
+    sunDirection(hours, sunDir);
+    moonDir.set(-sunDir.x, -sunDir.y, 0.4).normalize();
+
+    const daylight = smoothstep(-0.1, 0.22, sunDir.y);
+    const dusk = Math.exp(-(((sunDir.y - 0.02) / 0.13) ** 2));
+    lighting.daylight = daylight;
+    lighting.night = 1 - daylight;
+
+    top.copy(PALETTE.night.top).lerp(PALETTE.day.top, daylight).lerp(PALETTE.dusk.top, dusk * 0.6);
+    horizon.copy(PALETTE.night.horizon).lerp(PALETTE.day.horizon, daylight).lerp(PALETTE.dusk.horizon, dusk * 0.8);
+    skyMat.uniforms.top.value.copy(top);
+    skyMat.uniforms.horizon.value.copy(horizon);
+    const sunUp = smoothstep(-0.03, 0.08, sunDir.y);
+    skyMat.uniforms.glowDir.value.copy(sunUp > 0.02 ? sunDir : moonDir);
+    skyMat.uniforms.glowColor.value.set(sunUp > 0.02 ? 0xffebbf : 0xc8d4ff);
+    skyMat.uniforms.glowStrength.value = sunUp > 0.02 ? sunUp : 0.5 * lighting.night;
+    fog.color.copy(horizon);
+
+    hemi.color.copy(tmp.set(0x3a5488)).lerp(C(0xdcecff), daylight);
+    hemi.groundColor.copy(tmp.set(0x1a2418)).lerp(C(0x55703a), daylight);
+    hemi.intensity = lerp(0.55, 1.1, daylight);
+
+    // Sunlight by day (warmer when low), moonlight by night.
+    if (sunUp > 0.02) {
+      lightDir.copy(sunDir);
+      sun.color.set(0xffa060).lerp(C(0xfff0d8), smoothstep(0.05, 0.4, sunDir.y));
+      sun.intensity = 2.8 * sunUp;
+    } else {
+      lightDir.copy(moonDir);
+      sun.color.set(0x9fb4ff);
+      sun.intensity = 0.65 * lighting.night;
+    }
+    scene.environmentIntensity = lerp(0.15, 0.55, daylight);
+    starMat.opacity = smoothstep(0.35, 1, lighting.night);
+    (moon.material as THREE.SpriteMaterial).opacity = smoothstep(0.3, 1, lighting.night);
+    moon.position.copy(moonDir).multiplyScalar(1300);
+    nightGlow.update(lighting.night);
+  }
+
   /** Shadow frustum follows the player. */
   function follow(p: THREE.Vector3) {
     sun.target.position.set(Math.round(p.x), 0, Math.round(p.z));
-    sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 200);
+    sun.position.copy(sun.target.position).addScaledVector(lightDir, 200);
   }
-  return { sun, follow };
+  return { sun, follow, update };
 }

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   COLOR_RE,
+  DEFAULT_TEMPLE_TZ,
   ID_RE,
   PROTOCOL_VERSION,
   FRUIT_ID_RE,
@@ -35,7 +36,7 @@ const MAX_PLAYERS = Number(process.env.MAX_PLAYERS ?? 150);
 const MAX_MSG_BYTES = 2048;
 const MAX_MSGS_PER_SEC = 40;
 /** Offerings last until midnight in this time zone. */
-const TEMPLE_TZ = process.env.TEMPLE_TZ ?? 'Asia/Taipei';
+const TEMPLE_TZ = process.env.TEMPLE_TZ ?? DEFAULT_TEMPLE_TZ;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = path.resolve(here, '../../client/dist');
@@ -184,6 +185,7 @@ function handle(c: Client, msg: ClientMsg) {
     send(c, {
       t: 'welcome',
       id: c.id,
+      tz: TEMPLE_TZ,
       players: others,
       seats: Object.fromEntries(seats),
       wheels: turningWheels(now),

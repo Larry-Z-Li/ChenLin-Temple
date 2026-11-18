@@ -9,6 +9,8 @@ export interface Settings {
   langChosen: boolean;
   /** 'auto' = low on phones/tablets, high elsewhere. */
   graphics: 'auto' | 'high' | 'low';
+  /** 'temple' = sky follows the temple's clock (day and night); 'day' = always daytime. */
+  timeOfDay: 'temple' | 'day';
   musicOn: boolean;
   musicVolume: number;
   chantVolume: number;
@@ -24,6 +26,7 @@ const DEFAULTS: Settings = {
   lang: DEFAULT_LOCALE,
   langChosen: false,
   graphics: 'auto',
+  timeOfDay: 'temple',
   musicOn: true,
   musicVolume: 0.5,
   chantVolume: 0.8,
