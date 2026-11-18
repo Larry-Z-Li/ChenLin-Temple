@@ -34,6 +34,16 @@ export interface OfferingTable {
   ambientSmoke?: boolean;
 }
 
+/** Things anyone can strike (or pet): the hall instruments and Marīcī's boar. The sound is shared. */
+export interface Instrument {
+  id: string;
+  kind: 'bowl' | 'woodfish' | 'drum' | 'bell' | 'boar';
+  x: number;
+  z: number;
+  /** Visual reaction when struck or petted (sway, ripple, a sleepy boar stirring…). */
+  onStrike: () => void;
+}
+
 /** Shared registries filled while building the world. */
 export interface WorldContext {
   scene: THREE.Scene;
@@ -44,6 +54,7 @@ export interface WorldContext {
   cameraBlockers: THREE.Object3D[];
   seats: Map<string, Seat>;
   offeringTables: OfferingTable[];
+  instruments: Instrument[];
   updaters: ((dt: number, time: number) => void)[];
   /** Small decorative meshes (grass, flowers) hidden on the low graphics setting. */
   detailMeshes: THREE.Object3D[];

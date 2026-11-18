@@ -21,6 +21,7 @@ export interface NetEvents {
   seatDenied: (seat: string) => void;
   push: (wheel: string, by: string, speed: number) => void;
   picked: (fruit: string, by: string) => void;
+  strike: (inst: string, by: string) => void;
   pickDenied: (fruit: string, reason: 'gone' | 'full') => void;
   offered: (hall: string, offering: Offering, by: string) => void;
   offerDenied: (reason: 'noFruit' | 'full') => void;
@@ -109,6 +110,7 @@ export class NetClient {
       case 'seatDenied': return this.emit('seatDenied', msg.seat);
       case 'push': return this.emit('push', msg.wheel, msg.by, msg.speed);
       case 'picked': return this.emit('picked', msg.fruit, msg.by);
+      case 'strike': return this.emit('strike', msg.inst, msg.by);
       case 'pickDenied': return this.emit('pickDenied', msg.fruit, msg.reason);
       case 'offered': return this.emit('offered', msg.hall, msg.offering, msg.by);
       case 'offerDenied': return this.emit('offerDenied', msg.reason);
@@ -139,6 +141,11 @@ export class NetClient {
   /** The push is already applied locally; offline there's nothing else to do. */
   pushWheel(wheel: string) {
     this.send({ t: 'push', wheel });
+  }
+
+  /** Already played locally; the server relays it to everyone else. */
+  strike(inst: string) {
+    this.send({ t: 'strike', inst });
   }
 
   /** Callers check inventory space first; offline the pick is granted locally. */

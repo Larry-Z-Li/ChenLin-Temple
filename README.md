@@ -47,7 +47,7 @@ All buildings and statues face south; players spawn in the south. The map is dra
                  N
 ```
 
-Everything is data-driven from [client/src/config/layout.ts](client/src/config/layout.ts): move a hall, resize it, change seat counts or deity order there. Each hall has 40 kneeling cushions; the South and Center halls have front and back doors.
+Everything is data-driven from [client/src/config/layout.ts](client/src/config/layout.ts): move a hall, resize it, change seat counts or deity order there. Each hall has 40 kneeling cushions (60 in the Center Hall); the South and Center halls have front and back doors.
 
 ## Project structure
 
@@ -78,6 +78,8 @@ Default is Traditional Chinese (`zh-Hant`), with English selectable. Every UI st
 - **Soundscape:** wind, the waterfall and stream (louder as you approach), birdsong, an occasional wind chime, footsteps by surface, and a temple bell on the hour. Synthesized by default; drop recordings into `client/public/assets/sfx/index.json` to replace any of them.
 - **Day & night:** the sky follows the temple's clock (`TEMPLE_TZ`): dawn and dusk glow, a moonlit night with stars, lanterns lit after dark, crickets instead of birds. ⚙ → *Always day* opts out.
 - **Furnishings:** bronze incense burner, stone lanterns, red lanterns and wind bells on the eaves, column couplets (placeholder texts in `config/layout.ts`), stone tablet at the gate, arched bridge over the stream, koi, mani stones on the ridge, painted ceilings, canopies and water bowls in the halls, drifting leaves.
+- **Lights:** a canopy of colourful lotus lanterns over the approach, more along the courtyard and in the Bodhi tree, palace lanterns inside the halls, paper path lanterns, glowing lotus flowers and drifting water lanterns on the pond.
+- **Hall instruments:** strike the bowl bell (磬) and wooden fish (木魚) in every hall, and the drum and bell in the Center Hall; everyone nearby hears it. Marīcī's boar sleeps beside her altar: pet it.
 - **Cloud fast travel:** clouds by the gate and the Hall of Cundī fly you between them in ~5 s.
 - **Graphics:** ⚙ settings has High / Low (Low is the default on phones), plus ambient and effects volume.
 

@@ -7,6 +7,9 @@ import type { WorldContext } from '../core/context';
 import { ceilingTexture, textTexture, verticalTextTexture } from '../core/textures';
 import type { ThangkaEntry } from '../content/manifest';
 import { inscription, onLocaleChange, t, type I18nKey } from '../i18n';
+import { clamp } from '../core/math';
+import { buildBoar } from './boar';
+import { furnishHall, type CushionBlock } from './hallFurnishings';
 import { box, cylinder, hipRoofGeometry, mat } from './materials';
 import { buildOfferingTable } from './offeringTable';
 import { buildStatueSlot } from './statue';
@@ -66,8 +69,8 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
   };
   const lintel = (dw: number, z: number) => g.add(blocker(box(dw, H - DOOR_H, T, wallMat, hx, F + DOOR_H, z)));
 
+  const fd = width > 40 ? 7 : 5; // front door width
   if (!isShrine) {
-    const fd = width > 40 ? 7 : 5;
     wallX(hx - hw, hx - fd / 2, front);
     wallX(hx + fd / 2, hx + hw, front);
     lintel(fd, front);
@@ -149,7 +152,7 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
 
   // ---- Red lanterns under the front eave, wind bells at the eave corners (gently swaying) ----
   const swaying: { obj: THREE.Object3D; amp: number; speed: number; phase: number }[] = [];
-  const lanternXs = isShrine ? [-2.4, 2.4] : width > 40 ? [-12, -4, 4, 12] : [-4.2, 4.2];
+  const lanternXs = isShrine ? [-2.4, 2.4] : width > 40 ? [-20, -12, -4, 4, 12, 20] : [-8.6, -4.2, 4.2, 8.6];
   for (const lx of lanternXs) {
     const l = buildRedLantern();
     l.position.set(hx + lx, F + H - 0.1, isShrine ? front + 0.9 : front + 1.85);
@@ -229,6 +232,9 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
 
   g.add(bowlMesh, waterMesh);
 
+  // Marīcī's boar sleeps on the floor beside her altar (east side), head toward the visitors.
+  if (def.deities.includes('marici')) buildBoar(ctx, g, `${def.id}-boar`, hx + altarW / 2 + 1.3, F + 0.04, altarZ + 0.15, -0.3);
+
   // ---- Offering table ----
   const tableZ = altarZ + altarD / 2 + (isShrine ? 0.9 : 1.4);
   const tableLen = isShrine ? 2.2 : n > 1 ? Math.min(altarW - 1, 19) : 5;
@@ -239,9 +245,17 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
   const lamp = new THREE.PointLight(0xffc887, isShrine ? 6 : n > 1 ? 30 : 18, isShrine ? 10 : n > 1 ? 40 : 26, 1.2);
   lamp.position.set(hx, F + (isShrine ? 2.6 : 3.6), tableZ + 1.5);
   g.add(lamp);
+  const lampBase = lamp.intensity;
+  nightGlow.track((night) => (lamp.intensity = lampBase * (1 + 0.9 * night))); // lamplight carries further after dark
 
-  // ---- Kneeling cushions ----
-  if (def.seats > 0) buildCushions(ctx, g, def, hx, F, tableZ + 2.4);
+  // ---- Kneeling cushions, then the furnishings around them ----
+  const thangkaZs = Array.from({ length: def.thangkas }, (_, i) => back + 4 + (i * (depth - 8)) / Math.max(1, def.thangkas - 1));
+  if (def.seats > 0) {
+    const block = buildCushions(ctx, g, def, hx, F, tableZ + 2.6, front - T / 2);
+    if (!isShrine) {
+      furnishHall(ctx, g, { def, hx, hz, hw, F, H, front, back, frontInner: front - T / 2, altarZ, altarW, tableZ, tableLen, thangkaZs }, block);
+    }
+  }
 
   // ---- Thangkas on the side walls (and back wall when there's no back door) ----
   if (!isShrine && def.thangkas > 0) {
@@ -249,8 +263,7 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
     let k = 0;
     const next = () => (pool.length ? pool[k++ % pool.length] : null);
     const ty = F + 4.0;
-    for (let i = 0; i < def.thangkas; i++) {
-      const tz = back + 4 + (i * (depth - 8)) / Math.max(1, def.thangkas - 1);
+    for (const tz of thangkaZs) {
       const west = buildThangka(next());
       west.position.set(hx - hw + T / 2 + 0.04, ty, tz);
       west.rotation.y = Math.PI / 2;
@@ -272,26 +285,45 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
   return g;
 }
 
-function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: number, F: number, startZ: number) {
-  const cols = def.width > 40 ? 5 : 4; // per side of the centre aisle
+const CUSHION_R = 0.5;
+/** Plump round kneeling cushion (蒲團), base at y = 0. */
+const CUSHION_PROFILE = [[0, 0], [0.44, 0], [0.49, 0.04], [0.5, 0.1], [0.485, 0.16], [0.44, 0.205], [0.3, 0.228], [0, 0.235]];
+
+/**
+ * Kneeling cushions in a grid filling the floor in front of the offering table, split by a centre
+ * aisle (and, in the wide Center Hall, a side aisle on each half). Returns the grid's footprint.
+ */
+function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: number, F: number, startZ: number, frontInner: number): CushionBlock {
+  const wide = def.width > 40;
+  const cols = wide ? 6 : 4; // per side of the centre aisle
   const rows = Math.ceil(def.seats / (cols * 2));
-  const sx = 1.3, sz = 1.45, aisle = 2.4;
-  const body = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.38, 0.41, 0.17, 20), mat(THEME.cushion, { roughness: 0.95 }), def.seats);
-  const top = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.26, 0.26, 0.012, 20), mat(THEME.cushionTop, { roughness: 0.8 }), def.seats);
+  const sx = wide ? 2.2 : 2.0;
+  const aisle = wide ? 2.0 : 1.6; // half-width of the centre aisle
+  const sideAisle = wide ? 1.6 : 0; // extra gap after the third column
+  const sz = clamp((frontInner - 4.5 - startZ) / Math.max(1, rows - 1), 2.0, 2.5);
+  const xs = Array.from({ length: cols }, (_, c) => aisle + 1.0 + c * sx + (c >= 3 ? sideAisle : 0));
+
+  const body = new THREE.InstancedMesh(
+    new THREE.LatheGeometry(CUSHION_PROFILE.map(([r, y]) => new THREE.Vector2(r, y)), 28),
+    mat(THEME.cushion, { roughness: 0.95 }),
+    def.seats,
+  );
+  const top = new THREE.InstancedMesh(new THREE.TorusGeometry(0.3, 0.018, 6, 28).rotateX(Math.PI / 2), mat(THEME.cushionTop, { roughness: 0.7 }), def.seats);
   const m = new THREE.Matrix4();
+  const y = F + 0.056; // on the rug
   let i = 0;
   for (let r = 0; r < rows && i < def.seats; r++)
     for (let side = -1; side <= 1 && i < def.seats; side += 2)
       for (let c = 0; c < cols && i < def.seats; c++, i++) {
-        const x = hx + side * (aisle / 2 + 0.65 + c * sx), z = startZ + r * sz, y = F + 0.04;
-        body.setMatrixAt(i, m.makeTranslation(x, y + 0.085, z));
-        top.setMatrixAt(i, m.makeTranslation(x, y + 0.176, z));
+        const x = hx + side * xs[c], z = startZ + r * sz;
+        body.setMatrixAt(i, m.makeTranslation(x, y, z));
+        top.setMatrixAt(i, m.makeTranslation(x, y + 0.222, z));
         const id = `${def.id}-c${i}`;
-        ctx.seats.set(id, { id, kind: 'cushion', hallId: def.id, x, y: y + 0.12, z, yaw: 0, exit: [0, 0.7], occupiedBy: null });
+        ctx.seats.set(id, { id, kind: 'cushion', hallId: def.id, x, y: y + 0.17, z, yaw: 0, exit: [0, 0.95], occupiedBy: null });
       }
   body.receiveShadow = top.receiveShadow = true;
-  body.castShadow = true;
   g.add(body, top);
+  return { aisle, outer: xs[cols - 1] + CUSHION_R, z0: startZ, z1: startZ + (rows - 1) * sz };
 }
 
 /** Red silk lantern hanging from a cord; origin at the top of the cord (pivot for swaying). */

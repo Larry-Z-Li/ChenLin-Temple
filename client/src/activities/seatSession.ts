@@ -57,7 +57,7 @@ export class SeatSession {
   constructor(private d: Deps) {
     for (const s of d.ctx.seats.values()) {
       d.ctx.interactions.add({
-        id: s.id, x: s.x, z: s.z, radius: s.kind === 'bench' ? 1.0 : 0.75,
+        id: s.id, x: s.x, z: s.z, radius: s.kind === 'bench' ? 1.0 : 0.9,
         prompt: () => (s.occupiedBy ? { text: t('prompt.seatTaken'), busy: true } : { text: t(s.kind === 'bench' ? 'prompt.bench' : 'prompt.sit') }),
         onInteract: () => this.request(s),
       });

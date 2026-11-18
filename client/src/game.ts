@@ -3,6 +3,7 @@ import { FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, SNAPSHOT_HZ
 import { ChantPanel } from './activities/chantPanel';
 import { Mala } from './activities/beads';
 import { CloudRide } from './activities/cloudRide';
+import { Instruments } from './activities/instruments';
 import { Offerings } from './activities/offerings';
 import { SeatSession } from './activities/seatSession';
 import { SutraReader } from './activities/sutraReader';
@@ -33,6 +34,7 @@ import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
 import { mountJoystick } from './ui/touch';
 import { buildKoi } from './world/koi';
+import { buildLanterns } from './world/lanterns';
 import { buildLeaves } from './world/leaves';
 import { buildPrayerFlags } from './world/prayerFlags';
 import { buildSky, setDebugHours, setTempleTimeZone } from './world/sky';
@@ -68,6 +70,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
     cameraBlockers: [],
     seats: new Map(),
     offeringTables: [],
+    instruments: [],
     updaters: [],
     detailMeshes: [],
   };
@@ -85,6 +88,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   const stupas = buildStupas(ctx);
   buildPrayerFlags(ctx, stupas);
   buildDecorations(ctx, stupas);
+  buildLanterns(ctx);
   buildKoi(ctx);
   buildLeaves(ctx, camera);
   const { orchard } = buildVegetation(ctx);
@@ -154,6 +158,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   const seat: SeatSession = new SeatSession({ ctx, net, player, rig, hud, mala, sutra });
   const offerings = new Offerings(ctx, net, hud, orchard, player);
   const cloud = new CloudRide(ctx, player, rig, hud);
+  const instruments = new Instruments(ctx, net, player);
   const bow = (): void => (seat.seated ? seat.bow() : player.gesture("bow", 2.4));
 
   // Networking
@@ -243,5 +248,5 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   });
 
   // Debug handle for the console during development.
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, setDebugHours };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, setDebugHours };
 }

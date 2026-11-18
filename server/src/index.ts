@@ -94,6 +94,7 @@ interface Client {
   seat: string | null;
   lastPush: number;
   lastOffer: number;
+  lastStrike: number;
   /** Fruit this person picked and hasn't offered yet (server-authoritative). */
   inventory: Partial<Record<Fruit, number>>;
   alive: boolean;
@@ -225,6 +226,14 @@ function handle(c: Client, msg: ClientMsg) {
       broadcast({ t: 'push', wheel: msg.wheel, by: c.id, speed });
       break;
     }
+    case 'strike': {
+      if (typeof msg.inst !== 'string' || !ID_RE.test(msg.inst)) return;
+      const now = Date.now();
+      if (now - c.lastStrike < 300) return;
+      c.lastStrike = now;
+      broadcast({ t: 'strike', inst: msg.inst, by: c.id }, c.id);
+      break;
+    }
     case 'pick': {
       const m = typeof msg.fruit === 'string' ? FRUIT_ID_RE.exec(msg.fruit) : null;
       if (!m || !isFruit(m[1])) return;
@@ -276,6 +285,7 @@ wss.on('connection', (ws) => {
     seat: null,
     lastPush: 0,
     lastOffer: 0,
+    lastStrike: 0,
     inventory: {},
     alive: true,
     msgWindowStart: Date.now(),

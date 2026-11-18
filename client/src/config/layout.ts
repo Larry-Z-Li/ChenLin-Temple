@@ -68,7 +68,7 @@ export const HALLS: HallDef[] = [
     x: 0, z: 0, width: 54, depth: 26, wallHeight: 8,
     // ⚠ Placeholder ordering — confirm with your lineage's arrangement.
     deities: ['amitabha', 'amoghasiddhi', 'vairocana', 'ratnasambhava', 'akshobhya'],
-    frontDoor: true, backDoor: true, seats: 40, thangkas: 4, roofTiers: 2,
+    frontDoor: true, backDoor: true, seats: 60, thangkas: 4, roofTiers: 2,
     couplet: ['五智圓明周法界', '一心清淨即蓮邦'],
   },
   {
@@ -252,3 +252,29 @@ export const BRIDGE = { x: -86, z0: 15, z1: 27, width: 2.6, rise: 1.15 };
 
 /** Stone tablet (石碑) at the mountain gate, facing arriving visitors. */
 export const STELE = { x: -7, z: 104 };
+
+/**
+ * Canopy of colourful lotus lanterns (燃燈, as at Buddha's Birthday) over the approach:
+ * two rows of posts carry a beam each; wires strung across between them hold the lanterns.
+ */
+export const LANTERN_CANOPY = { x: 5.9, z0: 75.5, z1: 95.5, posts: 5, height: 4.8, wireSpacing: 1.6, lanternSpacing: 1.45 };
+
+/** More strings of lotus lanterns, [x, z, height] to [x, z, height]. The courtyard ones hang from the prayer-flag poles. */
+export const LANTERN_STRINGS: [[number, number, number], [number, number, number]][] = [
+  [[-14.5, 20, 4.2], [-14.5, 40, 4.2]],
+  [[14.5, 20, 4.2], [14.5, 40, 4.2]],
+];
+
+/** Low paper path lanterns (行燈): straight runs [x0, z0] → [x1, z1] with a light every `step` metres. */
+export const PATH_LIGHT_RUNS: { from: [number, number]; to: [number, number]; step: number }[] = [
+  // paths to the lotus pond and the orchard (both edges)
+  { from: [-37, 18.6], to: [-16, 18.6], step: 5.25 }, { from: [-37, 23.4], to: [-16, 23.4], step: 5.25 },
+  { from: [16, 18.6], to: [37, 18.6], step: 5.25 }, { from: [16, 23.4], to: [37, 23.4], step: 5.25 },
+  // north cross path
+  { from: [-48, -27.6], to: [48, -27.6], step: 6 },
+  { from: [-48, -34.4], to: [48, -34.4], step: 6 },
+  // from the Hall of the Five Tathāgatas to Cundī
+  { from: [-3.4, -18.5], to: [-3.4, -24.5], step: 6 }, { from: [3.4, -18.5], to: [3.4, -24.5], step: 6 },
+];
+/** And a ring of them around the lotus pond. */
+export const POND_LIGHT_RING = { radius: 17.2, count: 22 };

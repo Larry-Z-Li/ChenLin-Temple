@@ -4,6 +4,7 @@ import { POND, STREAM, WATERFALL } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range, smoothstep } from '../core/math';
 import { glowTexture, waterfallTexture } from '../core/textures';
+import { colourGlowMaterial, haloPoints, nightGlow, whiteColors } from './nightGlow';
 import { lighting } from './sky';
 import { STREAM_LENGTH } from './stream';
 import { terrainHeight } from './terrain';
@@ -62,21 +63,69 @@ export function buildPond(ctx: WorldContext) {
       petals.push(g.toNonIndexed());
     }
   }
-  const flowerGeo = mergeGeometries(petals);
+  const flowerGeo = whiteColors(mergeGeometries(petals));
   const podGeo = new THREE.CylinderGeometry(0.05, 0.035, 0.05, 8).translate(0, 0.08, 0);
   const flowerCount = 30;
-  const flowers = new THREE.InstancedMesh(flowerGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }), flowerCount);
-  const pods = new THREE.InstancedMesh(podGeo, new THREE.MeshStandardMaterial({ color: 0xe5c74a, roughness: 0.6 }), flowerCount);
+  // The flowers glow softly after dark, each in its own colour.
+  const flowers = new THREE.InstancedMesh(flowerGeo, colourGlowMaterial({ roughness: 0.5 }, (n) => 0.04 + 0.85 * n), flowerCount);
+  const podMat = new THREE.MeshStandardMaterial({ color: 0xe5c74a, roughness: 0.6, emissive: 0xffc040, emissiveIntensity: 0 });
+  nightGlow.track((n) => (podMat.emissiveIntensity = 0.9 * n));
+  const pods = new THREE.InstancedMesh(podGeo, podMat, flowerCount);
   const pink = new THREE.Color(0xf29bb8), whiteC = new THREE.Color(0xfdf3f3);
+  const haloPos: number[] = [], haloCol: number[] = [];
   for (let i = 0; i < flowerCount; i++) {
     const p = padPos[i * 2].clone().add(new THREE.Vector3(0, 0.03, 0));
     const s = range(rng, 1.4, 2.0);
     m.compose(p, q.setFromAxisAngle(up, rng() * 6), new THREE.Vector3(s, s, s));
     flowers.setMatrixAt(i, m);
     pods.setMatrixAt(i, m);
-    flowers.setColorAt(i, rng() < 0.65 ? pink : whiteC);
+    const c = rng() < 0.65 ? pink : whiteC;
+    flowers.setColorAt(i, c);
+    haloPos.push(p.x, p.y + 0.25, p.z);
+    haloCol.push(c.r, c.g * 0.9, c.b);
   }
-  ctx.scene.add(flowers, pods);
+  ctx.scene.add(flowers, pods, haloPoints(haloPos, haloCol, 1.6, 0.55));
+
+  buildWaterLanterns(ctx, flowerGeo);
+}
+
+/** Lotus-shaped candle lanterns (放水燈) drifting slowly around the pond. */
+function buildWaterLanterns(ctx: WorldContext, flowerGeo: THREE.BufferGeometry) {
+  const rng = mulberry32(4242);
+  const N = 12;
+  const COLS = [0xffb3c8, 0xfff0e0, 0xffd27a, 0xff8fa8];
+  const blooms = new THREE.InstancedMesh(flowerGeo, colourGlowMaterial({ roughness: 0.6 }, (n) => 0.25 + 1.3 * n), N);
+  const bases = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.17, 0.05, 10), new THREE.MeshStandardMaterial({ color: 0x3f7f3a, roughness: 0.7 }), N);
+  blooms.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  bases.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  blooms.frustumCulled = bases.frustumCulled = false;
+  const boats = Array.from({ length: N }, (_, i) => {
+    blooms.setColorAt(i, new THREE.Color(COLS[i % COLS.length]));
+    return { r: range(rng, 3, POND.radius - 3), a: rng() * Math.PI * 2, w: range(rng, 0.012, 0.03) * (rng() < 0.5 ? -1 : 1), wob: rng() * 6, spin: range(rng, -0.2, 0.2) };
+  });
+  // A bright candle core and a wide soft halo for each.
+  const corePos = new Float32Array(N * 3), haloPos = new Float32Array(N * 3);
+  const cores = haloPoints([...corePos], new Array(N * 3).fill(0).map((_, i) => [1, 0.85, 0.55][i % 3]), 0.35, 1, 0.55);
+  const halos = haloPoints([...haloPos], new Array(N * 3).fill(0).map((_, i) => [1, 0.75, 0.45][i % 3]), 2.4, 0.6);
+  ctx.scene.add(blooms, bases, cores, halos);
+  cores.frustumCulled = halos.frustumCulled = false;
+
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(2.1, 2.1, 2.1), one = new THREE.Vector3(1, 1, 1);
+  ctx.updaters.push((dt, time) => {
+    const cp = cores.geometry.attributes.position as THREE.BufferAttribute, hp = halos.geometry.attributes.position as THREE.BufferAttribute;
+    boats.forEach((b, i) => {
+      b.a += b.w * dt;
+      const r = b.r + Math.sin(time * 0.05 + b.wob) * 1.5;
+      const x = POND.x + Math.cos(b.a) * r, z = POND.z + Math.sin(b.a) * r, y = WATER_Y + 0.02 + Math.sin(time * 1.1 + b.wob) * 0.012;
+      q.setFromEuler(e.set(Math.sin(time * 0.9 + b.wob) * 0.04, b.wob + time * b.spin, Math.cos(time * 0.8 + b.wob) * 0.04));
+      bases.setMatrixAt(i, m.compose(p.set(x, y, z), q, one));
+      blooms.setMatrixAt(i, m.compose(p.set(x, y + 0.02, z), q, s));
+      cp.setXYZ(i, x, y + 0.3, z);
+      hp.setXYZ(i, x, y + 0.35, z);
+    });
+    blooms.instanceMatrix.needsUpdate = bases.instanceMatrix.needsUpdate = true;
+    cp.needsUpdate = hp.needsUpdate = true;
+  });
 }
 
 /** Waterfall on the western mountains, facing east toward the temple, feeding the stream. */

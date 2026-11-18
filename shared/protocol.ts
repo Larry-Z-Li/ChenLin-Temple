@@ -1,6 +1,6 @@
 // Wire protocol shared by client and server. Keep this file dependency-free.
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -74,6 +74,8 @@ export type ClientMsg =
   | { t: 'seat'; seat: string | null }
   | { t: 'push'; wheel: string }
   | { t: 'pick'; fruit: string }
+  /** Strike a hall instrument (bell, drum, singing bowl, wooden fish). */
+  | { t: 'strike'; inst: string }
   | { t: 'offer'; hall: string; kind: 'incense' }
   | { t: 'offer'; hall: string; kind: 'fruit'; fruit: Fruit };
 
@@ -100,6 +102,7 @@ export type ServerMsg =
   /** A push landed; `speed` is the wheel's authoritative speed right after it. */
   | { t: 'push'; wheel: string; by: string; speed: number }
   | { t: 'picked'; fruit: string; by: string }
+  | { t: 'strike'; inst: string; by: string }
   | { t: 'pickDenied'; fruit: string; reason: 'gone' | 'full' }
   | { t: 'offered'; hall: string; offering: Offering; by: string }
   | { t: 'offerDenied'; reason: 'noFruit' | 'full' }
