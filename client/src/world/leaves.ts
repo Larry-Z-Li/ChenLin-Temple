@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HALLS, PLATFORM_H } from '../config/layout';
+import { HALLS, PLATFORM_H , hallHalf } from '../config/layout';
 import type { WorldContext } from '../core/context';
 
 /** Leaves and petals drifting on the breeze around the visitor (hidden on low graphics). */
@@ -13,7 +13,7 @@ export function buildLeaves(ctx: WorldContext, camera: THREE.Camera) {
   ctx.detailMeshes.push(mesh);
 
   const indoors = (x: number, z: number, y: number) =>
-    HALLS.some((h) => Math.abs(x - h.x) < h.width / 2 + 2.5 && Math.abs(z - h.z) < h.depth / 2 + 2.5 && y < PLATFORM_H + h.wallHeight + 6);
+    HALLS.some((h) => Math.abs(x - h.x) < hallHalf(h)[0] + 2.5 && Math.abs(z - h.z) < hallHalf(h)[1] + 2.5 && y < PLATFORM_H + h.wallHeight + 6);
 
   const leaves = Array.from({ length: N }, (_, i) => {
     mesh.setColorAt(i, palette[i % palette.length]);

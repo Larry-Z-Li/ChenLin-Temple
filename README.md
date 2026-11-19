@@ -37,16 +37,19 @@ Production: `npm run build && npm start` serves everything from http://localhost
 All buildings and statues face south; players spawn in the south. The map is drawn south-up, so east appears on the left.
 
 ```
-                 S  (spawn, mountain gate, map board)
-      [lantern canopy + prayer wheels on the approach]
-   rock garden                        wish lanterns
-          COURTYARD (incense burner, prayer wheels)
- E  orchard   HALL OF THE FIVE TATHĀGATAS   lotus pond + pavilion  W
-   bamboo grove                       tea corner   ~ waterfall ~
-                 N
+                       S  (arrival, gate, map board)
+                         PLAZA 廣場 (lantern canopy)
+          Linggu ·          BAOSHENG 寶生苑            · Wenchang
+   spring 龍泉     DIZANG 地藏   GUOXUE 國學   WENSHU 文殊
+ W                 ZANGMI 藏密  ┌ 萬佛塔 ┐   DONGMI 東密      monks' quarters 僧舍 | orchard  E
+   release pond 放生池  GUANYIN 觀音  YANGSHENG 養生  CAISHEN 財神
+   abbot 住持 · Ruyi          CHENGJIU 成就苑          · Duobao
+                         dragon pool 泰山龍池
+                     cherry grove 櫻花樹林 + wish lanterns
+                       N
 ```
 
-Everything is data-driven from [client/src/config/layout.ts](client/src/config/layout.ts): move or resize the hall, change seat counts or deity order there. The one hall has 60 kneeling cushions and front and back doors.
+Everything is data-driven from [client/src/config/layout.ts](client/src/config/layout.ts), modelled on the client's site plan: the Ten Thousand Buddha Stupa in a walled court (prayer wheels inside its walls) ringed by eight halls on the eight gates, each with its own deities (see `HALLS`). The previous single-hall build lives on the `single-hall-layout` branch.
 
 ## Project structure
 
@@ -77,6 +80,7 @@ Default is Traditional Chinese (`zh-Hant`), with English selectable. Every UI st
 - **Soundscape:** wind, the waterfall and stream (louder as you approach), birdsong, an occasional wind chime, footsteps by surface, and a temple bell on the hour. Synthesized by default; drop recordings into `client/public/assets/sfx/index.json` to replace any of them.
 - **Day & night:** the sky follows the temple's clock (`TEMPLE_TZ`): dawn and dusk glow, a moonlit night with stars, lanterns lit after dark, crickets instead of birds. ⚙ → *Always day* opts out.
 - **Furnishings:** bronze incense burner, stone lanterns, red lanterns and wind bells on the eaves, column couplets (placeholder texts in `config/layout.ts`), stone tablet at the gate, arched bridge over the stream, koi, mani stones on the ridge, painted ceilings, canopies and water bowls in the halls, drifting leaves.
+- **Fast travel:** the 快速傳送 button opens the map; tap a hall, pagoda or landmark and a cloud flies you there.
 - **Lights:** a canopy of colourful lotus lanterns over the approach, more along the courtyard and in the Bodhi tree, palace lanterns inside the halls, paper path lanterns, glowing lotus flowers and drifting water lanterns on the pond.
 - **Hall instruments:** strike the bowl bell (磬), wooden fish (木魚), drum and bell in the hall; everyone nearby hears it.
 - **Gardens & life:** a bamboo grove path, a walled raked rock garden, a pavilion on the lotus pond (with a small stupa), a maple-and-moss tea corner, two little huts, a stupa at the heart of the courtyard; footpaths, wooden footbridges over the rivers (which you can't wade into), picnic tables; deer that wander lawns and paths (feed them any fruit), cats napping about, butterflies by day and fireflies at night; the ridge stupas glow after dark. A map board by the gate (E, M or ◫ for the big map).

@@ -1,26 +1,135 @@
 import * as THREE from 'three';
-import { box, cylinder, hipRoofGeometry, mat } from '../buildings/materials';
-import { BAMBOO_PATH, COURTYARD_STUPA, ORCHARD_SIGN, FOOT_BRIDGES, FOOTPATHS, PICNIC_TABLES, POND_PAVILION, TEA_CORNER, ZEN_GARDEN } from '../config/layout';
+import { box, cylinder, mat } from '../buildings/materials';
+import { DRAGON_POOL, DRAGON_SPRING, FOOT_BRIDGES, FOOTPATHS, GREAT_STUPA, ORCHARD_SIGN, PICNIC_TABLES, POND_PAVILION, STUPA_COURT } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
 import { canvasTexture } from '../core/textures';
 import { inscription, onLocaleChange, t } from '../i18n';
 import { smallStupa } from '../buildings/stupas';
+import { buildStatueSlot } from '../buildings/statue';
 
 const ROCK = new THREE.MeshStandardMaterial({ color: 0x77736c, roughness: 1, flatShading: true });
-const MOSS = new THREE.MeshStandardMaterial({ color: 0x4f7a34, roughness: 1 });
 
 /** Garden rooms: the rock garden, the bamboo path, the tea corner and the pond pavilion. */
-export function buildGardens(ctx: WorldContext) {
-  buildZenGarden(ctx);
-  buildBambooPath(ctx);
-  buildTeaCorner(ctx);
+export function buildGardens(ctx: WorldContext, models: Record<string, string>) {
+  buildFootpaths(ctx);
   buildPavilion(ctx);
   buildFootBridges(ctx);
-  buildCourtyardStupa(ctx);
   buildPicnicTables(ctx);
   buildOrchardSign(ctx);
+  buildStupaCourt(ctx, models);
+  buildDragonPool(ctx);
+  buildDragonSpring(ctx);
+}
+
+/**
+ * 萬佛塔 and its court: a white-walled square with a gate in each side and a pavilion on each corner;
+ * the great stupa on a two-step platform in the middle, Vairocana's altar at its south face.
+ */
+function buildStupaCourt(ctx: WorldContext, models: Record<string, string>) {
+  const { x: cx, z: cz, half, gate } = STUPA_COURT;
+  const y = ctx.ground.heightAt(cx, cz);
+  const wallMat = mat(THEME.wall, { roughness: 0.9 }), baseMat = mat(THEME.wallBase, { roughness: 0.8 });
+  const tiles = mat(THEME.roof, { roughness: 0.75 }), red = mat(THEME.column, { roughness: 0.55 }), gold = mat(THEME.goldLeaf, { metalness: 0.75, roughness: 0.3 });
+  const H = 3.2, T = 0.7;
+  const wall = (horizontal: boolean, at: number, from: number, to: number) => {
+    const len = to - from, mid = (from + to) / 2;
+    const [x, z, w, d] = horizontal ? [mid, at, len, T] : [at, mid, T, len];
+    ctx.scene.add(box(w, H, d, wallMat, x, y, z), box(w + 0.06, 0.8, d + 0.06, baseMat, x, y, z), box(w + (horizontal ? 0 : 0.7), 0.22, d + (horizontal ? 0.7 : 0), tiles, x, y + H, z));
+    ctx.collisions.addBox(x - w / 2, x + w / 2, z - d / 2, z + d / 2);
+  };
+  for (const s of [-1, 1]) {
+    wall(true, cz + s * half, cx - half, cx - gate / 2);
+    wall(true, cz + s * half, cx + gate / 2, cx + half);
+    wall(false, cx + s * half, cz - half, cz - gate / 2);
+    wall(false, cx + s * half, cz + gate / 2, cz + half);
+  }
+  // Gateways: two red posts and a little tiled roof over each opening.
+  const gateway = (x: number, z: number, alongX: boolean) => {
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    if (!alongX) g.rotation.y = Math.PI / 2;
+    ctx.scene.add(g);
+    for (const s of [-1, 1]) g.add(cylinder(0.2, 0.22, 4.2, red, s * (gate / 2 + 0.1), 0, 0, 10));
+    g.add(box(gate + 1.2, 0.5, 0.9, mat(THEME.beam, { roughness: 0.6 }), 0, 3.9, 0));
+    const roof = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, gate + 2.6, 4).rotateZ(Math.PI / 2).scale(1, 0.42, 1), mat(THEME.roof, { roughness: 0.75, flatShading: true }));
+    roof.position.y = 4.85;
+    g.add(roof);
+  };
+  gateway(cx, cz - half, true);
+  gateway(cx, cz + half, true);
+  gateway(cx - half, cz, false);
+  gateway(cx + half, cz, false);
+  // Corner pavilions
+  for (const sx of [-1, 1])
+    for (const sz of [-1, 1]) {
+      const px = cx + sx * half, pz = cz + sz * half;
+      ctx.scene.add(box(4.2, 0.4, 4.2, mat(THEME.platformStone, { roughness: 0.95 }), px, y, pz));
+      for (const [ox, oz] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]]) ctx.scene.add(cylinder(0.14, 0.15, 3.4, red, px + ox, y + 0.4, pz + oz, 8));
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4, 1.8, 4, 1).rotateY(Math.PI / 4), mat(THEME.roof, { roughness: 0.75, flatShading: true }));
+      roof.position.set(px, y + 4.7, pz);
+      ctx.scene.add(roof);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), gold);
+      tip.position.set(px, y + 5.7, pz);
+      ctx.scene.add(tip);
+      ctx.collisions.addBoxCentered(px, pz, 4.2, 4.2);
+    }
+
+  // The great stupa on its stepped platform
+  const S = GREAT_STUPA, b = S.base;
+  ctx.scene.add(box(b, 1.2, b, mat(THEME.platformStone, { roughness: 0.95 }), S.x, y, S.z));
+  ctx.scene.add(box(b - 5, 1.0, b - 5, mat(0xe9e4d8, { roughness: 0.9 }), S.x, y + 1.2, S.z));
+  ctx.scene.add(box(b - 4.6, 0.12, b - 4.6, gold, S.x, y + 2.15, S.z));
+  const st = smallStupa(S.height);
+  st.position.set(S.x, y + 2.2, S.z);
+  ctx.scene.add(st);
+  ctx.collisions.addBoxCentered(S.x, S.z, b + 0.4, b + 0.4);
+  // Vairocana's altar against the platform's south face
+  const az = S.z + b / 2 + 1.0;
+  ctx.scene.add(box(4.2, 1.1, 1.8, mat(THEME.altar, { roughness: 0.55 }), S.x, y, az));
+  ctx.scene.add(box(4.4, 0.1, 2.0, mat(THEME.altarTrim, { metalness: 0.7, roughness: 0.35 }), S.x, y + 1.1, az));
+  ctx.scene.add(buildStatueSlot('vairocana', S.x, y + 1.2, az - 0.1, models.vairocana));
+  ctx.collisions.addBoxCentered(S.x, az, 4.4, 2.0);
+}
+
+/** 泰山龍池: a small round pool with a stone rim and a tall Taishan rock rising from the back. */
+function buildDragonPool(ctx: WorldContext) {
+  const { x, z, r } = DRAGON_POOL;
+  const y = ctx.ground.heightAt(x, z);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(r, 36).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3a7f84, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.8 }));
+  water.position.set(x, y + 0.06, z);
+  ctx.scene.add(water);
+  const rng = mulberry32(5150);
+  for (let i = 0; i < 26; i++) {
+    const a = (i / 26) * Math.PI * 2;
+    rock(ctx, x + Math.cos(a) * (r + 0.3), z + Math.sin(a) * (r + 0.3), range(rng, 0.45, 0.75), rng);
+  }
+  const taishan = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), ROCK);
+  taishan.scale.set(1.6, 3.6, 1.2);
+  taishan.rotation.set(0.1, 0.6, -0.08);
+  taishan.position.set(x + 0.6, y + 2.6, z - r * 0.55);
+  taishan.castShadow = true;
+  ctx.scene.add(taishan);
+  ctx.collisions.addCircle(x, z, r + 0.4);
+}
+
+/** 清澈龍泉: a square stone spring basin with a bamboo spout under a little wooden frame. */
+function buildDragonSpring(ctx: WorldContext) {
+  const { x, z } = DRAGON_SPRING;
+  const y = ctx.ground.heightAt(x, z);
+  const stone = mat(0x9a958a, { roughness: 1, flatShading: true }), wood = mat(0x6b4a2a, { roughness: 0.8 });
+  ctx.scene.add(box(2.6, 0.6, 2.6, stone, x, y, z), box(2.1, 0.02, 2.1, mat(0x6fb3c4, { roughness: 0.05 }), x, y + 0.55, z));
+  for (const s of [-1, 1]) ctx.scene.add(box(0.14, 2.4, 0.14, wood, x + s * 1.5, y, z - 1.5));
+  ctx.scene.add(box(3.4, 0.14, 0.2, wood, x, y + 2.3, z - 1.5));
+  const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 3.8, 3).rotateZ(Math.PI / 2).rotateX(-Math.PI / 2).scale(1, 0.4, 1), mat(THEME.roof, { roughness: 0.75, flatShading: true }));
+  roof.position.set(x, y + 2.65, z - 1.5);
+  ctx.scene.add(roof);
+  const spout = cylinder(0.04, 0.04, 1.0, mat(0x8fa04a, { roughness: 0.6 }), 0, 0, 0, 6);
+  spout.rotation.x = Math.PI / 2 - 0.3;
+  spout.position.set(x, y + 1.0, z - 1.1);
+  ctx.scene.add(spout);
+  ctx.collisions.addBoxCentered(x, z, 2.7, 2.7);
 }
 
 /** Flat wooden footbridges with red rails; the deck is a walkable pad with short ramps at each end. */
@@ -140,19 +249,6 @@ function buildOrchardSign(ctx: WorldContext) {
   ctx.collisions.addCircle(x, z, 0.5);
 }
 
-/** A stupa in the middle of the courtyard, on an octagonal plinth you can walk around. */
-function buildCourtyardStupa(ctx: WorldContext) {
-  const { x, z } = COURTYARD_STUPA;
-  const y = ctx.ground.heightAt(x, z);
-  const stone = mat(THEME.platformStone, { roughness: 0.95 });
-  ctx.scene.add(cylinder(2.9, 3.1, 0.35, stone, x, y, z, 8));
-  ctx.scene.add(cylinder(2.6, 2.6, 0.06, mat(THEME.goldLeaf, { metalness: 0.6, roughness: 0.4 }), x, y + 0.35, z, 8));
-  const st = smallStupa(6.2);
-  st.position.set(x, y + 0.41, z);
-  ctx.scene.add(st);
-  ctx.collisions.addCircle(x, z, 3.1);
-}
-
 function rock(ctx: WorldContext, x: number, z: number, s: number, rng: () => number) {
   const m = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), ROCK);
   m.scale.set(s * range(rng, 0.9, 1.4), s * range(rng, 0.5, 0.9), s * range(rng, 0.8, 1.2));
@@ -163,64 +259,8 @@ function rock(ctx: WorldContext, x: number, z: number, s: number, rng: () => num
   return m;
 }
 
-/** 枯山水: raked gravel with ripples around three rock islands, framed by a stone curb. */
-function buildZenGarden(ctx: WorldContext) {
-  const { minX, maxX, minZ, maxZ } = ZEN_GARDEN;
-  const W = maxX - minX, D = maxZ - minZ, y = ctx.ground.heightAt((minX + maxX) / 2, (minZ + maxZ) / 2);
-  const islands = [
-    { x: minX + W * 0.3, z: minZ + D * 0.28, r: 1.6 },
-    { x: minX + W * 0.68, z: minZ + D * 0.52, r: 2.1 },
-    { x: minX + W * 0.35, z: minZ + D * 0.78, r: 1.3 },
-  ];
-  const PX = 40; // texture pixels per metre
-  const tex = canvasTexture(Math.round(W * PX), Math.round(D * PX), (g) => {
-    g.fillStyle = '#ddd7c9';
-    g.fillRect(0, 0, W * PX, D * PX);
-    g.strokeStyle = 'rgba(150,140,122,0.55)';
-    g.lineWidth = 3;
-    for (let v = 6; v < D * PX; v += 12) {
-      g.beginPath();
-      g.moveTo(0, v);
-      g.lineTo(W * PX, v);
-      g.stroke();
-    }
-    for (const isl of islands) {
-      const cx = (isl.x - minX) * PX, cy = (isl.z - minZ) * PX, R = (isl.r + 1.4) * PX;
-      g.fillStyle = '#ddd7c9';
-      g.beginPath();
-      g.arc(cx, cy, R + 4, 0, Math.PI * 2);
-      g.fill();
-      for (let r = isl.r * PX; r < R; r += 12) {
-        g.beginPath();
-        g.arc(cx, cy, r, 0, Math.PI * 2);
-        g.stroke();
-      }
-    }
-  });
-  const gravel = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, roughness: 1 }));
-  gravel.position.set((minX + maxX) / 2, y + 0.03, (minZ + maxZ) / 2);
-  gravel.receiveShadow = true;
-  ctx.scene.add(gravel);
-  // texture is drawn north-up in z; the plane maps v=0 to the far (−z) edge, which matches minZ
-  // Closed stepped stone border: look, don't walk on the gravel.
-  steppedWall(ctx, true, minZ, minX, maxX, y);
-  steppedWall(ctx, true, maxZ, minX, maxX, y);
-  steppedWall(ctx, false, minX, minZ, maxZ, y);
-  steppedWall(ctx, false, maxX, minZ, maxZ, y);
-
-  const rng = mulberry32(88);
-  for (const isl of islands) {
-    const moss = new THREE.Mesh(new THREE.CircleGeometry(isl.r, 20).rotateX(-Math.PI / 2), MOSS);
-    moss.position.set(isl.x, y + 0.045, isl.z);
-    ctx.scene.add(moss);
-    rock(ctx, isl.x, isl.z, isl.r * 0.55, rng);
-    for (let k = 0; k < 2; k++) rock(ctx, isl.x + range(rng, -0.8, 0.8) * isl.r, isl.z + range(rng, -0.8, 0.8) * isl.r, isl.r * range(rng, 0.2, 0.32), rng);
-  }
-}
-
 /** Gravel ribbons: the path winding through the bamboo, and the footpaths between places. */
-function buildBambooPath(ctx: WorldContext) {
-  gravelRibbon(ctx, BAMBOO_PATH, 0.85);
+function buildFootpaths(ctx: WorldContext) {
   for (const p of FOOTPATHS) gravelRibbon(ctx, p, 0.7);
 }
 
@@ -245,60 +285,6 @@ function gravelRibbon(ctx: WorldContext, points: [number, number][], w: number) 
   const ribbon = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xbdb3a0, roughness: 1, side: THREE.DoubleSide }));
   ribbon.receiveShadow = true;
   ctx.scene.add(ribbon);
-}
-
-/** Moss garden under maples, a little thatched tea hut, stepping stones and a stone water basin. */
-function buildTeaCorner(ctx: WorldContext) {
-  const { x, z, r, hut } = TEA_CORNER;
-  const y = ctx.ground.heightAt(x, z);
-  const moss = new THREE.Mesh(new THREE.CircleGeometry(r, 40).rotateX(-Math.PI / 2), MOSS);
-  moss.position.set(x, y + 0.025, z);
-  moss.receiveShadow = true;
-  ctx.scene.add(moss);
-
-  // Stepping stones from the north path to the hut.
-  const stoneGeo = new THREE.CylinderGeometry(0.42, 0.46, 0.1, 9);
-  const stoneMat = mat(0x9a958a, { roughness: 1, flatShading: true });
-  const from = new THREE.Vector2(-40, -22), to = new THREE.Vector2(hut.x + 2.4, hut.z + 0.4);
-  const steps = Math.round(from.distanceTo(to) / 0.95);
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps, sx = from.x + (to.x - from.x) * t + Math.sin(i * 1.7) * 0.25, sz = from.y + (to.y - from.y) * t + Math.cos(i * 1.3) * 0.25;
-    const s = new THREE.Mesh(stoneGeo, stoneMat);
-    s.position.set(sx, ctx.ground.heightAt(sx, sz) + 0.03, sz);
-    s.rotation.y = i;
-    ctx.scene.add(s);
-  }
-
-  // Hut: raised floor, posts, plaster back and sides, open to the east, thatched hip roof.
-  const g = new THREE.Group();
-  g.position.set(hut.x, y, hut.z);
-  ctx.scene.add(g);
-  const wood = mat(0x6b4a2a, { roughness: 0.8 });
-  g.add(box(3.2, 0.45, 3.2, wood, 0, 0, 0));
-  g.add(box(3.0, 0.04, 3.0, mat(0xc9bb7a, { roughness: 0.9 }), 0, 0.45, 0)); // tatami
-  for (const [px, pz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) g.add(box(0.14, 2.6, 0.14, wood, px, 0, pz));
-  const plaster = mat(0xd8cdb4, { roughness: 0.95 });
-  g.add(box(0.08, 1.9, 3.0, plaster, -1.5, 0.5, 0)); // west (back) wall
-  g.add(box(3.0, 1.9, 0.08, plaster, 0, 0.5, -1.5), box(3.0, 1.9, 0.08, plaster, 0, 0.5, 1.5));
-  const { geometry } = hipRoofGeometry(4.4, 4.4, 1.5);
-  const roof = new THREE.Mesh(geometry, mat(0x8a7444, { roughness: 1, flatShading: true, side: THREE.DoubleSide }));
-  roof.position.y = 2.55;
-  roof.castShadow = true;
-  g.add(roof);
-  g.add(box(0.9, 0.22, 0.6, mat(0x3a2416, { roughness: 0.6 }), 0.2, 0.49, 0)); // low tea table
-  g.add(cylinder(0.08, 0.09, 0.12, mat(0x2f3a3a, { roughness: 0.5 }), 0.15, 0.71, 0, 10));
-  for (const cz of [-0.18, 0.18]) g.add(cylinder(0.035, 0.03, 0.05, mat(0xe8e0d0), 0.45, 0.71, cz, 8));
-  ctx.collisions.addBoxCentered(hut.x, hut.z, 3.3, 3.3);
-
-  // Stone water basin (蹲踞) with a bamboo spout, beside the stepping stones.
-  const bx = hut.x + 3.6, bz = hut.z + 2.6, by = ctx.ground.heightAt(bx, bz);
-  ctx.scene.add(cylinder(0.42, 0.5, 0.5, stoneMat, bx, by, bz, 10));
-  ctx.scene.add(cylinder(0.3, 0.3, 0.02, mat(0x5f8f9a, { roughness: 0.1 }), bx, by + 0.46, bz, 14));
-  const spout = cylinder(0.035, 0.035, 0.9, mat(0x8fa04a, { roughness: 0.6 }), 0, 0, 0, 6);
-  spout.rotation.z = Math.PI / 2 - 0.25;
-  spout.position.set(bx - 0.65, by + 0.75, bz);
-  ctx.scene.add(spout);
-  ctx.collisions.addCircle(bx, bz, 0.55);
 }
 
 /** Octagonal pavilion (亭) on the pond and the covered walkway out to it. */

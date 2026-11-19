@@ -228,40 +228,7 @@ export class WishLanterns {
 
   private buildGarden() {
     const ctx = this.ctx;
-    const W = G.maxX - G.minX, D = G.maxZ - G.minZ, cx = (G.minX + G.maxX) / 2, cz = (G.minZ + G.maxZ) / 2;
-    const y = ctx.ground.heightAt(cx, cz);
-    const tex = canvasTexture(512, 512, (g) => {
-      g.fillStyle = '#d9d2c2';
-      g.fillRect(0, 0, 512, 512);
-      for (let i = 0; i < 2500; i++) {
-        g.fillStyle = Math.random() < 0.5 ? 'rgba(120,110,95,0.35)' : 'rgba(255,255,255,0.4)';
-        g.fillRect(Math.random() * 512, Math.random() * 512, 3, 3);
-      }
-    });
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(W / 4, D / 4);
-    const gravel = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, roughness: 1 }));
-    gravel.position.set(cx, y + 0.03, cz);
-    gravel.receiveShadow = true;
-    ctx.scene.add(gravel);
-    // Stepped stone border you can't climb, with a gap on each side.
-    const lower = mat(0x9a958a, { roughness: 1 }), upper = mat(0x8d8a80, { roughness: 1 });
-    const wall = (horizontal: boolean, at: number, from: number, to: number) => {
-      if (to - from < 0.05) return;
-      const len = to - from, mid = (from + to) / 2;
-      const [x, z, w, d] = horizontal ? [mid, at, len, 0] : [at, mid, 0, len];
-      ctx.scene.add(box(w + 0.8, 0.3, d + 0.8, lower, x, y, z), box(w + 0.42, 0.62, d + 0.42, upper, x, y, z));
-      ctx.collisions.addBox(x - (w + 0.8) / 2, x + (w + 0.8) / 2, z - (d + 0.8) / 2, z + (d + 0.8) / 2);
-    };
-    const side = (horizontal: boolean, at: number, from: number, to: number, gap: [number, number]) => {
-      wall(horizontal, at, from, gap[0]);
-      wall(horizontal, at, gap[1], to);
-    };
-    side(true, G.minZ, G.minX, G.maxX, G.openings.north);
-    side(true, G.maxZ, G.minX, G.maxX, G.openings.south);
-    side(false, G.minX, G.minZ, G.maxZ, G.openings.west);
-    side(false, G.maxX, G.minZ, G.maxZ, G.openings.east);
-
+    const y = ctx.ground.heightAt((G.minX + G.maxX) / 2, (G.minZ + G.maxZ) / 2);
     // Racks: red posts and a beam under a narrow tiled top.
     const red = mat(THEME.column, { roughness: 0.55 });
     for (const rz of G.racks) {
@@ -273,15 +240,15 @@ export class WishLanterns {
       ctx.scene.add(box(G.rackX1 - G.rackX0 + 0.9, 0.08, 0.5, mat(THEME.roof, { roughness: 0.75 }), (G.rackX0 + G.rackX1) / 2, y + HOOK_Y + 0.25, rz));
     }
 
-    // Writing desk at the west entrance, with paper, ink stone and a few spare lanterns.
+    // Writing desk facing the plaza's central walk (east): paper and ink in front, spare lanterns behind.
     const { x: dx, z: dz } = G.desk;
     const wood = mat(0x5a2b1a, { roughness: 0.55 });
     ctx.scene.add(box(0.8, 0.78, 1.6, wood, dx, y, dz));
-    ctx.scene.add(box(0.5, 0.01, 0.36, mat(0xf6efdc), dx - 0.05, y + 0.78, dz - 0.2));
-    ctx.scene.add(box(0.14, 0.03, 0.22, mat(0x222222, { roughness: 0.4 }), dx, y + 0.78, dz + 0.3));
+    ctx.scene.add(box(0.5, 0.01, 0.36, mat(0xf6efdc), dx + 0.1, y + 0.78, dz - 0.2));
+    ctx.scene.add(box(0.14, 0.03, 0.22, mat(0x222222, { roughness: 0.4 }), dx + 0.15, y + 0.78, dz + 0.3));
     [0, 3, 5].forEach((c, i) => {
       const l = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8).scale(1, 1.15, 1), mat(LOTUS_COLOURS[c], { roughness: 0.6 }));
-      l.position.set(dx + 0.15, y + 0.97, dz + 0.55 - i * 0.3);
+      l.position.set(dx - 0.2, y + 0.97, dz + 0.55 - i * 0.3);
       ctx.scene.add(l);
     });
     ctx.collisions.addBoxCentered(dx, dz, 0.9, 1.7);
@@ -301,20 +268,11 @@ export class WishLanterns {
         g.fillText('燈願許', 256, 76);
       }) }),
     );
-    sign.position.set(dx - 0.2, y + 2.1, dz - 1.2);
-    sign.rotation.y = -Math.PI / 2;
-    ctx.scene.add(sign, cylinder(0.05, 0.05, 2.3, wood, dx - 0.15, y, dz - 1.2, 6));
+    sign.position.set(dx + 0.2, y + 2.1, dz - 1.2);
+    sign.rotation.y = Math.PI / 2; // faces the central walk
+    ctx.scene.add(sign, cylinder(0.05, 0.05, 2.3, wood, dx + 0.15, y, dz - 1.2, 6));
 
-    ctx.interactions.add({ id: 'wish-desk', x: dx - 1.0, z: dz, radius: 1.5, prompt: () => ({ text: t('prompt.hangWish') }), onInteract: () => this.openForm() });
+    ctx.interactions.add({ id: 'wish-desk', x: dx + 1.0, z: dz, radius: 1.5, prompt: () => ({ text: t('prompt.hangWish') }), onInteract: () => this.openForm() });
 
-    // Stepping stones from the approach.
-    const stoneMat = mat(0x9a958a, { roughness: 1, flatShading: true }), stoneGeo = new THREE.CylinderGeometry(0.42, 0.46, 0.1, 9);
-    for (let i = 0; i <= 16; i++) {
-      const sx = 4 + i * 0.97, sz = 44 - (i / 16) * 2.5 + Math.sin(i * 1.9) * 0.2;
-      const s = new THREE.Mesh(stoneGeo, stoneMat);
-      s.position.set(sx, ctx.ground.heightAt(sx, sz) + 0.03, sz);
-      s.rotation.y = i;
-      ctx.scene.add(s);
-    }
   }
 }

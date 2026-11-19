@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HALLS, PAVED, PLATFORM_H, WATERFALL } from '../config/layout';
+import { HALLS, PAVED, PLATFORM_H, WATERFALL , hallHalf } from '../config/layout';
 import { settings } from '../config/settings';
 import { assetUrl } from '../content/manifest';
 import { lighting } from '../world/sky';
@@ -50,7 +50,7 @@ export class Soundscape {
   constructor(private birdPoints: THREE.Vector3[]) {
     // Wind chimes hang at the four eave corners of every hall.
     for (const h of HALLS) {
-      const ex = h.width / 2 + (h.kind === 'shrine' ? 1.6 : 2.4), ez = h.depth / 2 + (h.kind === 'shrine' ? 1.6 : 2.4);
+      const ex = hallHalf(h)[0] + (h.kind === 'shrine' ? 1.6 : 2.4), ez = hallHalf(h)[1] + (h.kind === 'shrine' ? 1.6 : 2.4);
       for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) this.chimePoints.push(new THREE.Vector3(h.x + sx * ex, PLATFORM_H + h.wallHeight, h.z + sz * ez));
     }
   }
@@ -252,7 +252,7 @@ export class Soundscape {
   /** What the listener is walking on. */
   surfaceAt(p: THREE.Vector3): Surface {
     if (nearestRiver(p.x, p.z).d < 2.2) return 'water';
-    const inHall = HALLS.some((h) => h.kind === 'hall' && Math.abs(p.x - h.x) < h.width / 2 && Math.abs(p.z - h.z) < h.depth / 2);
+    const inHall = HALLS.some((h) => h.kind === 'hall' && Math.abs(p.x - h.x) < hallHalf(h)[0] && Math.abs(p.z - h.z) < hallHalf(h)[1]);
     if (inHall && p.y > PLATFORM_H * 0.7) return 'wood';
     if (p.y > PLATFORM_H * 0.7) return 'stone'; // platforms and stairs
     if (PAVED.some((r) => p.x >= r.minX && p.x <= r.maxX && p.z >= r.minZ && p.z <= r.maxZ)) return 'stone';
@@ -290,7 +290,7 @@ export class Soundscape {
     } else this.stride = 0.5;
 
     // Indoors (inside a hall's walls) the outdoors is muffled.
-    const indoors = HALLS.some((h) => h.kind === 'hall' && Math.abs(listener.x - h.x) < h.width / 2 && Math.abs(listener.z - h.z) < h.depth / 2);
+    const indoors = HALLS.some((h) => h.kind === 'hall' && Math.abs(listener.x - h.x) < hallHalf(h)[0] && Math.abs(listener.z - h.z) < hallHalf(h)[1]);
     const out = indoors ? 0.25 : 1;
 
     // Wind: slow overlapping gusts, a little stronger up the slopes.

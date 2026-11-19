@@ -32,6 +32,8 @@ export interface OfferingTable {
   bowl?: { x: number; y: number; z: number; r: number };
   /** Smoke rises from the bowl even without offerings (the big courtyard burner). */
   ambientSmoke?: boolean;
+  /** Yaw of the hall it stands in (visitors stand on its front side); 0 = facing south. */
+  facing?: number;
 }
 
 /** Things anyone can strike (or pet): the hall instruments and the cat. The sound is shared. */

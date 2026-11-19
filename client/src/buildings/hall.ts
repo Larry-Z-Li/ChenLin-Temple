@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { DEITIES } from '../config/deities';
-import { PLATFORM_H, type HallDef } from '../config/layout';
+import { hallYaw, PLATFORM_H, type HallDef } from '../config/layout';
 import { THEME } from '../config/theme';
-import type { WorldContext } from '../core/context';
+import type { Instrument, OfferingTable, Seat, WorldContext } from '../core/context';
 import { ceilingTexture, textTexture, verticalTextTexture } from '../core/textures';
 import type { ThangkaEntry } from '../content/manifest';
 import { inscription, onLocaleChange, t, type I18nKey } from '../i18n';
@@ -19,7 +19,62 @@ const T = 0.4; // wall thickness
 const PORCH = 1.6; // platform margin around the walls
 const DOOR_H = 3.9;
 
+/**
+ * Build a hall. Halls facing east or west are built facing south around the origin inside a turned
+ * group, and everything they register with the world (collisions, floors, steps, seats, offering
+ * tables, instruments) is turned into place on the way through.
+ */
 export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string, string>, thangkas: ThangkaEntry[]) {
+  const yaw = hallYaw(def);
+  if (!yaw) return buildHallSouth(ctx, def, models, thangkas);
+  const root = new THREE.Group();
+  root.name = `hall-${def.id}`;
+  root.position.set(def.x, 0, def.z);
+  root.rotation.y = yaw;
+  ctx.scene.add(root);
+  return buildHallSouth(turnedContext(ctx, def.x, def.z, yaw, root), { ...def, x: 0, z: 0 }, models, thangkas);
+}
+
+/** A WorldContext whose registrations are turned by `yaw` about (ox, oz); meshes go into `root`. */
+function turnedContext(ctx: WorldContext, ox: number, oz: number, yaw: number, root: THREE.Group): WorldContext {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const X = (x: number, z: number) => ox + x * c + z * s, Z = (x: number, z: number) => oz - x * s + z * c;
+  const aabb = (x0: number, x1: number, z0: number, z1: number) => {
+    const xs = [X(x0, z0), X(x1, z0), X(x0, z1), X(x1, z1)], zs = [Z(x0, z0), Z(x1, z0), Z(x0, z1), Z(x1, z1)];
+    return { minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs) };
+  };
+  const vec = (x: number, z: number): [number, number] => [x * c + z * s, -x * s + z * c];
+  const collisions = {
+    addBox: (x0: number, x1: number, z0: number, z1: number) => { const b = aabb(x0, x1, z0, z1); ctx.collisions.addBox(b.minX, b.maxX, b.minZ, b.maxZ); },
+    addBoxCentered: (x: number, z: number, w: number, d: number) => ctx.collisions.addBoxCentered(X(x, z), Z(x, z), Math.abs(c) * w + Math.abs(s) * d, Math.abs(s) * w + Math.abs(c) * d),
+    addCircle: (x: number, z: number, r: number) => ctx.collisions.addCircle(X(x, z), Z(x, z), r),
+  };
+  const ground = {
+    addPad: (x0: number, x1: number, z0: number, z1: number, h: number) => { const b = aabb(x0, x1, z0, z1); ctx.ground.addPad(b.minX, b.maxX, b.minZ, b.maxZ, h); },
+    // a north–south ramp turned a quarter becomes an east–west one
+    addRamp: (x0: number, x1: number, z0: number, z1: number, h0: number, h1: number) => {
+      const b = aabb(x0, x1, z0, z1);
+      ctx.ground.addRampX(b.minZ, b.maxZ, X((x0 + x1) / 2, z0), X((x0 + x1) / 2, z1), h0, h1);
+    },
+    heightAt: (x: number, z: number) => ctx.ground.heightAt(X(x, z), Z(x, z)),
+  };
+  const seats = {
+    set: (id: string, st: Seat) => ctx.seats.set(id, { ...st, x: X(st.x, st.z), z: Z(st.x, st.z), yaw: st.yaw + yaw, exit: vec(...st.exit) }),
+  };
+  const offeringTables = {
+    push: (t: OfferingTable) =>
+      ctx.offeringTables.push({
+        ...t, x: X(t.x, t.z), z: Z(t.x, t.z), facing: yaw,
+        slots: t.slots.map((p) => ({ ...p, x: X(p.x, p.z), z: Z(p.x, p.z) })),
+        bowl: t.bowl && { ...t.bowl, x: X(t.bowl.x, t.bowl.z), z: Z(t.bowl.x, t.bowl.z) },
+        stand: t.stand && { x: X(t.stand.x, t.stand.z), z: Z(t.stand.x, t.stand.z) },
+      }),
+  };
+  const instruments = { push: (i: Instrument) => ctx.instruments.push({ ...i, x: X(i.x, i.z), z: Z(i.x, i.z) }) };
+  return { ...ctx, scene: root as unknown as THREE.Scene, collisions, ground, seats, offeringTables, instruments } as unknown as WorldContext;
+}
+
+function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, string>, thangkas: ThangkaEntry[]) {
   const g = new THREE.Group();
   g.name = `hall-${def.id}`;
   ctx.scene.add(g);
@@ -93,7 +148,8 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
       g.add(blocker(m));
     };
     if (def.roofTiers === 2) {
-      const rw = width * 0.5, rd = depth * 0.4, RC = 2.6, y = F + H - 0.02;
+      // keep the bay under the lower roof and below the clerestory
+      const rw = width * 0.5, rd = depth * 0.4, RC = Math.max(1.2, Math.min(2.6, (depth + 4.8) * 0.38 * 0.3 - 0.9)), y = F + H - 0.02;
       ceilPlane(width, (depth - rd) / 2, hx, hz + (rd + depth) / 4, y);
       ceilPlane(width, (depth - rd) / 2, hx, hz - (rd + depth) / 4, y);
       ceilPlane((width - rw) / 2, rd, hx + (rw + width) / 4, hz, y);
@@ -309,7 +365,9 @@ const CUSHION_PROFILE = [[0, 0], [0.44, 0], [0.49, 0.04], [0.5, 0.1], [0.485, 0.
  */
 function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: number, F: number, startZ: number, frontInner: number): CushionBlock {
   const wide = def.width > 40;
-  const cols = wide ? 6 : 4; // per side of the centre aisle
+  const sxGuess = wide ? 2.2 : 2.0, aisleGuess = wide ? 2.0 : 1.6;
+  // per side of the centre aisle: as many as fit with the outer cushion a metre clear of the wall
+  const cols = wide ? 6 : Math.max(2, Math.min(4, Math.floor((def.width / 2 - 1.1 - aisleGuess - 1.0) / sxGuess) + 1));
   const rows = Math.ceil(def.seats / (cols * 2));
   const sx = wide ? 2.2 : 2.0;
   const aisle = wide ? 2.0 : 1.6; // half-width of the centre aisle

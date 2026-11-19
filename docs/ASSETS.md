@@ -11,7 +11,7 @@ All content lives in `client/public/assets/`. Each folder has an `index.json` ma
 | `models/` | `.glb` | `{ "vairocana": "vairocana.glb", … }` (deity id → file) |
 | `sfx/` | `.mp3`, `.m4a`, `.ogg` | `{ "waterfall", "stream", "bell": file, "birds": [files], "chimes": [files] }` (each optional; synthesized when absent) |
 
-Deity ids (the Five Tathāgatas, west → east on the altar): `amitabha`, `amoghasiddhi`, `vairocana`, `ratnasambhava`, `akshobhya`. Hall id: `center` (the one hall).
+Deity ids: the Five Tathāgatas `vairocana` (the great stupa), `akshobhya`, `ratnasambhava`, `amitabha`, `amoghasiddhi`; the eight bodhisattvas `cintamanicakra` (如意輪觀音), `sarvanivarana` (除蓋障), `akashagarbha` (虛空藏), `samantabhadra` (普賢), `vajrapani` (金剛手), `ksitigarbha` (地藏), `maitreya` (彌勒), `manjushri` (文殊); plus `bhaisajyaguru` (藥師佛) and `daikokuten` (大黑天). Hall ids: `guanyin`, `yangsheng`, `caishen`, `zangmi`, `dongmi`, `dizang`, `guoxue`, `wenshu`, `chengjiu`, `baosheng`.
 
 **Translations:** give the same sutra in several languages the same `group` and a different `lang` (e.g. `heart.en.md`, `heart.zh.md`). The reader picks the visitor's language and falls back to English.
 

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { box, cylinder, mat } from '../buildings/materials';
 import {
-  BENCHES, BODHI_TREE, FLAG_LINES, HALLS, LANTERN_CANOPY, LANTERN_STRINGS, PATH_LIGHT_RUNS, POND, POND_LIGHT_RING, STONE_LANTERNS,
+  BENCHES, BODHI_TREE, FLAG_LINES, hallHalf, HALLS, LANTERN_CANOPY, LANTERN_STRINGS, PATH_LIGHT_RUNS, POND, POND_LIGHT_RING, STONE_LANTERNS,
 } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
@@ -171,8 +171,8 @@ function pathLightSpots() {
     if (BENCHES.some((b) => Math.hypot(x - b.x, z - b.z) < 1.9)) return false;
     if (poles.some((p) => Math.hypot(x - p.x, z - p.z) < 1.2)) return false;
     for (const h of HALLS) {
-      const front = h.z + h.depth / 2, back = h.z - h.depth / 2;
-      if (Math.abs(x - h.x) < h.width / 2 + 2 && z > back - 4.5 && z < front + 4.5) return false; // the hall, its porch and stairs
+      const [ex, ez] = hallHalf(h);
+      if (Math.abs(x - h.x) < ex + 4.5 && Math.abs(z - h.z) < ez + 4.5) return false; // the hall, its porch and stairs
     }
     return true;
   });

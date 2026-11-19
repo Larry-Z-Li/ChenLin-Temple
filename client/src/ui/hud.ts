@@ -13,6 +13,7 @@ export interface HudCallbacks {
   onMusic(on: boolean): void;
   onSeatAction(action: SeatAction): void;
   onChants(): void;
+  onFastTravel(): void;
   onMap(): void;
   /** Tapping the interaction prompt = pressing E (touch-friendly; tap repeatedly for wheels). */
   onPrompt(): void;
@@ -142,6 +143,7 @@ export class Hud {
       { class: 'quick-actions' },
       h('button', { class: 'icon-btn', i18n: 'bow.button', onclick: () => cb.onBow() }),
       h('button', { class: 'icon-btn', i18n: 'hud.chants', onclick: () => cb.onChants() }),
+      h('button', { class: 'icon-btn', i18n: 'hud.fastTravel', onclick: () => cb.onFastTravel() }),
     );
 
     this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, quick, this.toasts, this.help, this.settingsPanel);

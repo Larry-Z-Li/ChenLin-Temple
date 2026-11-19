@@ -143,14 +143,15 @@ export class Offerings {
   private addTable(table: OfferingTable) {
     const vis: TableVisual = { table, sticks: new Map(), fruits: new Map(), order: [] };
     this.tables.set(table.hallId, vis);
-    const front = table.z + 1.0; // visitors stand on the south side
+    // visitors stand on the table's front side (south, unless the hall is turned)
+    const fx = Math.sin(table.facing ?? 0), fz = Math.cos(table.facing ?? 0);
     const add = (key: string, x: number, z: number, prompt: () => { text: string } | null, act: () => void) =>
       this.ctx.interactions.add({ id: `${table.hallId}-${key}`, x, z, radius: 1.0, prompt, onInteract: act });
 
-    const stand = table.stand ?? { x: table.x, z: front };
+    const stand = table.stand ?? { x: table.x + fx, z: table.z + fz };
     add('incense', stand.x, stand.z, () => (this.ritual ? null : { text: t('prompt.placeIncense') }), () => this.startRitual(table));
     table.slots.forEach((slot, i) =>
-      add(`plate${i}`, slot.x, front, () => ({ text: this.inventory.length ? t('prompt.offerAllFruit', { n: this.inventory.length }) : t('prompt.offerFruit') }), () => {
+      add(`plate${i}`, slot.x + fx * 0.92, slot.z + fz * 0.92, () => ({ text: this.inventory.length ? t('prompt.offerAllFruit', { n: this.inventory.length }) : t('prompt.offerFruit') }), () => {
         // Required: a clear message when there's nothing to offer.
         if (!this.inventory.length) return this.hud.toast(t('offer.noFruit'));
         this.net.offerFruits(table.hallId, [...this.inventory]);
@@ -160,7 +161,7 @@ export class Offerings {
 
   private startRitual(table: OfferingTable) {
     if (this.ritual || this.player.mode !== 'free') return;
-    const stand = table.stand ?? { x: table.x, z: table.z + 1.0 };
+    const stand = table.stand ?? { x: table.x + Math.sin(table.facing ?? 0), z: table.z + Math.cos(table.facing ?? 0) };
     const bowl = table.bowl ?? { x: table.x, z: table.z };
     const yaw = Math.atan2(-(bowl.x - stand.x), -(bowl.z - stand.z));
     this.player.anchor(stand.x, this.ctx.ground.heightAt(stand.x, stand.z), stand.z, yaw, 'ritual', RITUAL[0].anim);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Offerings } from '../activities/offerings';
-import { BAMBOO_PATH, BODHI_TREE, CAT_SPOTS, DEER_RANGES, FOOTPATHS, HALLS, PAVED, POND, TEA_CORNER, WISH_GARDEN, ZEN_GARDEN } from '../config/layout';
+import { hallHalf, spreadPoint, PLAZA, ABBOT, BODHI_TREE, CAT_SPOTS, CHERRY_GROVE, DEER_RANGES, DORM, DRAGON_POOL, DRAGON_SPRING, FOOTPATHS, HALLS, ORCHARD, PAVED, POND, STUPA_COURT, WISH_GARDEN } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import type { Interactable } from '../core/interaction';
 import { mulberry32, range } from '../core/math';
@@ -79,7 +79,7 @@ interface Deer {
 }
 
 /** Inside a hall or on its porch: animals don't follow people there. */
-const inHallZone = (x: number, z: number) => HALLS.some((h) => Math.abs(x - h.x) < h.width / 2 + 3 && Math.abs(z - h.z) < h.depth / 2 + 4.5);
+const inHallZone = (x: number, z: number) => HALLS.some((h) => Math.abs(x - h.x) < hallHalf(h)[0] + 4 && Math.abs(z - h.z) < hallHalf(h)[1] + 4);
 
 const hash = (a: number, b: number) => {
   let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b, 0xc2b2ae35);
@@ -202,8 +202,9 @@ function buildCat(ctx: WorldContext, spot: (typeof CAT_SPOTS)[number], index: nu
 
 function buildButterflies(ctx: WorldContext) {
   const spots: [number, number][] = [
-    [BODHI_TREE.x + 3, BODHI_TREE.z - 2], [(ZEN_GARDEN.minX + ZEN_GARDEN.maxX) / 2, ZEN_GARDEN.maxZ + 2], [TEA_CORNER.x, TEA_CORNER.z],
-    [WISH_GARDEN.minX - 2, 30], [WISH_GARDEN.maxX + 3, 40], [POND.x + 4, POND.z + 19], [-18, -8], [18, -8], [-12, 56], [12, 56], [34, -6], [-30, 64], [60, 70],
+    [BODHI_TREE.x + 3, BODHI_TREE.z - 2], [CHERRY_GROVE.x - 16, CHERRY_GROVE.z + 6], [CHERRY_GROVE.x + 16, CHERRY_GROVE.z + 6],
+    [WISH_GARDEN.minX - 3, WISH_GARDEN.maxZ - 4], [POND.x + 4, POND.z + 18], [DRAGON_POOL.x + 8, DRAGON_POOL.z], [DRAGON_SPRING.x + 4, DRAGON_SPRING.z],
+    [-34, PLAZA.z], [34, PLAZA.z], [ORCHARD.minX - 3, (ORCHARD.minZ + ORCHARD.maxZ) / 2], [ABBOT.x + 8, ABBOT.z + 6], [(DORM.minX + DORM.maxX) / 2 - 4, (DORM.minZ + DORM.maxZ) / 2],
   ];
   const N = spots.length * 3;
   // Four wings in the XZ plane (body along Z); flapping squeezes them toward the body.
@@ -240,8 +241,8 @@ function buildButterflies(ctx: WorldContext) {
 
 function buildFireflies(ctx: WorldContext) {
   const areas: [number, number, number][] = [
-    [POND.x, POND.z, 20], [TEA_CORNER.x, TEA_CORNER.z, 11], [(ZEN_GARDEN.minX + ZEN_GARDEN.maxX) / 2, (ZEN_GARDEN.minZ + ZEN_GARDEN.maxZ) / 2, 10],
-    [BAMBOO_PATH[3][0], BAMBOO_PATH[3][1], 14], [BODHI_TREE.x, BODHI_TREE.z, 8], [33, 38, 14], [-40, 46, 10], [70, 0, 10], [-28, 84, 10], [40, 88, 12],
+    [POND.x, POND.z, 20], [CHERRY_GROVE.x, CHERRY_GROVE.z, 24], [DRAGON_POOL.x, DRAGON_POOL.z, 9], [BODHI_TREE.x, BODHI_TREE.z, 8],
+    [STUPA_COURT.x, STUPA_COURT.z + STUPA_COURT.half + 8, 10], [...spreadPoint(-62, 80), 12], [...spreadPoint(70, 66), 12], [ORCHARD.minX + 10, (ORCHARD.minZ + ORCHARD.maxZ) / 2, 14], [PLAZA.x, PLAZA.z, 14],
   ];
   const N = 200, rng = mulberry32(31);
   const base = Array.from({ length: N }, (_, i) => {

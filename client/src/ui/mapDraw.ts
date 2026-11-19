@@ -1,4 +1,4 @@
-import { BAMBOO_PATH, BASIN, BODHI_TREE, COURTYARD_STUPA, FOOT_BRIDGES, FOOTPATHS, HALLS, HUTS, MOUNTAIN_GATE, ORCHARD, PAVED, PLAY_RADIUS, POND, POND_PAVILION, RIVERS, TEA_CORNER, WHEEL_ROWS, WISH_GARDEN, ZEN_GARDEN } from '../config/layout';
+import { hallHalf, ABBOT, PLAZA, type TravelSpot, BASIN, BODHI_TREE, DORM, FOOT_BRIDGES, FOOTPATHS, GREAT_STUPA, HALLS, MOUNTAIN_GATE, ORCHARD, PAGODAS, PAVED, PLAY_RADIUS, POND, RIVERS, STUPA_COURT, WHEEL_ROWS } from '../config/layout';
 import { t, type I18nKey } from '../i18n';
 
 export interface MapMarks {
@@ -8,6 +8,16 @@ export interface MapMarks {
   here?: { x: number; z: number };
   /** Place names (big map and board). */
   labels?: boolean;
+  /** Fast-travel mode: gold rings on every destination, the hovered one highlighted. */
+  travel?: { spots: TravelSpot[]; hovered: TravelSpot | null };
+}
+
+/** World → map pixel mapping for an S×S map (south-up). */
+export function mapProjector(S: number) {
+  const k = S / 200;
+  const s = (S / 2 - 8 * k) / PLAY_RADIUS;
+  const cx = S / 2 + BASIN.x * s, cy = S / 2 + BASIN.z * s;
+  return { k, s, X: (x: number) => cx - x * s, Y: (z: number) => cy - z * s };
 }
 
 /**
@@ -15,10 +25,7 @@ export interface MapMarks {
  * into an S×S square of `g`. screenX = cx − x·s, screenY = cy − z·s.
  */
 export function drawTempleMap(g: CanvasRenderingContext2D, S: number, marks: MapMarks = {}) {
-  const k = S / 200; // line/dot scale relative to the 200px minimap
-  const s = (S / 2 - 8 * k) / PLAY_RADIUS;
-  const cx = S / 2 + BASIN.x * s, cy = S / 2 + BASIN.z * s;
-  const X = (x: number) => cx - x * s, Y = (z: number) => cy - z * s;
+  const { k, s, X, Y } = mapProjector(S); // k: line/dot scale relative to the 200px minimap
   const dot = (x: number, y: number, r: number) => {
     g.beginPath();
     g.arc(x, y, r, 0, Math.PI * 2);
@@ -37,16 +44,6 @@ export function drawTempleMap(g: CanvasRenderingContext2D, S: number, marks: Map
     g.stroke();
   }
 
-  // Garden rooms
-  g.fillStyle = 'rgba(70,110,45,0.95)';
-  dot(X(TEA_CORNER.x), Y(TEA_CORNER.z), TEA_CORNER.r * s);
-  g.fillStyle = 'rgba(222,215,200,0.9)';
-  for (const r of [ZEN_GARDEN, WISH_GARDEN]) g.fillRect(X(r.maxX), Y(r.maxZ), (r.maxX - r.minX) * s, (r.maxZ - r.minZ) * s);
-  g.strokeStyle = 'rgba(120,160,70,0.95)';
-  g.lineWidth = 3.2 * k;
-  g.beginPath();
-  BAMBOO_PATH.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
-  g.stroke();
   g.strokeStyle = 'rgba(205,195,170,0.85)';
   g.lineWidth = 1.4 * k;
   for (const p of FOOTPATHS) {
@@ -54,15 +51,20 @@ export function drawTempleMap(g: CanvasRenderingContext2D, S: number, marks: Map
     p.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
     g.stroke();
   }
-  g.fillStyle = '#f1ede3';
-  dot(X(COURTYARD_STUPA.x), Y(COURTYARD_STUPA.z), 3 * s);
   g.fillStyle = '#a3291f';
   for (const b of FOOT_BRIDGES) {
     const [w, d] = b.axis === 'x' ? [b.length, 2.4] : [2.4, b.length];
     g.fillRect(X(b.x + w / 2), Y(b.z + d / 2), w * s, d * s);
   }
+  // Abbot's and monks' quarters
   g.fillStyle = '#8e2b1f';
-  for (const h of HUTS) g.fillRect(X(h.x) - 3.2 * s, Y(h.z) - 3.2 * s, 6.4 * s, 6.4 * s);
+  g.fillRect(X(ABBOT.x) - 4.5 * s, Y(ABBOT.z) - 3.5 * s, 9 * s, 7 * s);
+  const d = DORM;
+  for (const [x0, x1, z0, z1] of [[d.minX, d.maxX, d.minZ, d.minZ + d.wing], [d.minX, d.maxX, d.maxZ - d.wing, d.maxZ], [d.maxX - d.wing, d.maxX, d.minZ, d.maxZ]])
+    g.fillRect(X(x1), Y(z1), (x1 - x0) * s, (z1 - z0) * s);
+  // Pagodas
+  g.fillStyle = '#c9b48a';
+  for (const p of PAGODAS) dot(X(p.x), Y(p.z), (p.stories ? 4 : 6) * s);
 
   g.fillStyle = 'rgba(190,182,166,0.92)';
   for (const r of PAVED) g.fillRect(X(r.maxX), Y(r.maxZ), (r.maxX - r.minX) * s, (r.maxZ - r.minZ) * s);
@@ -76,22 +78,30 @@ export function drawTempleMap(g: CanvasRenderingContext2D, S: number, marks: Map
   g.fillStyle = 'rgba(80,140,60,0.95)';
   dot(X(BODHI_TREE.x), Y(BODHI_TREE.z), 3 * k);
   g.fillStyle = '#a3291f';
-  dot(X(POND_PAVILION.x), Y(POND_PAVILION.z), POND_PAVILION.r * s);
-  g.fillRect(X(POND_PAVILION.walkX1), Y(POND_PAVILION.walkZ1), (POND_PAVILION.walkX1 - POND_PAVILION.walkX0) * s, (POND_PAVILION.walkZ1 - POND_PAVILION.walkZ0) * s);
 
   g.fillStyle = '#d9a441';
   for (const w of WHEEL_ROWS) g.fillRect(X(w.x) - k, Y(w.zStart + (w.count - 1) * w.spacing), 2 * k, (w.count - 1) * w.spacing * s);
 
+  // The stupa court (walls) and the great stupa
+  const sc = STUPA_COURT;
+  g.strokeStyle = '#efe6d2';
+  g.lineWidth = 1.6 * k;
+  g.strokeRect(X(sc.x + sc.half), Y(sc.z + sc.half), sc.half * 2 * s, sc.half * 2 * s);
+  g.fillStyle = '#f4efe2';
+  dot(X(GREAT_STUPA.x), Y(GREAT_STUPA.z), (GREAT_STUPA.base / 2) * s);
+  g.fillStyle = '#d4af37';
+  dot(X(GREAT_STUPA.x), Y(GREAT_STUPA.z), 2.2 * s);
   for (const hall of HALLS) {
     g.fillStyle = hall.kind === 'shrine' ? '#b0473a' : '#8e2b1f';
-    g.fillRect(X(hall.x + hall.width / 2), Y(hall.z + hall.depth / 2), hall.width * s, hall.depth * s);
+    const [hx, hz] = hallHalf(hall);
+    g.fillRect(X(hall.x + hx), Y(hall.z + hz), hx * 2 * s, hz * 2 * s);
   }
   g.fillStyle = '#a3291f';
   g.fillRect(X(MOUNTAIN_GATE.x + MOUNTAIN_GATE.width / 2), Y(MOUNTAIN_GATE.z) - k, MOUNTAIN_GATE.width * s, 2.5 * k);
 
   if (marks.labels) {
     const label = (key: I18nKey, x: number, z: number, dy = 0) => {
-      g.font = `600 ${Math.round(7.5 * k)}px "Noto Serif TC", "Songti TC", serif`;
+      g.font = `600 ${Math.round(6.8 * k)}px "Noto Serif TC", "Songti TC", serif`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.lineWidth = 3 * k;
@@ -101,15 +111,18 @@ export function drawTempleMap(g: CanvasRenderingContext2D, S: number, marks: Map
       g.fillText(t(key), X(x), Y(z) + dy * k);
     };
     for (const hall of HALLS) label(hall.nameKey as I18nKey, hall.x, hall.z, hall.kind === 'shrine' ? -10 : 0);
+    label('map.stupa', GREAT_STUPA.x, GREAT_STUPA.z);
+    // pagoda names sit on the far side of each pagoda, away from the halls
+    for (const p of PAGODAS) {
+      const dx = p.x - GREAT_STUPA.x, dz = p.z - GREAT_STUPA.z, l = Math.hypot(dx, dz) || 1;
+      label(p.nameKey as I18nKey, p.x + (dx / l) * 10, p.z + (dz / l) * 10);
+    }
+    label('map.abbot', ABBOT.x, ABBOT.z);
+    label('map.dorm', (DORM.minX + DORM.maxX) / 2, (DORM.minZ + DORM.maxZ) / 2);
+    label('map.plaza', PLAZA.x, PLAZA.z);
     label('map.pond', POND.x, POND.z);
     label('map.orchard', (ORCHARD.minX + ORCHARD.maxX) / 2, (ORCHARD.minZ + ORCHARD.maxZ) / 2);
-    label('map.gate', MOUNTAIN_GATE.x, MOUNTAIN_GATE.z, -7);
     label('map.bodhi', BODHI_TREE.x, BODHI_TREE.z, 7);
-    label('map.zen', (ZEN_GARDEN.minX + ZEN_GARDEN.maxX) / 2, (ZEN_GARDEN.minZ + ZEN_GARDEN.maxZ) / 2);
-    label('map.wishes', (WISH_GARDEN.minX + WISH_GARDEN.maxX) / 2, (WISH_GARDEN.minZ + WISH_GARDEN.maxZ) / 2);
-    label('map.tea', TEA_CORNER.x, TEA_CORNER.z);
-    label('map.bamboo', BAMBOO_PATH[4][0], BAMBOO_PATH[4][1] - 6);
-    label('map.pavilion', POND_PAVILION.x, POND_PAVILION.z, 8);
   }
 
   g.fillStyle = '#fff';
@@ -129,6 +142,17 @@ export function drawTempleMap(g: CanvasRenderingContext2D, S: number, marks: Map
     g.strokeText(t('map.here'), px + 6 * k, py);
     g.fillStyle = '#ffd36b';
     g.fillText(t('map.here'), px + 6 * k, py);
+  }
+
+  if (marks.travel) {
+    for (const spot of marks.travel.spots) {
+      const on = spot === marks.travel.hovered;
+      g.strokeStyle = on ? '#fff3c4' : 'rgba(217,164,65,0.95)';
+      g.lineWidth = (on ? 2.6 : 1.6) * k;
+      g.beginPath();
+      g.arc(X(spot.at.x), Y(spot.at.z), (on ? 6.5 : 4.5) * k, 0, Math.PI * 2);
+      g.stroke();
+    }
   }
 
   if (marks.me) {

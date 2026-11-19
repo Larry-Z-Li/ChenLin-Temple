@@ -109,7 +109,8 @@ body.reading .minimap { display: none; }
 .seg-btn.active { background: var(--accent); color: var(--accent-ink); }
 
 /* ---------- Bow, fruit, beads ---------- */
-.quick-actions { position: absolute; left: 16px; bottom: 16px; display: flex; gap: 8px; }
+.quick-actions { position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; display: flex; gap: 8px; }
+.seatbar:not(.hidden) ~ .quick-actions { display: none; } /* the seated bar takes the bottom centre */
 .quick-actions .icon-btn { height: 44px; padding: 0 16px; font-family: var(--serif); }
 .inventory { position: absolute; left: 16px; bottom: 70px; display: flex; flex-wrap: wrap; gap: 6px; max-width: 50vw; }
 .fruit-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border); font-size: 13px; }
@@ -120,7 +121,7 @@ body.reading .minimap { display: none; }
 /* ---------- Touch ---------- */
 .joystick { position: fixed; left: 24px; bottom: 24px; width: 120px; height: 120px; border-radius: 50%; background: rgba(28, 20, 16, 0.35); border: 1px solid var(--panel-border); touch-action: none; display: grid; place-items: center; }
 .joy-knob { width: 52px; height: 52px; border-radius: 50%; background: rgba(217, 164, 65, 0.75); pointer-events: none; }
-body.touch .quick-actions { bottom: 160px; left: 24px; }
+body.touch .quick-actions { bottom: 160px; }
 body.touch .inventory { bottom: 212px; left: 24px; }
 body.touch .chant-panel { bottom: 252px; left: 24px; }
 body.touch .seatbar { bottom: 16px; }

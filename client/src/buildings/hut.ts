@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HUTS } from '../config/layout';
+import { ABBOT, DORM } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
@@ -23,23 +23,58 @@ const latticeTex = () =>
   }));
 
 /** Small decorative huts in the temple style, with homely bits around them. */
+/** 住持 (the abbot's quarters) and 僧舍 (the monks' quarters round a courtyard). Decorative. */
 export function buildHuts(ctx: WorldContext) {
-  for (const h of HUTS) buildHut(ctx, h.x, h.z, h.yaw);
-  const [sw, e] = HUTS;
-  // South-west: a well, a woodpile and water jars.
-  buildWell(ctx, sw.x - 6.4, sw.z + 0.6);
-  buildWoodpile(ctx, sw.x + 4.1, sw.z + 0.4, Math.PI / 2);
-  for (const dx of [-2.2, 2.2]) waterJar(ctx, sw.x + dx, sw.z - 4.3); // flanking the path to the porch
-  // East: a fenced vegetable patch and a jar by the door.
-  buildVegPatch(ctx, e.x - 10.6, e.x - 5.6, e.z - 5, e.z + 2);
-  waterJar(ctx, e.x + 3.9, e.z + 3.2);
+  const a = ABBOT;
+  buildHut(ctx, a.x, a.z, 0, 1.4);
+  buildWell(ctx, a.x - 7.6, a.z + 1);
+  buildWoodpile(ctx, a.x + 5.6, a.z + 0.5, Math.PI / 2);
+  for (const dx of [-3, 3]) waterJar(ctx, a.x + dx, a.z + 6.1);
+  buildVegPatch(ctx, a.x - 4, a.x + 4, a.z - 12, a.z - 8);
+
+  // Monks' quarters: north, east and south wings facing a courtyard that opens to the west.
+  const d = DORM, w = d.wing;
+  longHouse(ctx, (d.minX + d.maxX) / 2, d.minZ + w / 2, d.maxX - d.minX, w, 0); // north wing faces south
+  longHouse(ctx, (d.minX + d.maxX) / 2, d.maxZ - w / 2, d.maxX - d.minX, w, Math.PI); // south wing faces north
+  longHouse(ctx, d.maxX - w / 2, (d.minZ + d.maxZ) / 2, d.maxZ - d.minZ - 2 * w - 0.4, w, -Math.PI / 2); // east wing faces west
+  for (const [jx, jz] of [[d.minX + 6, d.minZ + w + 1.2], [d.minX + 9, d.maxZ - w - 1.2]]) waterJar(ctx, jx, jz);
+  buildWoodpile(ctx, d.maxX - w - 1.4, d.minZ + w + 2, 0);
 }
 
-/** Built facing +Z (south); `yaw` turns it. */
-function buildHut(ctx: WorldContext, x: number, z: number, yaw: number) {
+/** A long temple-style building (white walls, red posts and lattice windows along the front, tiled hip roof). Built facing +Z, then turned by `yaw`. */
+function longHouse(ctx: WorldContext, x: number, z: number, L: number, Dp: number, yaw: number) {
   const g = new THREE.Group();
   g.position.set(x, ctx.ground.heightAt(x, z), z);
   g.rotation.y = yaw;
+  ctx.scene.add(g);
+  const red = mat(THEME.column, { roughness: 0.55 });
+  const Hh = 3.2, ld = Dp - 1.6; // walls set back behind a front veranda
+  g.add(box(L, PL, Dp, mat(THEME.platformStone, { roughness: 0.95 }), 0, 0, 0));
+  g.add(box(L - 0.4, Hh, ld, mat(THEME.wall, { roughness: 0.9 }), 0, PL, -0.7));
+  g.add(box(L - 0.34, 0.6, ld + 0.06, mat(THEME.wallBase, { roughness: 0.8 }), 0, PL, -0.7));
+  g.add(box(L, 0.3, Dp, mat(THEME.beam, { roughness: 0.6 }), 0, PL + Hh - 0.3, 0));
+  const n = Math.max(3, Math.round(L / 3.2));
+  for (let i = 0; i <= n; i++) g.add(cylinder(0.11, 0.12, Hh, red, -L / 2 + 0.25 + (i * (L - 0.5)) / n, PL, Dp / 2 - 0.3, 8));
+  for (let i = 0; i < n; i++) {
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.1), new THREE.MeshStandardMaterial({ map: latticeTex(), roughness: 0.8 }));
+    win.position.set(-L / 2 + 0.25 + ((i + 0.5) * (L - 0.5)) / n, PL + 1.6, -0.7 + ld / 2 + 0.01);
+    g.add(win);
+  }
+  const { geometry } = hipRoofGeometry(L + 1.6, Dp + 1.6, 1.6);
+  const roof = new THREE.Mesh(geometry, mat(THEME.roof, { roughness: 0.75, side: THREE.DoubleSide, flatShading: true }));
+  roof.position.y = PL + Hh;
+  roof.castShadow = true;
+  g.add(roof);
+  const c = Math.abs(Math.cos(yaw)), s = Math.abs(Math.sin(yaw));
+  ctx.collisions.addBoxCentered(x, z, c * L + s * Dp, s * L + c * Dp);
+}
+
+/** Built facing +Z (south); `yaw` turns it. */
+function buildHut(ctx: WorldContext, x: number, z: number, yaw: number, scale = 1) {
+  const g = new THREE.Group();
+  g.position.set(x, ctx.ground.heightAt(x, z), z);
+  g.rotation.y = yaw;
+  g.scale.setScalar(scale);
   ctx.scene.add(g);
   const stone = mat(THEME.platformStone, { roughness: 0.95 });
   const red = mat(THEME.column, { roughness: 0.55 });
@@ -79,8 +114,8 @@ function buildHut(ctx: WorldContext, x: number, z: number, yaw: number) {
   }
   // Collision: the rotated footprint's bounding box
   const c = Math.abs(Math.cos(yaw)), s = Math.abs(Math.sin(yaw));
-  const fw = W + 1.2, fd = D + 2.2;
-  ctx.collisions.addBoxCentered(x + Math.sin(yaw) * 0.5, z + Math.cos(yaw) * 0.5, c * fw + s * fd, s * fw + c * fd);
+  const fw = (W + 1.2) * scale, fd = (D + 2.2) * scale;
+  ctx.collisions.addBoxCentered(x + Math.sin(yaw) * 0.5 * scale, z + Math.cos(yaw) * 0.5 * scale, c * fw + s * fd, s * fw + c * fd);
 }
 
 function buildWell(ctx: WorldContext, x: number, z: number) {

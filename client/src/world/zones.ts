@@ -1,4 +1,4 @@
-import { BAMBOO_PATH, BASIN, COURTYARD_STUPA, BENCHES, BODHI_TREE, FOOT_BRIDGES, FOOTPATHS, HUTS, PICNIC_TABLES, POND_PAVILION, TEA_CORNER, WISH_GARDEN, ZEN_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WATERFALL, WHEEL_ROWS, type Rect } from '../config/layout';
+import { hallHalf, ABBOT, BASIN, BENCHES, BODHI_TREE, DORM, DRAGON_POOL, DRAGON_SPRING, FOOT_BRIDGES, FOOTPATHS, PAGODAS, PICNIC_TABLES, POND_PAVILION, STUPA_COURT, WISH_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WATERFALL, WHEEL_ROWS, type Rect } from '../config/layout';
 import { smoothstep } from '../core/math';
 import { nearestOnStream, nearestRiver, nearStream } from './stream';
 
@@ -9,8 +9,9 @@ const inRect = (x: number, z: number, r: Rect, m: number) => x >= r.minX - m && 
 /** True if (x,z) is reserved for buildings, paths, water etc. — keep vegetation out. */
 export function isReserved(x: number, z: number, margin = 1.5, includeOrchard = true) {
   for (const h of HALLS) {
-    // halls + stairs + porch
-    if (inRect(x, z, { minX: h.x - h.width / 2, maxX: h.x + h.width / 2, minZ: h.z - h.depth / 2 - 2, maxZ: h.z + h.depth / 2 + 4 }, margin + 2)) return true;
+    // halls + stairs + porch (whichever way they face)
+    const [ex, ez] = hallHalf(h);
+    if (inRect(x, z, { minX: h.x - ex - 4, maxX: h.x + ex + 4, minZ: h.z - ez - 4, maxZ: h.z + ez + 4 }, margin)) return true;
   }
   for (const p of PAVED) if (inRect(x, z, p, margin)) return true;
   if (Math.hypot(x - POND.x, z - POND.z) < POND.radius + margin + 2) return true;
@@ -21,13 +22,14 @@ export function isReserved(x: number, z: number, margin = 1.5, includeOrchard = 
   for (const p of POLES) if (Math.hypot(x - p.x, z - p.z) < 0.8 + margin * 0.5) return true;
   for (const [lx, lz] of STONE_LANTERNS) if (Math.hypot(x - lx, z - lz) < 0.9 + margin * 0.5) return true;
   if (inRect(x, z, { minX: BRIDGE.x - BRIDGE.width / 2, maxX: BRIDGE.x + BRIDGE.width / 2, minZ: BRIDGE.z0, maxZ: BRIDGE.z1 }, margin + 1)) return true;
-  for (const r of [ZEN_GARDEN, WISH_GARDEN]) if (inRect(x, z, r, margin)) return true;
-  if (Math.hypot(x - TEA_CORNER.x, z - TEA_CORNER.z) < TEA_CORNER.r + margin) return true;
-  if (inRect(x, z, { minX: POND_PAVILION.walkX0 - 3, maxX: POND_PAVILION.walkX1, minZ: 17, maxZ: 25 }, margin)) return true;
-  if (nearBambooPath(x, z) < 1.6 + margin * 0.5) return true;
+  if (inRect(x, z, WISH_GARDEN, margin)) return true;
+  const sc = STUPA_COURT;
+  if (Math.abs(x - sc.x) < sc.half + 2 + margin && Math.abs(z - sc.z) < sc.half + 2 + margin) return true;
+  for (const p of PAGODAS) if (Math.hypot(x - p.x, z - p.z) < 8 + margin) return true;
+  if (Math.hypot(x - ABBOT.x, z - ABBOT.z) < 8 + margin || inRect(x, z, DORM, margin + 1)) return true;
+  if (Math.hypot(x - DRAGON_POOL.x, z - DRAGON_POOL.z) < DRAGON_POOL.r + 2.5 + margin || Math.hypot(x - DRAGON_SPRING.x, z - DRAGON_SPRING.z) < 3 + margin) return true;
+  if (inRect(x, z, { minX: POND_PAVILION.walkX0 - 3, maxX: POND_PAVILION.walkX1, minZ: POND_PAVILION.z - 4, maxZ: POND_PAVILION.z + 4 }, margin)) return true;
   if (FOOTPATHS.some((p) => distToPolyline(p, x, z) < 1.3 + margin * 0.5)) return true;
-  for (const h of HUTS) if (Math.hypot(x - h.x, z - h.z) < 7 + margin) return true;
-  if (Math.hypot(x - COURTYARD_STUPA.x, z - COURTYARD_STUPA.z) < 3.5 + margin) return true;
   for (const t of PICNIC_TABLES) if (Math.hypot(x - t.x, z - t.z) < 2.2 + margin) return true;
   for (const b of FOOT_BRIDGES) if (Math.hypot(x - b.x, z - b.z) < b.length / 2 + 1 + margin) return true;
   const c = LANTERN_CANOPY;
@@ -50,9 +52,6 @@ export function inStreamVista(x: number, z: number) {
 }
 
 export const basinDist = (x: number, z: number) => Math.hypot(x - BASIN.x, z - BASIN.z);
-
-/** Distance from (x,z) to the bamboo-grove path polyline. */
-export const nearBambooPath = (x: number, z: number) => distToPolyline(BAMBOO_PATH, x, z);
 
 export function distToPolyline(pts: [number, number][], x: number, z: number) {
   let best = Infinity;

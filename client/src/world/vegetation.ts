@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BAMBOO_PATH, BASIN, BODHI_TREE, ORCHARD, TEA_CORNER } from '../config/layout';
+import { BASIN, BODHI_TREE, CHERRY_GROVE, ORCHARD, PLAZA, spreadPoint } from '../config/layout';
 import { FRUIT_TYPES, type FruitType } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32, pick, range, type Rng } from '../core/math';
 import { terrainHeight } from './terrain';
-import { basinDist, inStreamVista, isReserved, nearBambooPath } from './zones';
+import { basinDist, inStreamVista, isReserved } from './zones';
 
 // ---------- Instancing helper ----------
 
@@ -143,7 +143,7 @@ export function buildVegetation(ctx: WorldContext) {
   };
 
   // Forest ring at the foot of the mountains, thinning up the slopes.
-  for (let i = 0; i < 1400; i++) {
+  for (let i = 0; i < 2200; i++) {
     const a = rng() * Math.PI * 2;
     const r = BASIN.radius - 18 + Math.pow(rng(), 1.4) * 170;
     const x = BASIN.x + Math.sin(a) * r, z = BASIN.z + Math.cos(a) * r;
@@ -158,7 +158,7 @@ export function buildVegetation(ctx: WorldContext) {
   }
 
   // Scattered meadow trees and bushes inside the valley.
-  for (let i = 0; i < 260; i++) {
+  for (let i = 0; i < 620; i++) {
     const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * (BASIN.radius - 12);
     const x = BASIN.x + Math.sin(a) * r, z = BASIN.z + Math.cos(a) * r;
     if (isReserved(x, z, 4) || inStreamVista(x, z)) continue;
@@ -169,17 +169,24 @@ export function buildVegetation(ctx: WorldContext) {
     else place(sp.bush, x, z, range(rng, 0.7, 1.4), pick(rng, GREENS), false);
   }
 
-  // Cherry avenue along the approach.
-  for (let z = 20; z <= 62; z += 7) {
-    place(sp.cherry, -11, z, 1, pick(rng, BLOSSOM));
-    place(sp.cherry, 11, z, 1, pick(rng, BLOSSOM));
+  // Rows of trees down the plaza's east side (as on the site plan; the wish lanterns stand on the west).
+  for (const z of [-10, -4, 2, 8].map((d) => PLAZA.z + d))
+    for (const x of [12, 20]) place(Math.abs(x) === 12 ? sp.cherry : sp.broad, x, z, Math.abs(x) === 12 ? 0.95 : 1.1, Math.abs(x) === 12 ? pick(rng, BLOSSOM) : pick(rng, GREENS));
+
+  // 櫻花樹林: the cherry grove at the back.
+  for (let k = 0; k < 70; k++) {
+    const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * CHERRY_GROVE.r;
+    const x = CHERRY_GROVE.x + Math.cos(a) * r, z = CHERRY_GROVE.z + Math.sin(a) * r;
+    if (isReserved(x, z, 1.2) || basinDist(x, z) > BASIN.radius - 3) continue;
+    place(sp.cherry, x, z, range(rng, 0.85, 1.2), pick(rng, BLOSSOM));
   }
 
-  // Groves close to the halls so there's greenery near the centre, not only at the valley rim.
+  // Groves in the open lawns so there's greenery between the buildings, as on the plan.
   const GROVES: [number, number][] = [
-    [-26, 60], [24, 64], [-12, 76], [14, 80], [-46, 84], [40, 86], [-58, 52], [34, 58],
-    [-80, -6], [-82, 34], [86, -4], [86, 40], [-36, -58], [8, -60], [-24, -46], [-74, 18]
-  ];
+    [-40, 86], [40, 88], [-30, -78], [30, -78], [-82, -8], [-90, 56], [92, 52], [70, -64],
+    [-48, -66], [-100, 20], [102, -30], [-30, 108], [32, 112], [-58, 92], [60, 96], [-76, -40],
+    [-20, -30], [20, -30], [-25, 50], [25, 50], [-75, 30], [75, 30], [0, -75], [-40, 120], [40, 120],
+  ].map(([x, z]) => spreadPoint(x, z));
   for (const [gx, gz] of GROVES)
     for (let k = 0; k < 8; k++) {
       const x = gx + range(rng, -8, 8), z = gz + range(rng, -8, 8);
@@ -192,27 +199,13 @@ export function buildVegetation(ctx: WorldContext) {
       else place(sp.bush, x, z, range(rng, 0.8, 1.3), pick(rng, GREENS), false);
     }
 
-  // Bamboo grove along the winding north-east path: dense on both sides.
-  for (let i = 0; i + 1 < BAMBOO_PATH.length; i++) {
-    const [ax, az] = BAMBOO_PATH[i], [bx, bz] = BAMBOO_PATH[i + 1];
-    const len = Math.hypot(bx - ax, bz - az), nx = -(bz - az) / len, nz = (bx - ax) / len;
-    for (let d = 0; d < len; d += 1.1)
-      for (const side of [-1, 1]) {
-        const off = side * range(rng, 2.0, 6.5), x = ax + ((bx - ax) * d) / len + nx * off, z = az + ((bz - az) * d) / len + nz * off;
-        if (nearBambooPath(x, z) < 1.8 || basinDist(x, z) > BASIN.radius - 4) continue;
-        place(sp.bamboo, x, z, range(rng, 0.9, 1.35));
-      }
-  }
-  // Maples around the moss garden and tea hut.
-  for (let k = 0; k < 9; k++) {
-    const a = (k / 9) * Math.PI * 2 + 0.3, r = TEA_CORNER.r - range(rng, 0.5, 2.5);
-    place(sp.maple, TEA_CORNER.x + Math.cos(a) * r, TEA_CORNER.z + Math.sin(a) * r, range(rng, 0.8, 1.15), pick(rng, MAPLE));
+  // Bamboo clumps behind Chengjiu Court and by the abbot's quarters.
+  for (const [gx, gz] of [[-30, -70], [30, -70], [-74, -68]].map(([x, z]) => spreadPoint(x, z))) for (let k = 0; k < 6; k++) {
+    const x = gx + range(rng, -6, 6), z = gz + range(rng, -4, 4);
+    if (!isReserved(x, z, 0.5)) place(sp.bamboo, x, z, range(rng, 0.9, 1.2), undefined, true);
   }
 
-  // Bamboo groves behind the northern halls.
-  for (const gx of [-60, -20]) for (let k = 0; k < 4; k++) place(sp.bamboo, gx + range(rng, -6, 6), -70 + range(rng, -4, 3), range(rng, 0.9, 1.2), undefined, true);
-
-  // Bodhi tree (large broadleaf) in the courtyard.
+  // Bodhi tree (large broadleaf) on the west lawn.
   place(sp.broad, BODHI_TREE.x, BODHI_TREE.z, 2.4, new THREE.Color(0x4d8a3a));
 
   Object.values(sp).forEach((s) => s.build(ctx.scene));
@@ -293,7 +286,7 @@ function buildFlowers(ctx: WorldContext, rng: Rng) {
   };
 
   // Natural-looking patches
-  for (let p = 0; p < 260; p++) {
+  for (let p = 0; p < 600; p++) {
     const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * (BASIN.radius - 8);
     const cx = BASIN.x + Math.sin(a) * r, cz = BASIN.z + Math.cos(a) * r;
     if (isReserved(cx, cz, 1)) continue;
@@ -304,7 +297,7 @@ function buildFlowers(ctx: WorldContext, rng: Rng) {
     }
   }
   // Borders along the paved courtyard and approach
-  for (let z = 76; z < 106; z += 0.7) for (const x of [-3.6, 3.6]) if (!isReserved(x + Math.sign(x) * 0.3, z, 0)) addFlower(x + Math.sign(x) * 0.3, z, pick(rng, PALETTES), 0);
+  for (let z = PLAZA.z - 13; z < PLAZA.z + 13; z += 0.7) for (const x of [-27.6, 27.6]) if (!isReserved(x + Math.sign(x) * 0.3, z, 0)) addFlower(x + Math.sign(x) * 0.3, z, pick(rng, PALETTES), 0);
 
   heads.forEach((geo, i) => {
     if (!lists[i].length) return;
