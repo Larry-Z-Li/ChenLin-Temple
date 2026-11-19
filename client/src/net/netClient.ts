@@ -26,7 +26,7 @@ export interface NetEvents {
   wishAdded: (wish: Wish) => void;
   wishRemoved: (id: string) => void;
   wishDenied: (reason: 'slow' | 'empty') => void;
-  fed: (deer: string, by: string) => void;
+  fed: (deer: string, by: string, fruit: Fruit) => void;
   pickDenied: (fruit: string, reason: 'gone' | 'full') => void;
   offered: (hall: string, offering: Offering, by: string) => void;
   offerDenied: (reason: 'noFruit' | 'full') => void;
@@ -119,7 +119,7 @@ export class NetClient {
       case 'wishAdded': return this.emit('wishAdded', msg.wish);
       case 'wishRemoved': return this.emit('wishRemoved', msg.id);
       case 'wishDenied': return this.emit('wishDenied', msg.reason);
-      case 'fed': return this.emit('fed', msg.deer, msg.by);
+      case 'fed': return this.emit('fed', msg.deer, msg.by, msg.fruit);
       case 'pickDenied': return this.emit('pickDenied', msg.fruit, msg.reason);
       case 'offered': return this.emit('offered', msg.hall, msg.offering, msg.by);
       case 'offerDenied': return this.emit('offerDenied', msg.reason);
@@ -162,8 +162,8 @@ export class NetClient {
     if (!this.send({ t: 'wish', title, text, color })) this.emit('wishAdded', { id: `l${++this.localSeq}`, slot, title, text, color, name, at: Date.now() });
   }
 
-  feedDeer(deer: string) {
-    if (!this.send({ t: 'feed', deer })) this.emit('fed', deer, this.id);
+  feedDeer(deer: string, fruit: Fruit) {
+    if (!this.send({ t: 'feed', deer, fruit })) this.emit('fed', deer, this.id, fruit);
   }
 
   /** Callers check inventory space first; offline the pick is granted locally. */
@@ -175,7 +175,8 @@ export class NetClient {
     if (!this.send({ t: 'offer', hall, kind: 'incense' })) this.emit('offered', hall, { id: `l${++this.localSeq}`, kind: 'incense', ago: 0 }, this.id);
   }
 
-  offerFruit(hall: string, fruit: Fruit) {
-    if (!this.send({ t: 'offer', hall, kind: 'fruit', fruit })) this.emit('offered', hall, { id: `l${++this.localSeq}`, kind: 'fruit', fruit, ago: 0 }, this.id);
+  /** Offer the whole basket. */
+  offerFruits(hall: string, fruits: Fruit[]) {
+    if (!this.send({ t: 'offer', hall, kind: 'fruit', fruits })) for (const fruit of fruits) this.emit('offered', hall, { id: `l${++this.localSeq}`, kind: 'fruit', fruit, ago: 0 }, this.id);
   }
 }

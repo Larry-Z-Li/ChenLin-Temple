@@ -166,7 +166,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
 
   const seat: SeatSession = new SeatSession({ ctx, net, player, rig, hud, mala, sutra });
   const offerings = new Offerings(ctx, net, hud, orchard, player);
-  const wildlife = new Wildlife(ctx, net, offerings, player); // registers the cat before the instruments pick it up
+  const wildlife = new Wildlife(ctx, net, offerings, player, () => remotes.positions()); // registers the cat before the instruments pick it up
   const instruments = new Instruments(ctx, net, player);
   const wishes = new WishLanterns(ctx, net, hud, player, uiEl, name);
   const bow = (): void => (seat.seated ? seat.bow() : player.gesture("bow", 2.4));

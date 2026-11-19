@@ -20,6 +20,7 @@ import {
   WHEEL_PUSH,
   WHEEL_PUSH_COOLDOWN_MS,
   isFruit,
+  FRUITS,
   isTransform,
   wheelSpeedAfter,
   type Fruit,
@@ -301,10 +302,13 @@ function handle(c: Client, msg: ClientMsg) {
     case 'feed': {
       if (typeof msg.deer !== 'string' || !ID_RE.test(msg.deer)) return;
       const now = Date.now();
-      if (now - c.lastFeed < 800 || !c.inventory.apple) return;
+      if (now - c.lastFeed < 800) return;
+      // The fruit they offered, or whatever else they're carrying.
+      const fruit = isFruit(msg.fruit) && c.inventory[msg.fruit] ? msg.fruit : FRUITS.find((f) => c.inventory[f]);
+      if (!fruit) return;
       c.lastFeed = now;
-      c.inventory.apple--;
-      broadcast({ t: 'fed', deer: msg.deer, by: c.id });
+      c.inventory[fruit]!--;
+      broadcast({ t: 'fed', deer: msg.deer, by: c.id, fruit });
       break;
     }
     case 'pick': {
@@ -325,22 +329,28 @@ function handle(c: Client, msg: ClientMsg) {
       const now = Date.now();
       if (now - c.lastOffer < 800) return;
       if (!offerings.has(msg.hall) && offerings.size >= MAX_HALLS) return;
-      const list = offerings.get(msg.hall) ?? [];
-      let offering: Omit<Offering, 'ago'>;
+      // Drop burnt-out incense as we go so the list stays small.
+      const list = (offerings.get(msg.hall) ?? []).filter((o) => o.kind === 'fruit' || now - o.at < INCENSE_BURN_MS);
+      const added: Omit<Offering, 'ago'>[] = [];
       if (msg.kind === 'incense') {
-        const burning = list.filter((o) => o.kind === 'incense' && now - o.at < INCENSE_BURN_MS).length;
+        const burning = list.filter((o) => o.kind === 'incense').length;
         if (burning >= MAX_INCENSE_PER_HALL) return send(c, { t: 'offerDenied', reason: 'full' });
-        offering = { id: `o${++offeringSeq}`, kind: 'incense' };
-      } else if (msg.kind === 'fruit' && isFruit(msg.fruit)) {
-        if (!c.inventory[msg.fruit]) return send(c, { t: 'offerDenied', reason: 'noFruit' });
-        if (list.filter((o) => o.kind === 'fruit').length >= MAX_FRUIT_PER_HALL) return send(c, { t: 'offerDenied', reason: 'full' });
-        c.inventory[msg.fruit]!--;
-        offering = { id: `o${++offeringSeq}`, kind: 'fruit', fruit: msg.fruit };
+        added.push({ id: `o${++offeringSeq}`, kind: 'incense' });
+      } else if (msg.kind === 'fruit' && Array.isArray(msg.fruits)) {
+        // The whole basket at once, as much as there's room for on the plates.
+        let room = MAX_FRUIT_PER_HALL - list.filter((o) => o.kind === 'fruit').length;
+        for (const f of msg.fruits.slice(0, INVENTORY_MAX)) {
+          if (!isFruit(f) || !c.inventory[f]) continue;
+          if (room <= 0) break;
+          c.inventory[f]!--;
+          room--;
+          added.push({ id: `o${++offeringSeq}`, kind: 'fruit', fruit: f });
+        }
+        if (!added.length) return send(c, { t: 'offerDenied', reason: room <= 0 ? 'full' : 'noFruit' });
       } else return;
       c.lastOffer = now;
-      // Drop burnt-out incense as we go so the list stays small.
-      offerings.set(msg.hall, [...list.filter((o) => o.kind === 'fruit' || now - o.at < INCENSE_BURN_MS), { ...offering, at: now }]);
-      broadcast({ t: 'offered', hall: msg.hall, offering: { ...offering, ago: 0 }, by: c.id });
+      offerings.set(msg.hall, [...list, ...added.map((o) => ({ ...o, at: now }))]);
+      for (const o of added) broadcast({ t: 'offered', hall: msg.hall, offering: { ...o, ago: 0 }, by: c.id });
       break;
     }
   }

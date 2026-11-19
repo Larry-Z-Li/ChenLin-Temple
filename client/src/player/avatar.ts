@@ -93,10 +93,11 @@ export class Avatar {
     // Torso (robe) — origin at hips, shoulders at ~0.55
     this.torso.add(mk(new THREE.CylinderGeometry(0.17, 0.22, 0.62, 12).translate(0, 0.31, 0), robe));
     this.torso.add(mk(new THREE.SphereGeometry(0.2, 12, 8).scale(1, 0.55, 0.8).translate(0, 0.56, 0), robe));
-    // Sash over the left shoulder
-    const sash = mk(new THREE.BoxGeometry(0.06, 0.7, 0.36).translate(0, 0.3, 0), under);
-    sash.rotation.z = 0.55;
-    sash.position.set(0.02, 0.05, 0);
+    // Sash (kasaya band) wrapping diagonally from the left shoulder to the right hip, front and back.
+    // An open ring, stretched so that once tilted it hugs the round torso instead of cutting through it.
+    const tilt = 0.6;
+    const sash = mk(new THREE.CylinderGeometry(0.218, 0.218, 0.12, 24, 1, true).scale(1 / Math.cos(tilt), 1, 1).rotateZ(tilt).translate(0, 0.33, 0), under);
+    (sash.material as THREE.Material).side = THREE.DoubleSide;
     this.torso.add(sash);
 
     this.head.position.set(0, 0.62, 0);

@@ -261,6 +261,15 @@ export const DEER_RANGES: Rect[] = [
   { minX: 36, maxX: 52, minZ: 78, maxZ: 96 }, // south-east meadow
   { minX: -10, maxX: 14, minZ: -62, maxZ: -50 }, // behind the hall
   { minX: -82, maxX: -70, minZ: -36, maxZ: -18 }, // west lawn by the tea corner
+  { minX: 18, maxX: 34, minZ: 55, maxZ: 63 }, // lawn south of the wish garden
+  { minX: -36, maxX: -14, minZ: 16, maxZ: 22 }, // lawn between the pond path and the rock garden
+  { minX: 62, maxX: 80, minZ: 20, maxZ: 40 }, // east bank, south of the orchard bridge
+  { minX: -70, maxX: -56, minZ: -32, maxZ: -17 }, // north-west of the pond
+  // nearer the middle, among people
+  { minX: -17, maxX: -7, minZ: 20, maxZ: 44 }, // west of the approach, among the cherries
+  { minX: 7, maxX: 17, minZ: 20, maxZ: 44 }, // east of the approach
+  { minX: -34, maxX: -16, minZ: -10, maxZ: -1 }, // lawn west of the courtyard
+  { minX: 16, maxX: 30, minZ: -10, maxZ: -1 }, // lawn east of the courtyard
 ];
 
 /** Cats napping about the place (`h` = height they lie at). */
@@ -314,3 +323,6 @@ export const PICNIC_TABLES = [
 
 /** A stupa at the heart of the courtyard, between the hall steps and the incense burner. */
 export const COURTYARD_STUPA = { x: 0, z: 1.5 };
+
+/** Sign where the orchard path enters: the fruit is for offering. */
+export const ORCHARD_SIGN = { x: 35.6, z: -1.4 };

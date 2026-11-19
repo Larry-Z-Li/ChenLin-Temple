@@ -14,8 +14,8 @@ export type IncenseState = 0 | 1 | 2;
 
 const fruitName = (f: Fruit) => t(FRUIT_TYPES[f].nameKey as I18nKey);
 
-// Fruit piles on an offering plate: [ring radius, height, count] per layer (15 per plate).
-const PILE = ([[0.11, 0, 7], [0.06, 0.1, 4], [0.03, 0.19, 2], [0, 0.27, 1], [0, 0.34, 1]] as const).flatMap(([r, y, n]) =>
+// Fruit piled in an offering bowl: [ring radius, height, count] per layer (24 per bowl).
+const PILE = ([[0.21, 0, 10], [0.14, 0.09, 7], [0.075, 0.18, 4], [0.03, 0.26, 2], [0, 0.33, 1]] as const).flatMap(([r, y, n]) =>
   Array.from({ length: n }, (_, i) => (r === 0 && n === 1 ? [0, y, 0] : [Math.cos((i / n) * Math.PI * 2 + y * 9) * r, y, Math.sin((i / n) * Math.PI * 2 + y * 9) * r])),
 );
 
@@ -150,10 +150,10 @@ export class Offerings {
     const stand = table.stand ?? { x: table.x, z: front };
     add('incense', stand.x, stand.z, () => (this.ritual ? null : { text: t('prompt.placeIncense') }), () => this.startRitual(table));
     table.slots.forEach((slot, i) =>
-      add(`plate${i}`, slot.x, front, () => ({ text: t('prompt.offerFruit') }), () => {
+      add(`plate${i}`, slot.x, front, () => ({ text: this.inventory.length ? t('prompt.offerAllFruit', { n: this.inventory.length }) : t('prompt.offerFruit') }), () => {
         // Required: a clear message when there's nothing to offer.
         if (!this.inventory.length) return this.hud.toast(t('offer.noFruit'));
-        this.net.offerFruit(table.hallId, this.inventory[0]);
+        this.net.offerFruits(table.hallId, [...this.inventory]);
       }),
     );
   }

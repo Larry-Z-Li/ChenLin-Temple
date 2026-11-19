@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { box, cylinder, hipRoofGeometry, mat } from '../buildings/materials';
-import { BAMBOO_PATH, COURTYARD_STUPA, FOOT_BRIDGES, FOOTPATHS, PICNIC_TABLES, POND_PAVILION, TEA_CORNER, ZEN_GARDEN } from '../config/layout';
+import { BAMBOO_PATH, COURTYARD_STUPA, ORCHARD_SIGN, FOOT_BRIDGES, FOOTPATHS, PICNIC_TABLES, POND_PAVILION, TEA_CORNER, ZEN_GARDEN } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
 import { canvasTexture } from '../core/textures';
+import { inscription, onLocaleChange, t } from '../i18n';
 import { smallStupa } from '../buildings/stupas';
 
 const ROCK = new THREE.MeshStandardMaterial({ color: 0x77736c, roughness: 1, flatShading: true });
@@ -19,6 +20,7 @@ export function buildGardens(ctx: WorldContext) {
   buildFootBridges(ctx);
   buildCourtyardStupa(ctx);
   buildPicnicTables(ctx);
+  buildOrchardSign(ctx);
 }
 
 /** Flat wooden footbridges with red rails; the deck is a walkable pad with short ramps at each end. */
@@ -95,6 +97,47 @@ export function steppedWall(ctx: WorldContext, horizontal: boolean, at: number, 
   const [x, z, w, d] = horizontal ? [mid, at, len, 0] : [at, mid, 0, len];
   ctx.scene.add(box(w + 0.8, 0.3, d + 0.8, mat(0x9a958a, { roughness: 1 }), x, y, z), box(w + 0.42, 0.62, d + 0.42, mat(0x8d8a80, { roughness: 1 }), x, y, z));
   ctx.collisions.addBox(x - (w + 0.8) / 2, x + (w + 0.8) / 2, z - (d + 0.8) / 2, z + (d + 0.8) / 2);
+}
+
+/** Wooden signboard at the orchard entrance, facing the path from the courtyard (west). */
+function buildOrchardSign(ctx: WorldContext) {
+  const { x, z } = ORCHARD_SIGN;
+  const g = new THREE.Group();
+  g.position.set(x, ctx.ground.heightAt(x, z), z);
+  g.rotation.y = -Math.PI / 2;
+  ctx.scene.add(g);
+  const wood = mat(0x4a2214, { roughness: 0.6 });
+  for (const s of [-1, 1]) g.add(cylinder(0.06, 0.07, 2.1, wood, s * 0.85, 0, 0, 8));
+  g.add(box(1.95, 0.9, 0.08, wood, 0, 1.0, -0.02));
+  const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 2.3, 4).rotateZ(Math.PI / 2).scale(1, 0.4, 1), mat(THEME.roof, { roughness: 0.75, flatShading: true }));
+  roof.position.set(0, 2.15, 0);
+  g.add(roof);
+  const face = new THREE.MeshStandardMaterial({ roughness: 0.7 });
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.78), face);
+  panel.position.set(0, 1.45, 0.03);
+  g.add(panel);
+  const draw = () => {
+    face.map?.dispose();
+    face.map = canvasTexture(640, 278, (c) => {
+      c.fillStyle = '#efe3c8';
+      c.fillRect(0, 0, 640, 278);
+      c.strokeStyle = '#7a1f16';
+      c.lineWidth = 10;
+      c.strokeRect(8, 8, 624, 262);
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillStyle = '#7a1f16';
+      c.font = '700 84px "Noto Serif TC", "Songti TC", serif';
+      c.fillText(inscription(t('sign.orchard')), 320, 108, 590);
+      c.fillStyle = '#3a2416';
+      c.font = '500 40px "Noto Serif TC", "Songti TC", serif';
+      c.fillText(inscription(t('sign.orchardSub')), 320, 205, 590);
+    });
+    face.needsUpdate = true;
+  };
+  draw();
+  onLocaleChange(draw);
+  ctx.collisions.addCircle(x, z, 0.5);
 }
 
 /** A stupa in the middle of the courtyard, on an octagonal plinth you can walk around. */

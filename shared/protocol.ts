@@ -1,6 +1,6 @@
 // Wire protocol shared by client and server. Keep this file dependency-free.
 
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -52,11 +52,11 @@ export type Fruit = (typeof FRUITS)[number];
 /** Picked fruit grows back after this long. */
 export const FRUIT_REGROW_MS = 10 * 60 * 1000;
 /** Most fruit one person can carry. */
-export const INVENTORY_MAX = 5;
+export const INVENTORY_MAX = 10;
 /** A stick of incense burns this long, then is gone. */
 export const INCENSE_BURN_MS = 30 * 60 * 1000;
 export const MAX_INCENSE_PER_HALL = 40;
-export const MAX_FRUIT_PER_HALL = 30;
+export const MAX_FRUIT_PER_HALL = 96; // four offering bowls × 24
 /** Fruit ids look like `fruit-orange-12`. */
 export const FRUIT_ID_RE = /^fruit-([a-z]+)-(\d{1,4})$/;
 
@@ -97,10 +97,11 @@ export type ClientMsg =
   /** Strike a hall instrument (bell, drum, singing bowl, wooden fish). */
   | { t: 'strike'; inst: string }
   | { t: 'wish'; title: string; text: string; color: number }
-  /** Give one apple from your basket to a deer. */
-  | { t: 'feed'; deer: string }
+  /** Give one fruit from your basket to a deer (they eat any kind). */
+  | { t: 'feed'; deer: string; fruit: Fruit }
   | { t: 'offer'; hall: string; kind: 'incense' }
-  | { t: 'offer'; hall: string; kind: 'fruit'; fruit: Fruit };
+  /** Offer everything in the basket at once. */
+  | { t: 'offer'; hall: string; kind: 'fruit'; fruits: Fruit[] };
 
 export type ServerMsg =
   | {
@@ -130,7 +131,7 @@ export type ServerMsg =
   | { t: 'wishAdded'; wish: Wish }
   | { t: 'wishRemoved'; id: string }
   | { t: 'wishDenied'; reason: 'slow' | 'empty' }
-  | { t: 'fed'; deer: string; by: string }
+  | { t: 'fed'; deer: string; by: string; fruit: Fruit }
   | { t: 'pickDenied'; fruit: string; reason: 'gone' | 'full' }
   | { t: 'offered'; hall: string; offering: Offering; by: string }
   | { t: 'offerDenied'; reason: 'noFruit' | 'full' }

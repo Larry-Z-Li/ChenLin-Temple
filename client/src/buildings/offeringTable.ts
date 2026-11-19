@@ -20,9 +20,9 @@ export function buildOfferingTable(ctx: WorldContext, hallId: string, x: number,
   const top = floorY + H;
   const bronze = mat(THEME.bronze, { metalness: 0.8, roughness: 0.35 });
 
-  // Incense bowl (centre) filled with ash
-  g.add(cylinder(0.3, 0.22, 0.24, bronze, x, top, z, 20));
-  g.add(cylinder(0.27, 0.27, 0.01, mat(0xb9b3a6, { roughness: 1 }), x, top + 0.2, z, 20));
+  // Incense bowl (centre) filled with ash: wide enough for many people's sticks
+  g.add(cylinder(0.42, 0.3, 0.3, bronze, x, top, z, 24));
+  g.add(cylinder(0.39, 0.39, 0.01, mat(0xb9b3a6, { roughness: 1 }), x, top + 0.26, z, 24));
 
   // Stack of ready incense sticks in a holder, beside the bowl
   const stack = new THREE.Group();
@@ -34,13 +34,13 @@ export function buildOfferingTable(ctx: WorldContext, hallId: string, x: number,
     s.castShadow = false;
     stack.add(s);
   }
-  stack.position.set(x + 0.45, top, z);
+  stack.position.set(x + 0.62, top, z);
   g.add(stack);
 
   // Altar candles at both ends, plus a small lighting candle right beside the incense.
   const flames: THREE.Sprite[] = [];
   const candleXs = [x - (length / 2 - 0.35), x + (length / 2 - 0.35)];
-  if (length >= 3) candleXs.push(x + 0.85); // short tables light from the end candle, already close by
+  if (length >= 3) candleXs.push(x + 0.98); // short tables light from the end candle, already close by
   for (const cx of candleXs) {
     g.add(cylinder(0.12, 0.14, 0.06, bronze, cx, top, z, 12));
     g.add(cylinder(0.05, 0.05, 0.3, mat(0xf4ead2, { roughness: 0.6 }), cx, top + 0.06, z, 10));
@@ -57,11 +57,13 @@ export function buildOfferingTable(ctx: WorldContext, hallId: string, x: number,
   const span = length - 2.2;
   for (let i = 0; i < nPlates; i++) {
     const px = nPlates === 1 ? x : x - span / 2 + (i * span) / (nPlates - 1);
-    if (Math.abs(px - x) < 1.15) continue; // keep clear of the bowl, incense and lighting candle
-    g.add(cylinder(0.2, 0.14, 0.04, bronze, px, top, z + 0.1, 16));
-    slots.push({ x: px, y: top + 0.04, z: z + 0.1 });
+    if (Math.abs(px - x) < 1.3) continue; // keep clear of the bowl, incense and lighting candle
+    // Wide, shallow offering bowl for fruit
+    g.add(cylinder(0.33, 0.2, 0.11, bronze, px, top, z + 0.08, 20));
+    g.add(cylinder(0.3, 0.3, 0.01, mat(0x6b4a24, { roughness: 0.6 }), px, top + 0.1, z + 0.08, 20));
+    slots.push({ x: px, y: top + 0.1, z: z + 0.08 });
   }
-  ctx.offeringTables.push({ hallId, x, y: top, z, length, slots });
+  ctx.offeringTables.push({ hallId, x, y: top, z, length, slots, bowl: { x, y: top + 0.27, z, r: 0.36 } });
 
   ctx.updaters.push((_dt, time) => {
     flames.forEach((f, i) => {

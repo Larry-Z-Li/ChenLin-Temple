@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import type { Offerings } from '../activities/offerings';
-import { BAMBOO_PATH, BODHI_TREE, CAT_SPOTS, DEER_RANGES, FOOTPATHS, PAVED, POND, TEA_CORNER, WISH_GARDEN, ZEN_GARDEN } from '../config/layout';
+import { BAMBOO_PATH, BODHI_TREE, CAT_SPOTS, DEER_RANGES, FOOTPATHS, HALLS, PAVED, POND, TEA_CORNER, WISH_GARDEN, ZEN_GARDEN } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import type { Interactable } from '../core/interaction';
 import { mulberry32, range } from '../core/math';
 import { canvasTexture } from '../core/textures';
+import { FRUIT_TYPES } from '../config/theme';
 import { t } from '../i18n';
 import type { NetClient } from '../net/netClient';
 import type { LocalPlayer } from '../player/localPlayer';
@@ -71,7 +72,14 @@ interface Deer {
   item: Interactable;
   happy: number;
   stride: number;
+  /** Friendly deer come over to people nearby. */
+  friendly: boolean;
+  pos: THREE.Vector3;
+  started: boolean;
 }
+
+/** Inside a hall or on its porch: animals don't follow people there. */
+const inHallZone = (x: number, z: number) => HALLS.some((h) => Math.abs(x - h.x) < h.width / 2 + 3 && Math.abs(z - h.z) < h.depth / 2 + 4.5);
 
 const hash = (a: number, b: number) => {
   let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b, 0xc2b2ae35);
@@ -285,7 +293,7 @@ function glowSprite() {
 export class Wildlife {
   private deer: Deer[] = [];
 
-  constructor(private ctx: WorldContext, private net: NetClient, private offerings: Offerings, private player: LocalPlayer) {
+  constructor(private ctx: WorldContext, private net: NetClient, private offerings: Offerings, private player: LocalPlayer, private others: () => THREE.Vector3[]) {
     heartScene = ctx.scene;
     CAT_SPOTS.forEach((c, i) => buildCat(ctx, c, i));
     buildButterflies(ctx);
@@ -318,23 +326,26 @@ export class Wildlife {
       const { root, legs, neck, head } = deerModel(i % 2 === 0);
       ctx.scene.add(root);
       const id = `deer-${i}`;
-      const d: Deer = { id, root, legs, neck, head, wps, seed: i * 7919 + 13, happy: 99, stride: 0, item: null! };
+      const d: Deer = { id, root, legs, neck, head, wps, seed: i * 7919 + 13, happy: 99, stride: 0, item: null!, friendly: i % 3 === 0, pos: new THREE.Vector3(), started: false };
       d.item = {
         id, x: 0, z: 0, radius: 2.0,
-        prompt: () => (this.offerings.inventory.includes('apple') ? { text: t('prompt.feedDeer') } : { text: t('prompt.deerWantsApple'), busy: true }),
+        prompt: () => {
+          const f = this.offerings.inventory[0];
+          return f ? { text: t('prompt.feedDeer', { fruit: t(FRUIT_TYPES[f].nameKey) }) } : { text: t('prompt.deerWantsApple'), busy: true };
+        },
         onInteract: () => this.feed(d),
       };
       ctx.interactions.add(d.item);
       this.deer.push(d);
     });
 
-    net.on('fed', (deerId, by) => {
+    net.on('fed', (deerId, by, fruit) => {
       const d = this.deer.find((x) => x.id === deerId);
       if (!d) return;
       d.happy = 0;
       const p = d.root.position;
       heartBurst(p.x + Math.sin(d.root.rotation.y) * 0.5, p.y + 1.4, p.z + Math.cos(d.root.rotation.y) * 0.5, 7);
-      if (by === net.id) this.offerings.removeFruit('apple');
+      if (by === net.id) this.offerings.removeFruit(fruit);
     });
     ctx.updaters.push((dt) => {
       updateHearts(dt);
@@ -343,38 +354,70 @@ export class Wildlife {
   }
 
   private feed(d: Deer) {
-    if (!this.offerings.inventory.includes('apple')) return;
+    const fruit = this.offerings.inventory[0];
+    if (!fruit) return;
     const p = this.player;
     p.yaw = Math.atan2(-(d.root.position.x - p.pos.x), -(d.root.position.z - p.pos.z));
     p.gesture('reach', 0.6);
-    this.net.feedDeer(d.id);
+    this.net.feedDeer(d.id, fruit);
   }
 
   private update(dt: number) {
     const now = Date.now() / 1000, P = 22;
+    const people = [this.player.pos, ...this.others()].filter((p) => !inHallZone(p.x, p.z));
     for (const d of this.deer) {
+      // Where the shared schedule says this deer is (same on every client).
       const tt = now + d.seed;
       const k = Math.floor(tt / P), f = tt - k * P;
       const a = d.wps[hash(d.seed, k) % d.wps.length], b = d.wps[hash(d.seed, k + 1) % d.wps.length];
       const dist = Math.hypot(b[0] - a[0], b[1] - a[1]);
       const walkT = Math.min(P * 0.6, dist / 0.9);
-      const walking = dist > 0.2 && f < walkT;
-      const u = walking ? f / walkT : 1;
+      const u = dist > 0.2 && f < walkT ? f / walkT : 1;
       const e = u * u * (3 - 2 * u);
-      const x = a[0] + (b[0] - a[0]) * e, z = a[1] + (b[1] - a[1]) * e;
+      let tx = a[0] + (b[0] - a[0]) * e, tz = a[1] + (b[1] - a[1]) * e;
+      // Friendly deer wander over to the nearest person (not into the hall) and stop a little way off.
+      let near: THREE.Vector3 | null = null;
+      if (d.friendly) {
+        let best = 16;
+        for (const p of people) {
+          const dd = Math.hypot(p.x - tx, p.z - tz);
+          if (dd < best) [best, near] = [dd, p];
+        }
+        if (near) {
+          const dx = d.pos.x - near.x, dz = d.pos.z - near.z, l = Math.hypot(dx, dz) || 1;
+          tx = near.x + (dx / l) * 1.8;
+          tz = near.z + (dz / l) * 1.8;
+        }
+      }
+      if (!d.started) {
+        d.pos.set(tx, 0, tz);
+        d.started = true;
+      }
+      // Walk toward the target (trot if far behind), never through walls, rivers or the hall.
+      const gx = tx - d.pos.x, gz = tz - d.pos.z, gl = Math.hypot(gx, gz);
+      const speed = gl > 6 ? 2.6 : 1.1;
+      const step = Math.min(gl, speed * dt);
+      const moving = gl > 0.15;
+      if (moving) {
+        d.pos.x += (gx / gl) * step;
+        d.pos.z += (gz / gl) * step;
+        d.root.rotation.y = Math.atan2(gx, gz);
+      } else if (near) d.root.rotation.y = Math.atan2(near.x - d.pos.x, near.z - d.pos.z); // look at them
+      this.ctx.collisions.resolve(d.pos, 0.45);
+      if (inHallZone(d.pos.x, d.pos.z)) d.pos.z += dt * 3; // drift back out the front
       const prev = d.root.position.clone();
-      d.root.position.set(x, this.ctx.ground.heightAt(x, z), z);
-      if (dist > 0.2) d.root.rotation.y = Math.atan2(b[0] - a[0], b[1] - a[1]);
+      d.root.position.set(d.pos.x, this.ctx.ground.heightAt(d.pos.x, d.pos.z), d.pos.z);
       d.stride += prev.distanceTo(d.root.position) * 7;
-      d.legs.forEach((l, i) => (l.rotation.x = walking ? Math.sin(d.stride + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.45 : l.rotation.x * 0.9));
-      // Graze with the head down; look up when fed (or now and then).
+      d.legs.forEach((l, i) => (l.rotation.x = moving ? Math.sin(d.stride + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.45 : l.rotation.x * 0.9));
+      // Graze with the head down; look up when fed, when visiting someone, or now and then.
       d.happy += dt;
-      const lookUp = d.happy < 3 || walking || Math.sin(tt * 0.7) > 0.85;
+      const lookUp = d.happy < 3 || moving || !!near || Math.sin(tt * 0.7) > 0.85;
       const target = lookUp ? 0.35 : 2.35;
       d.neck.rotation.x += (target - d.neck.rotation.x) * Math.min(1, dt * 3);
       d.head.rotation.x = -d.neck.rotation.x * 0.75 + (d.happy < 3 ? Math.sin(d.happy * 9) * 0.15 : 0);
-      d.item.x = x;
-      d.item.z = z;
+      d.item.x = d.pos.x;
+      d.item.z = d.pos.z;
     }
   }
+
 }
