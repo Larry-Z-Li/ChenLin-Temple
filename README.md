@@ -1,4 +1,4 @@
-# 辰霖寺 · Chenlin Temple
+# 千和學院 · Qianhe Academy
 
 A browser-based 3D temple where people can practise together online: walk the grounds, kneel on a cushion in silence, count prayer beads, read sutras, listen to chants, turn prayer wheels, offer incense and fruit, and do prostrations.
 
