@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { POND, RIVERS, STREAM, WATERFALL } from '../config/layout';
+import { BASIN, BRIDGE, FOOT_BRIDGES, PLAY_RADIUS, POND, RIVERS, STREAM, WATERFALL } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range, smoothstep } from '../core/math';
 import { glowTexture, waterfallTexture } from '../core/textures';
@@ -239,4 +239,29 @@ export function buildStream(ctx: WorldContext) {
   ctx.updaters.push((dt) => {
     tex.offset.y -= dt * 0.55; // flows downstream
   });
+}
+
+/** Rivers can't be walked into: a line of colliders down each channel, open only where a bridge crosses. */
+export function buildRiverColliders(ctx: WorldContext) {
+  // Leave the channel open beside each deck far enough that no collider reaches onto it
+  // (deck half-width + collider radius + a walker's radius); the rails close the sides.
+  const onBridge = (x: number, z: number, r: number) => {
+    const across = 1.2 + r + 0.35;
+    return (
+      FOOT_BRIDGES.some((b) => (b.axis === 'x' ? Math.abs(x - b.x) < b.length / 2 + 0.3 && Math.abs(z - b.z) < across : Math.abs(z - b.z) < b.length / 2 + 0.3 && Math.abs(x - b.x) < across)) ||
+      (Math.abs(x - BRIDGE.x) < BRIDGE.width / 2 + r + 0.35 && z > BRIDGE.z0 - 0.3 && z < BRIDGE.z1 + 0.3)
+    );
+  };
+  for (const river of RIVERS) {
+    const curve = new THREE.CatmullRomCurve3(river.points.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+    const L = riverLength(river), p = new THREE.Vector3();
+    for (let s = 0; s <= L; s += 0.9) {
+      curve.getPointAt(s / L, p);
+      if (Math.hypot(p.x - BASIN.x, p.z - BASIN.z) > PLAY_RADIUS + 4) continue; // beyond the walkable valley
+      if (Math.hypot(p.x - POND.x, p.z - POND.z) < POND.radius) continue; // the pond has its own rim
+      const r = river.halfWidth * 0.8;
+      if (onBridge(p.x, p.z, r)) continue;
+      ctx.collisions.addCircle(p.x, p.z, r);
+    }
+  }
 }

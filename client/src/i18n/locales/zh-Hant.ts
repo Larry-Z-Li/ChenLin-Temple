@@ -2,7 +2,7 @@ import type { I18nKey } from './en';
 
 /** 繁體中文 (default locale). Must cover every key in en.ts. */
 const zhHant: Record<I18nKey, string> = {
-  'app.title': '九宮寺',
+  'app.title': '辰霖寺',
   'app.subtitle': '一同修行的寧靜之處',
 
   'entry.name': '您的名字',
@@ -125,7 +125,7 @@ const zhHant: Record<I18nKey, string> = {
   'map.n': '北',
   'map.e': '東',
   'map.w': '西',
-  'map.title': '九宮寺全圖',
+  'map.title': '辰霖寺全圖',
   'map.here': '您在此',
   'map.pond': '蓮池',
   'map.orchard': '果園',

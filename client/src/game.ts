@@ -15,6 +15,7 @@ import { buildBenches } from './buildings/benches';
 import { buildDecor } from './buildings/decor';
 import { buildDecorations } from './buildings/decorations';
 import { buildHall } from './buildings/hall';
+import { buildHuts } from './buildings/hut';
 import { buildMapBoard } from './buildings/mapBoard';
 import { PrayerWheels } from './buildings/prayerWheels';
 import { buildStupas } from './buildings/stupas';
@@ -43,7 +44,7 @@ import { buildSky, setDebugHours, setTempleTimeZone } from './world/sky';
 import { buildTerrain } from './world/terrain';
 import { buildVegetation } from './world/vegetation';
 import { Wildlife } from './world/wildlife';
-import { buildPond, buildStream, buildWaterfall } from './world/water';
+import { buildPond, buildRiverColliders, buildStream, buildWaterfall } from './world/water';
 
 export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: string, color: string) {
   unlockAudio();
@@ -88,11 +89,13 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   buildPond(ctx);
   buildWaterfall(ctx);
   buildStream(ctx);
+  buildRiverColliders(ctx);
   const stupas = buildStupas(ctx);
   buildPrayerFlags(ctx, stupas);
   buildDecorations(ctx, stupas);
   buildLanterns(ctx);
   buildGardens(ctx);
+  buildHuts(ctx);
   buildKoi(ctx);
   buildLeaves(ctx, camera);
   const { orchard } = buildVegetation(ctx);

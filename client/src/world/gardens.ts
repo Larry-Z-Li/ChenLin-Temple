@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { box, cylinder, hipRoofGeometry, mat } from '../buildings/materials';
-import { BAMBOO_PATH, POND_PAVILION, TEA_CORNER, ZEN_GARDEN } from '../config/layout';
+import { BAMBOO_PATH, COURTYARD_STUPA, FOOT_BRIDGES, FOOTPATHS, PICNIC_TABLES, POND_PAVILION, TEA_CORNER, ZEN_GARDEN } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
 import { canvasTexture } from '../core/textures';
+import { smallStupa } from '../buildings/stupas';
 
 const ROCK = new THREE.MeshStandardMaterial({ color: 0x77736c, roughness: 1, flatShading: true });
 const MOSS = new THREE.MeshStandardMaterial({ color: 0x4f7a34, roughness: 1 });
@@ -15,6 +16,98 @@ export function buildGardens(ctx: WorldContext) {
   buildBambooPath(ctx);
   buildTeaCorner(ctx);
   buildPavilion(ctx);
+  buildFootBridges(ctx);
+  buildCourtyardStupa(ctx);
+  buildPicnicTables(ctx);
+}
+
+/** Flat wooden footbridges with red rails; the deck is a walkable pad with short ramps at each end. */
+function buildFootBridges(ctx: WorldContext) {
+  const deck = mat(0x7a5434, { roughness: 0.8 }), red = mat(THEME.column, { roughness: 0.55 }), gold = mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 });
+  const WIDTH = 2.4, H = 0.45;
+  for (const b of FOOT_BRIDGES) {
+    const g = new THREE.Group();
+    const y0 = Math.max(ctx.ground.heightAt(b.x, b.z), ctx.ground.heightAt(b.x + (b.axis === 'x' ? b.length / 2 : 0), b.z + (b.axis === 'z' ? b.length / 2 : 0)), 0);
+    g.position.set(b.x, 0, b.z);
+    if (b.axis === 'z') g.rotation.y = Math.PI / 2; // built along X
+    ctx.scene.add(g);
+    g.add(box(b.length, 0.14, WIDTH, deck, 0, y0 + H - 0.14, 0));
+    for (const s of [-1, 1]) {
+      g.add(box(b.length, 0.2, 0.16, deck, 0, y0 + H - 0.3, s * (WIDTH / 2 - 0.08))); // side stringers
+      for (let t = -b.length / 2 + 0.15; t <= b.length / 2; t += (b.length - 0.3) / 4) {
+        g.add(cylinder(0.06, 0.07, 1.0, red, t, y0 + H - 0.4, s * (WIDTH / 2 - 0.05), 8));
+        g.add(cylinder(0.08, 0.08, 0.06, gold, t, y0 + H + 0.6, s * (WIDTH / 2 - 0.05), 8));
+      }
+      g.add(box(b.length, 0.08, 0.1, red, 0, y0 + H + 0.5, s * (WIDTH / 2 - 0.05)));
+      g.add(box(b.length, 0.05, 0.06, red, 0, y0 + H + 0.22, s * (WIDTH / 2 - 0.05)));
+    }
+    for (const s of [-1, 1]) g.add(box(0.5, 0.9, WIDTH - 0.2, mat(0x8d8a80, { roughness: 1 }), s * (b.length / 2 - 0.25), y0 - 0.5, 0)); // stone abutments
+    // walkable deck + ramps, and rails you can't step through
+    const half = b.length / 2, hw = WIDTH / 2 - 0.15, top = y0 + H;
+    if (b.axis === 'x') {
+      ctx.ground.addPad(b.x - half + 0.8, b.x + half - 0.8, b.z - hw, b.z + hw, top);
+      ctx.ground.addRampX(b.z - hw, b.z + hw, b.x - half - 0.4, b.x - half + 0.8, y0, top);
+      ctx.ground.addRampX(b.z - hw, b.z + hw, b.x + half + 0.4, b.x + half - 0.8, y0, top);
+      for (const s of [-1, 1]) ctx.collisions.addBox(b.x - half, b.x + half, b.z + s * (WIDTH / 2) - 0.08, b.z + s * (WIDTH / 2) + 0.08);
+    } else {
+      ctx.ground.addPad(b.x - hw, b.x + hw, b.z - half + 0.8, b.z + half - 0.8, top);
+      ctx.ground.addRamp(b.x - hw, b.x + hw, b.z - half - 0.4, b.z - half + 0.8, y0, top);
+      ctx.ground.addRamp(b.x - hw, b.x + hw, b.z + half + 0.4, b.z + half - 0.8, y0, top);
+      for (const s of [-1, 1]) ctx.collisions.addBox(b.x + s * (WIDTH / 2) - 0.08, b.x + s * (WIDTH / 2) + 0.08, b.z - half, b.z + half);
+    }
+  }
+}
+
+/** Wooden picnic tables with a bench each side; each bench seats two. */
+function buildPicnicTables(ctx: WorldContext) {
+  const wood = mat(0x8a6038, { roughness: 0.8 });
+  PICNIC_TABLES.forEach((tb, i) => {
+    const y = ctx.ground.heightAt(tb.x, tb.z);
+    const g = new THREE.Group();
+    g.position.set(tb.x, y, tb.z);
+    g.rotation.y = tb.yaw;
+    ctx.scene.add(g);
+    g.add(box(1.9, 0.07, 0.85, wood, 0, 0.72, 0)); // top
+    for (const s of [-1, 1]) {
+      g.add(box(0.08, 0.72, 0.08, wood, s * 0.75, 0, 0)); // legs
+      g.add(box(1.9, 0.06, 0.32, wood, 0, 0.42, s * 0.72)); // bench seats
+      g.add(box(0.08, 0.42, 1.6, wood, s * 0.75, 0, 0)); // A-frame foot
+    }
+    g.traverse((o) => (o.castShadow = o.receiveShadow = true));
+    ctx.collisions.addCircle(tb.x, tb.z, 0.75);
+    // seats: two per bench, facing the table
+    const ax = Math.cos(tb.yaw), az = -Math.sin(tb.yaw); // table's local +X in world
+    const fx = Math.sin(tb.yaw), fz = Math.cos(tb.yaw); // local +Z in world
+    [-1, 1].forEach((side) =>
+      [-0.45, 0.45].forEach((along, k) => {
+        const id = `picnic-${i}-${side > 0 ? 'b' : 'a'}${k}`;
+        const x = tb.x + ax * along + fx * side * 0.75, z = tb.z + az * along + fz * side * 0.75;
+        const face = tb.yaw + (side > 0 ? Math.PI : 0); // sitter faces the table
+        ctx.seats.set(id, { id, kind: 'bench', x, y, z, yaw: face + Math.PI, exit: [fx * side * 0.7, fz * side * 0.7], occupiedBy: null });
+      }),
+    );
+  });
+}
+
+/** Two-step stone wall along x (horizontal) or z at `at`, from → to; solid to walk into. */
+export function steppedWall(ctx: WorldContext, horizontal: boolean, at: number, from: number, to: number, y: number) {
+  const len = to - from, mid = (from + to) / 2;
+  const [x, z, w, d] = horizontal ? [mid, at, len, 0] : [at, mid, 0, len];
+  ctx.scene.add(box(w + 0.8, 0.3, d + 0.8, mat(0x9a958a, { roughness: 1 }), x, y, z), box(w + 0.42, 0.62, d + 0.42, mat(0x8d8a80, { roughness: 1 }), x, y, z));
+  ctx.collisions.addBox(x - (w + 0.8) / 2, x + (w + 0.8) / 2, z - (d + 0.8) / 2, z + (d + 0.8) / 2);
+}
+
+/** A stupa in the middle of the courtyard, on an octagonal plinth you can walk around. */
+function buildCourtyardStupa(ctx: WorldContext) {
+  const { x, z } = COURTYARD_STUPA;
+  const y = ctx.ground.heightAt(x, z);
+  const stone = mat(THEME.platformStone, { roughness: 0.95 });
+  ctx.scene.add(cylinder(2.9, 3.1, 0.35, stone, x, y, z, 8));
+  ctx.scene.add(cylinder(2.6, 2.6, 0.06, mat(THEME.goldLeaf, { metalness: 0.6, roughness: 0.4 }), x, y + 0.35, z, 8));
+  const st = smallStupa(6.2);
+  st.position.set(x, y + 0.41, z);
+  ctx.scene.add(st);
+  ctx.collisions.addCircle(x, z, 3.1);
 }
 
 function rock(ctx: WorldContext, x: number, z: number, s: number, rng: () => number) {
@@ -66,9 +159,11 @@ function buildZenGarden(ctx: WorldContext) {
   gravel.receiveShadow = true;
   ctx.scene.add(gravel);
   // texture is drawn north-up in z; the plane maps v=0 to the far (−z) edge, which matches minZ
-  const curb = mat(0x8d8a80, { roughness: 1 });
-  ctx.scene.add(box(W + 0.4, 0.18, 0.2, curb, (minX + maxX) / 2, y, minZ - 0.1), box(W + 0.4, 0.18, 0.2, curb, (minX + maxX) / 2, y, maxZ + 0.1));
-  ctx.scene.add(box(0.2, 0.18, D, curb, minX - 0.1, y, (minZ + maxZ) / 2), box(0.2, 0.18, D, curb, maxX + 0.1, y, (minZ + maxZ) / 2));
+  // Closed stepped stone border: look, don't walk on the gravel.
+  steppedWall(ctx, true, minZ, minX, maxX, y);
+  steppedWall(ctx, true, maxZ, minX, maxX, y);
+  steppedWall(ctx, false, minX, minZ, maxZ, y);
+  steppedWall(ctx, false, maxX, minZ, maxZ, y);
 
   const rng = mulberry32(88);
   for (const isl of islands) {
@@ -80,16 +175,21 @@ function buildZenGarden(ctx: WorldContext) {
   }
 }
 
-/** Gravel ribbon winding through the bamboo, with stepping stones where it leaves the lawn. */
+/** Gravel ribbons: the path winding through the bamboo, and the footpaths between places. */
 function buildBambooPath(ctx: WorldContext) {
-  const curve = new THREE.CatmullRomCurve3(BAMBOO_PATH.map(([x, z]) => new THREE.Vector3(x, 0, z)));
+  gravelRibbon(ctx, BAMBOO_PATH, 0.85);
+  for (const p of FOOTPATHS) gravelRibbon(ctx, p, 0.7);
+}
+
+function gravelRibbon(ctx: WorldContext, points: [number, number][], w: number) {
+  const curve = new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, 0, z)));
   const n = Math.ceil(curve.getLength() / 0.6);
   const pos: number[] = [], idx: number[] = [];
   const p = new THREE.Vector3(), tng = new THREE.Vector3();
   for (let i = 0; i <= n; i++) {
     curve.getPointAt(i / n, p);
     curve.getTangentAt(i / n, tng);
-    const nx = -tng.z, nz = tng.x, w = 0.85;
+    const nx = -tng.z, nz = tng.x;
     for (const s of [-1, 1]) {
       const x = p.x + nx * w * s, z = p.z + nz * w * s;
       pos.push(x, ctx.ground.heightAt(x, z) + 0.04, z);
@@ -209,4 +309,11 @@ function buildPavilion(ctx: WorldContext) {
   const finial = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 8), gold);
   finial.position.set(P.x, FLOOR + H + 2.4, P.z);
   ctx.scene.add(finial);
+
+  // A small stupa in the middle of the pavilion
+  ctx.scene.add(cylinder(0.75, 0.8, 0.25, stone, P.x, FLOOR, P.z, 8));
+  const st = smallStupa(1.9);
+  st.position.set(P.x, FLOOR + 0.25, P.z);
+  ctx.scene.add(st);
+  ctx.collisions.addCircle(P.x, P.z, 0.85);
 }

@@ -201,7 +201,7 @@ function palaceFrameGeometry(drop: number) {
   const parts: THREE.BufferGeometry[] = [];
   const add = (g: THREE.BufferGeometry, hex: number) => parts.push(tint(g.index ? g.toNonIndexed() : g, hex));
   const RED = 0x8e1f16, GOLD = 0xd4af37, DARK = 0x3a1a10;
-  add(new THREE.CylinderGeometry(0.015, 0.015, drop, 5).translate(0, -drop / 2, 0), DARK);
+  add(new THREE.CylinderGeometry(0.015, 0.015, drop + 3, 5).translate(0, (3 - drop) / 2, 0), DARK); // runs up past the ceiling (reaches the raised bay)
   const top = -drop;
   add(new THREE.CylinderGeometry(0.12, 0.42, 0.12, 6).translate(0, top - 0.0, 0), RED);
   add(new THREE.CylinderGeometry(0.42, 0.42, 0.04, 6).translate(0, top - 0.07, 0), GOLD);

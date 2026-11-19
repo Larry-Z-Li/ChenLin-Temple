@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Offerings } from '../activities/offerings';
-import { BAMBOO_PATH, BODHI_TREE, CAT_SPOT, DEER_RANGES, POND, TEA_CORNER, WISH_GARDEN, ZEN_GARDEN } from '../config/layout';
+import { BAMBOO_PATH, BODHI_TREE, CAT_SPOTS, DEER_RANGES, FOOTPATHS, PAVED, POND, TEA_CORNER, WISH_GARDEN, ZEN_GARDEN } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import type { Interactable } from '../core/interaction';
 import { mulberry32, range } from '../core/math';
@@ -142,14 +142,14 @@ function deerModel(stag: boolean) {
 
 // ---------------------------------------------------------------- cat
 
-function buildCat(ctx: WorldContext) {
-  const { x, z, h } = CAT_SPOT;
-  const fur = new THREE.MeshStandardMaterial({ color: 0xd98a3a, roughness: 0.95, flatShading: true });
+function buildCat(ctx: WorldContext, spot: (typeof CAT_SPOTS)[number], index: number) {
+  const { x, z, h } = spot;
+  const fur = new THREE.MeshStandardMaterial({ color: spot.color, roughness: 0.95, flatShading: true });
   const white = new THREE.MeshStandardMaterial({ color: 0xf3ece0, roughness: 0.95, flatShading: true });
   const dark = new THREE.MeshStandardMaterial({ color: 0x3a2414 });
   const root = new THREE.Group();
   root.position.set(x, h, z);
-  root.rotation.y = 0.6;
+  root.rotation.y = 0.6 + index * 1.9;
   ctx.scene.add(root);
   const body = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1).scale(0.2, 0.12, 0.25), fur);
   body.position.y = 0.11;
@@ -184,7 +184,7 @@ function buildCat(ctx: WorldContext) {
     head.rotation.x = -0.35 * Math.exp(-woke * 1.5) * Math.min(1, woke * 8);
     head.rotation.z = Math.sin(woke * 20) * 0.08 * Math.exp(-woke * 3);
   });
-  ctx.instruments.push({ id: 'cat', kind: 'cat', x, z, onStrike: () => {
+  ctx.instruments.push({ id: `cat-${index}`, kind: 'cat', x, z, onStrike: () => {
     woke = 0;
     heartBurst(x, h + 0.4, z, 4);
   } });
@@ -287,7 +287,7 @@ export class Wildlife {
 
   constructor(private ctx: WorldContext, private net: NetClient, private offerings: Offerings, private player: LocalPlayer) {
     heartScene = ctx.scene;
-    buildCat(ctx);
+    CAT_SPOTS.forEach((c, i) => buildCat(ctx, c, i));
     buildButterflies(ctx);
     buildFireflies(ctx);
 
@@ -299,6 +299,22 @@ export class Wildlife {
         if (!isReserved(x, z, 0.5)) wps.push([x, z]);
       }
       if (wps.length < 2) return;
+      // Now and then they wander onto a nearby path too (about one stop in four).
+      const cx = (r.minX + r.maxX) / 2, cz = (r.minZ + r.maxZ) / 2;
+      const onPaths: [number, number][] = [];
+      for (const fp of FOOTPATHS)
+        for (let k = 0; k + 1 < fp.length; k++)
+          for (let t = 0; t < 1; t += 0.34) onPaths.push([fp[k][0] + (fp[k + 1][0] - fp[k][0]) * t, fp[k][1] + (fp[k + 1][1] - fp[k][1]) * t]);
+      for (const pv of PAVED.filter((r) => Math.min(r.maxX - r.minX, r.maxZ - r.minZ) < 8)) // narrow paved paths only (not the plaza or courtyard)
+        for (let t = 0.1; t < 1; t += 0.2)
+          onPaths.push(pv.maxX - pv.minX > pv.maxZ - pv.minZ ? [pv.minX + (pv.maxX - pv.minX) * t, (pv.minZ + pv.maxZ) / 2] : [(pv.minX + pv.maxX) / 2, pv.minZ + (pv.maxZ - pv.minZ) * t]);
+      const near = onPaths.filter(([x, z]) => Math.hypot(x - cx, z - cz) < 32);
+      for (let k = near.length - 1; k > 0; k--) {
+        const j = Math.floor(rng() * (k + 1)); // seeded shuffle: identical on every client
+        [near[k], near[j]] = [near[j], near[k]];
+      }
+      near.length = Math.min(near.length, Math.ceil(wps.length / 3));
+      wps.push(...near);
       const { root, legs, neck, head } = deerModel(i % 2 === 0);
       ctx.scene.add(root);
       const id = `deer-${i}`;

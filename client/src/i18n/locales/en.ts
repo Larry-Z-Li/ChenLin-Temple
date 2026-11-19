@@ -1,6 +1,6 @@
 /** English strings. Other locales mirror these keys (missing keys fall back to English). */
 const en = {
-  'app.title': 'Nine Palace Temple',
+  'app.title': 'Chenlin Temple',
   'app.subtitle': 'A quiet place to practice together',
 
   'entry.name': 'Your name',

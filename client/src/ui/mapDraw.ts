@@ -1,4 +1,4 @@
-import { BAMBOO_PATH, BASIN, BODHI_TREE, HALLS, MOUNTAIN_GATE, ORCHARD, PAVED, PLAY_RADIUS, POND, POND_PAVILION, RIVERS, TEA_CORNER, WHEEL_ROWS, WISH_GARDEN, ZEN_GARDEN } from '../config/layout';
+import { BAMBOO_PATH, BASIN, BODHI_TREE, COURTYARD_STUPA, FOOT_BRIDGES, FOOTPATHS, HALLS, HUTS, MOUNTAIN_GATE, ORCHARD, PAVED, PLAY_RADIUS, POND, POND_PAVILION, RIVERS, TEA_CORNER, WHEEL_ROWS, WISH_GARDEN, ZEN_GARDEN } from '../config/layout';
 import { t, type I18nKey } from '../i18n';
 
 export interface MapMarks {
@@ -47,6 +47,22 @@ export function drawTempleMap(g: CanvasRenderingContext2D, S: number, marks: Map
   g.beginPath();
   BAMBOO_PATH.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
   g.stroke();
+  g.strokeStyle = 'rgba(205,195,170,0.85)';
+  g.lineWidth = 1.4 * k;
+  for (const p of FOOTPATHS) {
+    g.beginPath();
+    p.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
+    g.stroke();
+  }
+  g.fillStyle = '#f1ede3';
+  dot(X(COURTYARD_STUPA.x), Y(COURTYARD_STUPA.z), 3 * s);
+  g.fillStyle = '#a3291f';
+  for (const b of FOOT_BRIDGES) {
+    const [w, d] = b.axis === 'x' ? [b.length, 2.4] : [2.4, b.length];
+    g.fillRect(X(b.x + w / 2), Y(b.z + d / 2), w * s, d * s);
+  }
+  g.fillStyle = '#8e2b1f';
+  for (const h of HUTS) g.fillRect(X(h.x) - 3.2 * s, Y(h.z) - 3.2 * s, 6.4 * s, 6.4 * s);
 
   g.fillStyle = 'rgba(190,182,166,0.92)';
   for (const r of PAVED) g.fillRect(X(r.maxX), Y(r.maxZ), (r.maxX - r.minX) * s, (r.maxZ - r.minZ) * s);

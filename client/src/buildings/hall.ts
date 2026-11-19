@@ -82,13 +82,31 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
     wallZ(back, front, hx + hw);
 
     // Ceiling
-    // Painted coffered ceiling
-    const ceilTex = ceilingTexture().clone();
-    ceilTex.repeat.set(width / 2.4, depth / 2.4);
-    ceilTex.needsUpdate = true;
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(width, depth).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 0.8, side: THREE.DoubleSide }));
-    ceil.position.set(hx, F + H - 0.02, hz);
-    g.add(blocker(ceil));
+    // Painted coffered ceiling. Under a two-tier roof the middle opens up into a raised bay (藻井),
+    // so the inside gains some of the height the roof shows outside.
+    const ceilPlane = (w: number, d: number, cx: number, cz: number, y: number) => {
+      const tex = ceilingTexture().clone();
+      tex.repeat.set(w / 2.4, d / 2.4);
+      tex.needsUpdate = true;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, side: THREE.DoubleSide }));
+      m.position.set(cx, y, cz);
+      g.add(blocker(m));
+    };
+    if (def.roofTiers === 2) {
+      const rw = width * 0.5, rd = depth * 0.4, RC = 2.6, y = F + H - 0.02;
+      ceilPlane(width, (depth - rd) / 2, hx, hz + (rd + depth) / 4, y);
+      ceilPlane(width, (depth - rd) / 2, hx, hz - (rd + depth) / 4, y);
+      ceilPlane((width - rw) / 2, rd, hx + (rw + width) / 4, hz, y);
+      ceilPlane((width - rw) / 2, rd, hx - (rw + width) / 4, hz, y);
+      ceilPlane(rw, rd, hx, hz, y + RC);
+      const side = mat(THEME.beam, { roughness: 0.6, side: THREE.DoubleSide });
+      for (const s of [-1, 1]) {
+        g.add(blocker(box(rw, RC, 0.08, side, hx, y, hz + s * rd / 2, false)));
+        g.add(blocker(box(0.08, RC, rd, side, hx + s * rw / 2, y, hz, false)));
+        g.add(box(rw + 0.2, 0.16, 0.16, mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 }), hx, y - 0.08, hz + s * rd / 2, false));
+        g.add(box(0.16, 0.16, rd + 0.2, mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 }), hx + s * rw / 2, y - 0.08, hz, false));
+      }
+    } else ceilPlane(width, depth, hx, hz, F + H - 0.02);
   }
 
   // Painted beam band under the eaves

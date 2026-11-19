@@ -108,8 +108,8 @@ export const STREAM: [number, number][] = [
 export interface RiverDef { id: string; points: [number, number][]; halfWidth: number; falls?: boolean }
 export const RIVERS: RiverDef[] = [
   { id: 'falls', points: STREAM, halfWidth: 1.5, falls: true },
-  { id: 'west', halfWidth: 2.1, points: [[-50.5, 16.5], [-47, 28], [-52, 42], [-45, 56], [-35, 68], [-28, 82], [-17, 95], [-4, 106], [0, 120], [5, 142], [1, 168], [0, 215]] },
-  { id: 'east', halfWidth: 1.8, points: [[98, -124], [83, -90], [71, -63], [66, -38], [72, -14], [68, 12], [72, 36], [64, 60], [50, 80], [30, 96], [12, 104], [-4, 106]] },
+  { id: 'west', halfWidth: 2.1, points: [[-50.5, 16.5], [-45, 26], [-39.5, 36], [-39.5, 47], [-36, 57], [-27, 65], [-15, 73], [-4, 78], [4, 80], [4, 92], [6, 108], [3, 130], [5, 150], [1, 175], [0, 215]] },
+  { id: 'east', halfWidth: 1.8, points: [[98, -124], [83, -90], [71, -63], [64, -38], [63, -14], [63, 12], [56, 30], [54, 48], [48, 60], [38, 67], [24, 74], [12, 79], [4, 80]] },
 ];
 
 export interface WheelRowDef {
@@ -146,18 +146,12 @@ const ring = (cx: number, cz: number, r: number, angles: number[]): BenchDef[] =
 export const BENCHES: BenchDef[] = [
   // spawn plaza
   { x: -7.5, z: 57, face: E }, { x: 7.5, z: 57, face: W },
-  // approach, between the prayer-wheel galleries and the cherry trees
-  { x: -7.5, z: 24, face: E }, { x: 7.5, z: 24, face: W },
-  { x: -7.5, z: 43, face: E }, { x: 7.5, z: 43, face: W },
-  // courtyard
+  // courtyard front
   { x: -13.5, z: 15, face: E }, { x: 13.5, z: 15, face: W },
-  { x: -13.5, z: -10, face: E }, { x: 13.5, z: -10, face: W },
   // under the Bodhi tree
   { x: BODHI_TREE.x + 4, z: BODHI_TREE.z, face: W }, { x: BODHI_TREE.x - 4, z: BODHI_TREE.z, face: E },
-  // orchard edge
-  { x: 33.5, z: -10, face: E }, { x: 33.5, z: 12, face: E },
-  // around the lotus pond (path from the east at angle 0, falls stream from the west at π, river out to the south at π/2)
-  ...ring(POND.x, POND.z, POND.radius + 3.5, [0.75, 2.3, 3.95, 4.71, 5.5]),
+  // a few around the lotus pond (path from the east at angle 0, falls stream at π, river out at π/2)
+  ...ring(POND.x, POND.z, POND.radius + 3.5, [0.75, 2.3, 5.5]),
   // viewing benches at the rock garden, facing west over the gravel
   { x: -16, z: 30, face: -Math.PI / 2 }, { x: -16, z: 36, face: -Math.PI / 2 },
 ];
@@ -198,7 +192,7 @@ export const STONE_LANTERNS: [number, number][] = [
   [-20, 5.3], [-31, 5.3], [20, 5.3], [31, 5.3], // paths to the pond and orchard
   [-87.7, -0.6], [-84.3, 14], // ends of the stream bridge
   [-54.6, -39.2], [-68, -42], // tea corner
-  [20.6, 25], [20.6, 51], [45.4, 25], [45.4, 51], // wish-lantern garden corners
+  [21.4, 25.6], [21.4, 50.4], [44.6, 25.6], [44.6, 50.4], // wish-lantern garden corners
 ];
 
 /** Large bronze incense burner (香爐) at the front of the courtyard, on the axis, with its incense table. */
@@ -233,8 +227,8 @@ export const PATH_LIGHT_RUNS: { from: [number, number]; to: [number, number]; st
 /** And a ring of them around the lotus pond. */
 export const POND_LIGHT_RING = { radius: 17.2, count: 22 };
 
-/** Map board (告示牌) on the left as you arrive, angled toward the spawn point. */
-export const MAP_BOARD = { x: -4.8, z: 51.6 };
+/** Map board (告示牌) on the right as you arrive, angled toward the spawn point. */
+export const MAP_BOARD = { x: 4.8, z: 51.6 };
 
 // ---------- Garden rooms ----------
 
@@ -251,15 +245,72 @@ export const POND_PAVILION = { x: POND.x + 6.6, z: POND.z, r: 2.6, walkX0: POND.
 export const TEA_CORNER = { x: -60, z: -48, r: 10, hut: { x: -64.5, z: -50.5 } };
 
 /** Wish-lantern garden (south-east): racks of lanterns over gravel, with a writing desk. */
-export const WISH_GARDEN = { minX: 20, maxX: 46, minZ: 24, maxZ: 52, racks: [28, 33, 38, 43, 48], rackX0: 24, rackX1: 42, desk: { x: 21.6, z: 38 } };
+export const WISH_GARDEN = {
+  minX: 20, maxX: 46, minZ: 24, maxZ: 52, racks: [28, 33, 38, 43, 48], rackX0: 24, rackX1: 42, desk: { x: 22.6, z: 40.5 },
+  /** Gaps in the stepped stone border, as [from, to] along each side. */
+  openings: { west: [39.5, 43.5], east: [36, 40], north: [31, 35], south: [31, 35] } as Record<'west' | 'east' | 'north' | 'south', [number, number]>,
+};
 
 /** Lawns where the deer roam (each deer keeps to one). */
 export const DEER_RANGES: Rect[] = [
   { minX: -50, maxX: -32, minZ: -34, maxZ: -16 }, // north of the pond
-  { minX: -40, maxX: -20, minZ: 46, maxZ: 64 }, // south-west meadow
-  { minX: 48, maxX: 60, minZ: 22, maxZ: 48 }, // between the wish garden and the east river
+  { minX: -62, maxX: -48, minZ: 42, maxZ: 60 }, // west of the river, south of the pond
+  { minX: 66, maxX: 80, minZ: -30, maxZ: -10 }, // east bank
   { minX: 32, maxX: 56, minZ: -36, maxZ: -26 }, // north of the orchard
+  { minX: -34, maxX: -22, minZ: 82, maxZ: 102 }, // south meadow
+  { minX: 36, maxX: 52, minZ: 78, maxZ: 96 }, // south-east meadow
+  { minX: -10, maxX: 14, minZ: -62, maxZ: -50 }, // behind the hall
+  { minX: -82, maxX: -70, minZ: -36, maxZ: -18 }, // west lawn by the tea corner
 ];
 
-/** The cat naps on the hall's front steps, off to one side. */
-export const CAT_SPOT = { x: 2.9, z: -10.35, h: 0.4 };
+/** Cats napping about the place (`h` = height they lie at). */
+export const CAT_SPOTS = [
+  { x: 2.9, z: -10.35, h: 0.4, color: 0xd98a3a }, // the hall's front steps (ginger)
+  { x: -23.4, z: 45.6, h: 0.35, color: 0x8a8a8a }, // south-west hut porch (grey)
+  { x: 26.6, z: 17.0, h: 0.35, color: 0x2a2a2a }, // east hut porch (black)
+  { x: -63.2, z: -50.5, h: 0.49, color: 0xe8d8b8 }, // tea hut floor (cream)
+  { x: -21.6, z: 15.2, h: 0, color: 0x7a5a3a }, // under the Bodhi tree (tabby)
+];
+
+/** Small decorative huts in the temple style (not enterable). yaw 0 = front faces south. */
+export const HUTS = [
+  { id: 'sw', x: -24.75, z: 48.6, yaw: Math.PI }, // behind the rock garden, looking over it
+  { id: 'e', x: 28, z: 14, yaw: 0 }, // between the orchard path and the wish-lantern garden
+];
+
+/** Informal gravel footpaths tying the places together. */
+export const FOOTPATHS: [number, number][][] = [
+  [[-3, 43.5], [-10, 44.2], [-17, 43.8], [-24.75, 44], [-30.5, 43.2], [-34.5, 41.5]], // approach → south-west hut → west bridge
+  [[-44.5, 41.5], [-49, 39.5], [-55, 33], [-58.5, 26]], // west bridge → pond's south shore
+  [[26, 4.6], [25, 10], [24.2, 16], [27, 19.2], [31.5, 20.6], [33, 23.4]], // orchard path → east hut → wish garden
+  [[-33, -0.6], [-34.5, -9], [-37.5, -16], [-40, -22]], // pond path → tea corner stepping stones
+  [[0, -43.5], [5, -47], [11, -47.5], [18, -44]], // hall back door → bamboo grove
+  [[-5, 61], [-8, 66], [-9, 71.2]], // spawn → south bridge
+  [[-9, 80.2], [-10, 86], [-12, 91]], // → picnic meadow
+  [[33, 52.6], [33, 58], [31.5, 65.6]], // wish garden's south gate → east bridge
+  [[31.5, 75], [30, 81], [27, 87]], // → south-east meadow
+  [[35, 3], [45, 3], [52, 3], [58.3, 3]], // through the orchard → orchard bridge
+  [[67.7, 3], [71, 4.5]], // → east bank
+];
+
+/** Wooden footbridges over the rivers (flat decks, red rails). `axis` = the direction you walk across. */
+export const FOOT_BRIDGES: { x: number; z: number; axis: 'x' | 'z'; length: number }[] = [
+  { x: -39.5, z: 41.5, axis: 'x', length: 9.5 }, // west river, by the south-west hut
+  { x: -9, z: 75.7, axis: 'z', length: 8.5 }, // west river, south of the spawn
+  { x: 31.5, z: 70.3, axis: 'z', length: 9 }, // east river, below the wish garden
+  { x: 63, z: 3, axis: 'x', length: 9 }, // east river, past the orchard
+];
+
+/** Picnic tables with benches (you can sit at them). yaw turns the table. */
+export const PICNIC_TABLES = [
+  { x: -17, z: 54, yaw: 0.15 }, { x: 16.5, z: 56, yaw: -0.15 }, // lawns either side of the spawn
+  { x: 32, z: -9, yaw: Math.PI / 2 }, { x: 32, z: -16, yaw: Math.PI / 2 }, // orchard edge
+  { x: -26, z: -6, yaw: 0.3 }, // lawn west of the hall
+  { x: -14, z: 93, yaw: 0.2 }, { x: -20, z: 88, yaw: -0.3 }, // south meadow, over the bridge
+  { x: 26, z: 90, yaw: 0.2 }, // south-east meadow
+  { x: 73, z: 9, yaw: Math.PI / 2 }, // east bank
+  { x: -61, z: 33, yaw: 0.5 }, // pond's south shore
+];
+
+/** A stupa at the heart of the courtyard, between the hall steps and the incense burner. */
+export const COURTYARD_STUPA = { x: 0, z: 1.5 };

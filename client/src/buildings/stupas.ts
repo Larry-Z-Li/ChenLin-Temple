@@ -9,6 +9,7 @@ import { terrainHeight } from '../world/terrain';
 
 export interface StupaSpot { x: number; z: number; y: number; yaw: number; s: number }
 import { mat } from './materials';
+import { haloPoints, nightGlow } from '../world/nightGlow';
 
 const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
 const slab = (w: number, h: number, y: number) => new THREE.BoxGeometry(w, h, w).translate(0, y + h / 2, 0);
@@ -40,6 +41,20 @@ function stupaGeometries() {
     new THREE.ConeGeometry(0.12, 0.42, 12).translate(0, 9.78, 0), // finial
   ]);
   return { stone, white, accent, gold };
+}
+
+/** A small chörten (`height` metres tall) as a plain group, e.g. for the pond pavilion. */
+export function smallStupa(height: number) {
+  const geos = stupaGeometries();
+  const g = new THREE.Group();
+  g.add(
+    new THREE.Mesh(geos.white, mat(0xf1ede3, { roughness: 0.85 })),
+    new THREE.Mesh(geos.accent, mat(0x9c3b22, { roughness: 0.7 })),
+    new THREE.Mesh(geos.gold, mat(THEME.goldLeaf, { metalness: 0.8, roughness: 0.3 })),
+  );
+  g.scale.setScalar(height / 9.9);
+  g.traverse((o) => (o.castShadow = o.receiveShadow = true));
+  return g;
 }
 
 export function buildStupas(ctx: WorldContext) {
@@ -90,5 +105,17 @@ export function buildStupas(ctx: WorldContext) {
     mesh.computeBoundingSphere();
     ctx.scene.add(mesh);
   }
+  // After dark the chörtens are lit: the whitewash glows warm and each wears a soft halo.
+  const white = mats.white;
+  white.emissive.set(0xffd9a0);
+  nightGlow.track((n) => (white.emissiveIntensity = 0.55 * n));
+  const pos: number[] = [], col: number[] = [], spark: number[] = [], sparkCol: number[] = [];
+  for (const p of spots) {
+    pos.push(p.x, p.y + 4 * p.s, p.z);
+    col.push(1, 0.82, 0.55);
+    spark.push(p.x, p.y + 9.4 * p.s, p.z);
+    sparkCol.push(1, 0.9, 0.6);
+  }
+  ctx.scene.add(haloPoints(pos, col, 16, 0.55), haloPoints(spark, sparkCol, 3.5, 0.9));
   return spots;
 }

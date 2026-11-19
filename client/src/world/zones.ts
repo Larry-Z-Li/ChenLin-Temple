@@ -1,4 +1,4 @@
-import { BAMBOO_PATH, BASIN, BENCHES, BODHI_TREE, POND_PAVILION, TEA_CORNER, WISH_GARDEN, ZEN_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WATERFALL, WHEEL_ROWS, type Rect } from '../config/layout';
+import { BAMBOO_PATH, BASIN, COURTYARD_STUPA, BENCHES, BODHI_TREE, FOOT_BRIDGES, FOOTPATHS, HUTS, PICNIC_TABLES, POND_PAVILION, TEA_CORNER, WISH_GARDEN, ZEN_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WATERFALL, WHEEL_ROWS, type Rect } from '../config/layout';
 import { smoothstep } from '../core/math';
 import { nearestOnStream, nearestRiver, nearStream } from './stream';
 
@@ -25,6 +25,11 @@ export function isReserved(x: number, z: number, margin = 1.5, includeOrchard = 
   if (Math.hypot(x - TEA_CORNER.x, z - TEA_CORNER.z) < TEA_CORNER.r + margin) return true;
   if (inRect(x, z, { minX: POND_PAVILION.walkX0 - 3, maxX: POND_PAVILION.walkX1, minZ: 17, maxZ: 25 }, margin)) return true;
   if (nearBambooPath(x, z) < 1.6 + margin * 0.5) return true;
+  if (FOOTPATHS.some((p) => distToPolyline(p, x, z) < 1.3 + margin * 0.5)) return true;
+  for (const h of HUTS) if (Math.hypot(x - h.x, z - h.z) < 7 + margin) return true;
+  if (Math.hypot(x - COURTYARD_STUPA.x, z - COURTYARD_STUPA.z) < 3.5 + margin) return true;
+  for (const t of PICNIC_TABLES) if (Math.hypot(x - t.x, z - t.z) < 2.2 + margin) return true;
+  for (const b of FOOT_BRIDGES) if (Math.hypot(x - b.x, z - b.z) < b.length / 2 + 1 + margin) return true;
   const c = LANTERN_CANOPY;
   if (inRect(x, z, { minX: -c.x - 0.5, maxX: c.x + 0.5, minZ: c.z0 - 0.5, maxZ: c.z1 + 0.5 }, margin)) return true;
   if (Math.hypot(x - INCENSE_BURNER.x, z - INCENSE_BURNER.z) < 3 + margin || Math.hypot(x - STELE.x, z - STELE.z) < 1.5 + margin) return true;
@@ -47,10 +52,12 @@ export function inStreamVista(x: number, z: number) {
 export const basinDist = (x: number, z: number) => Math.hypot(x - BASIN.x, z - BASIN.z);
 
 /** Distance from (x,z) to the bamboo-grove path polyline. */
-export function nearBambooPath(x: number, z: number) {
+export const nearBambooPath = (x: number, z: number) => distToPolyline(BAMBOO_PATH, x, z);
+
+export function distToPolyline(pts: [number, number][], x: number, z: number) {
   let best = Infinity;
-  for (let i = 0; i + 1 < BAMBOO_PATH.length; i++) {
-    const [ax, az] = BAMBOO_PATH[i], [bx, bz] = BAMBOO_PATH[i + 1];
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
     const dx = bx - ax, dz = bz - az, L = dx * dx + dz * dz;
     const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L));
     best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));

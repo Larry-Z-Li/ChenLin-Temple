@@ -244,9 +244,23 @@ export class WishLanterns {
     gravel.position.set(cx, y + 0.03, cz);
     gravel.receiveShadow = true;
     ctx.scene.add(gravel);
-    const curb = mat(0x8d8a80, { roughness: 1 });
-    ctx.scene.add(box(W, 0.16, 0.22, curb, cx, y, G.minZ), box(W, 0.16, 0.22, curb, cx, y, G.maxZ), box(0.22, 0.16, D, curb, G.maxX, y, cz));
-    for (const z of [G.minZ + 4, G.maxZ - 4]) ctx.scene.add(box(0.22, 0.16, 10, curb, G.minX, y, z)); // west side, open in the middle
+    // Stepped stone border you can't climb, with a gap on each side.
+    const lower = mat(0x9a958a, { roughness: 1 }), upper = mat(0x8d8a80, { roughness: 1 });
+    const wall = (horizontal: boolean, at: number, from: number, to: number) => {
+      if (to - from < 0.05) return;
+      const len = to - from, mid = (from + to) / 2;
+      const [x, z, w, d] = horizontal ? [mid, at, len, 0] : [at, mid, 0, len];
+      ctx.scene.add(box(w + 0.8, 0.3, d + 0.8, lower, x, y, z), box(w + 0.42, 0.62, d + 0.42, upper, x, y, z));
+      ctx.collisions.addBox(x - (w + 0.8) / 2, x + (w + 0.8) / 2, z - (d + 0.8) / 2, z + (d + 0.8) / 2);
+    };
+    const side = (horizontal: boolean, at: number, from: number, to: number, gap: [number, number]) => {
+      wall(horizontal, at, from, gap[0]);
+      wall(horizontal, at, gap[1], to);
+    };
+    side(true, G.minZ, G.minX, G.maxX, G.openings.north);
+    side(true, G.maxZ, G.minX, G.maxX, G.openings.south);
+    side(false, G.minX, G.minZ, G.maxZ, G.openings.west);
+    side(false, G.maxX, G.minZ, G.maxZ, G.openings.east);
 
     // Racks: red posts and a beam under a narrow tiled top.
     const red = mat(THEME.column, { roughness: 0.55 });
@@ -296,7 +310,7 @@ export class WishLanterns {
     // Stepping stones from the approach.
     const stoneMat = mat(0x9a958a, { roughness: 1, flatShading: true }), stoneGeo = new THREE.CylinderGeometry(0.42, 0.46, 0.1, 9);
     for (let i = 0; i <= 16; i++) {
-      const sx = 4 + i, sz = 44 - (i / 16) * 5.8 + Math.sin(i * 1.9) * 0.2;
+      const sx = 4 + i * 0.97, sz = 44 - (i / 16) * 2.5 + Math.sin(i * 1.9) * 0.2;
       const s = new THREE.Mesh(stoneGeo, stoneMat);
       s.position.set(sx, ctx.ground.heightAt(sx, sz) + 0.03, sz);
       s.rotation.y = i;

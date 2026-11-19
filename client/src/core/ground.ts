@@ -8,6 +8,7 @@ interface Ramp { minX: number; maxX: number; z0: number; z1: number; h0: number;
 export class Ground {
   private pads: Pad[] = [];
   private ramps: Ramp[] = [];
+  private rampsX: { minZ: number; maxZ: number; x0: number; x1: number; h0: number; h1: number }[] = [];
 
   addPad(minX: number, maxX: number, minZ: number, maxZ: number, h: number) {
     this.pads.push({ minX, maxX, minZ, maxZ, h });
@@ -15,6 +16,11 @@ export class Ground {
 
   addRamp(minX: number, maxX: number, z0: number, z1: number, h0: number, h1: number) {
     this.ramps.push({ minX, maxX, z0, z1, h0, h1 });
+  }
+
+  /** Linear ramp along X: height h0 at x0 → h1 at x1. */
+  addRampX(minZ: number, maxZ: number, x0: number, x1: number, h0: number, h1: number) {
+    this.rampsX.push({ minZ, maxZ, x0, x1, h0, h1 });
   }
 
   heightAt(x: number, z: number) {
@@ -26,6 +32,10 @@ export class Ground {
         const t = (z - r.z0) / (r.z1 - r.z0);
         h = Math.max(h, r.h0 + (r.h1 - r.h0) * t);
       }
+    }
+    for (const r of this.rampsX) {
+      const lo = Math.min(r.x0, r.x1), hi = Math.max(r.x0, r.x1);
+      if (z >= r.minZ && z <= r.maxZ && x >= lo && x <= hi) h = Math.max(h, r.h0 + ((r.h1 - r.h0) * (x - r.x0)) / (r.x1 - r.x0));
     }
     return h;
   }
