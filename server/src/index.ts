@@ -25,6 +25,14 @@ import {
   type Fruit,
   type Offering,
   sanitizeName,
+  sanitizeText,
+  WISH_COLOURS,
+  WISH_COOLDOWN_MS,
+  WISH_SLOTS,
+  WISH_TEXT_MAX,
+  WISH_TITLE_MAX,
+  WISH_TTL_MS,
+  type Wish,
   type ClientMsg,
   type PlayerInfo,
   type ServerMsg,
@@ -95,6 +103,8 @@ interface Client {
   lastPush: number;
   lastOffer: number;
   lastStrike: number;
+  lastWish: number;
+  lastFeed: number;
   /** Fruit this person picked and hasn't offered yet (server-authoritative). */
   inventory: Partial<Record<Fruit, number>>;
   alive: boolean;
@@ -133,6 +143,36 @@ let offeringSeq = 0;
 const dayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TEMPLE_TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 const dayKey = () => dayFormat.format(new Date());
 let currentDay = dayKey();
+
+// ---------- Wish lanterns (persisted to a JSON file; see README for hosting caveats) ----------
+const DATA_DIR = process.env.DATA_DIR ?? path.resolve(here, '../data');
+const WISH_FILE = path.join(DATA_DIR, 'wishes.json');
+const wishes = new Map<string, Wish>();
+try {
+  const list = JSON.parse(fs.readFileSync(WISH_FILE, 'utf8')) as Wish[];
+  for (const w of list) if (w && typeof w.id === 'string' && Date.now() - w.at < WISH_TTL_MS) wishes.set(w.id, w);
+  console.log(`Loaded ${wishes.size} wish lanterns`);
+} catch {
+  /* none yet */
+}
+let saveTimer: NodeJS.Timeout | null = null;
+function saveWishes() {
+  saveTimer ??= setTimeout(() => {
+    saveTimer = null;
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFile(WISH_FILE, JSON.stringify([...wishes.values()]), (e) => e && console.warn('[wishes] save failed', e.message));
+  }, 2000);
+}
+function pruneWishes(now = Date.now()) {
+  for (const w of wishes.values()) {
+    if (now - w.at >= WISH_TTL_MS) {
+      wishes.delete(w.id);
+      broadcast({ t: 'wishRemoved', id: w.id });
+      saveWishes();
+    }
+  }
+}
+setInterval(pruneWishes, 10 * 60 * 1000);
 
 const inventoryCount = (c: Client) => Object.values(c.inventory).reduce((a, b) => a + (b ?? 0), 0);
 
@@ -192,6 +232,7 @@ function handle(c: Client, msg: ClientMsg) {
       wheels: turningWheels(now),
       picked: pickedAgo,
       offerings: liveOfferings(now),
+      wishes: [...wishes.values()],
     });
     broadcast({ t: 'join', player: { ...c.info, tr: c.tr } }, c.id);
     return;
@@ -232,6 +273,38 @@ function handle(c: Client, msg: ClientMsg) {
       if (now - c.lastStrike < 300) return;
       c.lastStrike = now;
       broadcast({ t: 'strike', inst: msg.inst, by: c.id }, c.id);
+      break;
+    }
+    case 'wish': {
+      const now = Date.now();
+      const title = sanitizeText(msg.title, WISH_TITLE_MAX), text = sanitizeText(msg.text, WISH_TEXT_MAX);
+      if (!title) return send(c, { t: 'wishDenied', reason: 'empty' });
+      if (now - c.lastWish < WISH_COOLDOWN_MS) return send(c, { t: 'wishDenied', reason: 'slow' });
+      c.lastWish = now;
+      pruneWishes(now);
+      // Full: take down the oldest lantern and reuse its hook.
+      const used = new Set([...wishes.values()].map((w) => w.slot));
+      let slot = [...Array(WISH_SLOTS).keys()].find((s) => !used.has(s));
+      if (slot === undefined) {
+        const oldest = [...wishes.values()].reduce((a, b) => (a.at <= b.at ? a : b));
+        wishes.delete(oldest.id);
+        broadcast({ t: 'wishRemoved', id: oldest.id });
+        slot = oldest.slot;
+      }
+      const color = Number.isInteger(msg.color) && msg.color >= 0 && msg.color < WISH_COLOURS ? msg.color : 0;
+      const wish: Wish = { id: randomUUID().slice(0, 12), slot, title, text, color, name: c.info.name, at: now };
+      wishes.set(wish.id, wish);
+      saveWishes();
+      broadcast({ t: 'wishAdded', wish });
+      break;
+    }
+    case 'feed': {
+      if (typeof msg.deer !== 'string' || !ID_RE.test(msg.deer)) return;
+      const now = Date.now();
+      if (now - c.lastFeed < 800 || !c.inventory.apple) return;
+      c.lastFeed = now;
+      c.inventory.apple--;
+      broadcast({ t: 'fed', deer: msg.deer, by: c.id });
       break;
     }
     case 'pick': {
@@ -280,12 +353,14 @@ wss.on('connection', (ws) => {
     id: randomUUID().slice(0, 8),
     ws,
     info: null,
-    tr: [0, 0, 110, 0, 0, 0],
+    tr: [0, 0, 55, 0, 0, 0],
     dirty: false,
     seat: null,
     lastPush: 0,
     lastOffer: 0,
     lastStrike: 0,
+    lastWish: 0,
+    lastFeed: 0,
     inventory: {},
     alive: true,
     msgWindowStart: Date.now(),

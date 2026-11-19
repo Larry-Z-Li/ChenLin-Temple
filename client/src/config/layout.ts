@@ -6,13 +6,13 @@
  * All buildings and statues face SOUTH (+Z). Players spawn in the south and walk north.
  *
  *            (minimap, south at top)
- *                    SPAWN
- *               [ prayer wheels ]
- *               SOUTH HALL (Mañjuśrī)
- *                 MARĪCĪ SHRINE
- *  ORCHARD (E)    CENTER HALL     LOTUS POND (W) ~~ stream ~~ waterfall (W mountains)
- *              (Five Tathāgatas)
- *   NE Daikokuten   N Cundī   NW Cintāmaṇicakra
+ *                    SPAWN · gate
+ *        [ lantern canopy + prayer wheels ]
+ *     rock garden               wish lanterns
+ *               COURTYARD (incense burner)
+ *  ORCHARD (E)                      LOTUS POND (W) ~~ stream ~~ waterfall
+ *           HALL OF THE FIVE TATHĀGATAS (N)
+ *     bamboo grove (NE)         tea corner (NW)
  */
 import type { DeityId } from './deities';
 
@@ -20,7 +20,7 @@ export const BASIN = { x: 0, z: 10, radius: 110 }; // flat valley floor (circle)
 export const PLAY_RADIUS = 120; // soft boundary, measured from BASIN center
 export const TERRAIN_SIZE = 780;
 
-export const SPAWN = { x: 0, z: 110, yaw: 0 }; // yaw 0 = facing north
+export const SPAWN = { x: 0, z: 55, yaw: 0 }; // yaw 0 = facing north
 
 /** Height of hall platforms above ground. */
 export const PLATFORM_H = 0.6;
@@ -51,43 +51,15 @@ export interface HallDef {
   couplet?: [string, string];
 }
 
+/** One temple: the Hall of the Five Tathāgatas at the north end of the courtyard. */
 export const HALLS: HallDef[] = [
   {
-    id: 'south', kind: 'hall', nameKey: 'hall.south',
-    x: 0, z: 62, width: 26, depth: 24, wallHeight: 6.5,
-    deities: ['manjushri'], frontDoor: true, backDoor: true, seats: 40, thangkas: 3, roofTiers: 1,
-    couplet: ['妙德慈光開智慧', '吉祥法雨潤群生'],
-  },
-  {
-    id: 'marici', kind: 'shrine', nameKey: 'hall.marici',
-    x: 0, z: 30, width: 9, depth: 9, wallHeight: 4.2,
-    deities: ['marici'], frontDoor: true, backDoor: false, seats: 0, thangkas: 0, roofTiers: 1,
-  },
-  {
     id: 'center', kind: 'hall', nameKey: 'hall.center',
-    x: 0, z: 0, width: 54, depth: 26, wallHeight: 8,
+    x: 0, z: -26, width: 54, depth: 26, wallHeight: 8,
     // ⚠ Placeholder ordering — confirm with your lineage's arrangement.
     deities: ['amitabha', 'amoghasiddhi', 'vairocana', 'ratnasambhava', 'akshobhya'],
     frontDoor: true, backDoor: true, seats: 60, thangkas: 4, roofTiers: 2,
     couplet: ['五智圓明周法界', '一心清淨即蓮邦'],
-  },
-  {
-    id: 'northwest', kind: 'hall', nameKey: 'hall.northwest',
-    x: -44, z: -50, width: 24, depth: 24, wallHeight: 6.5,
-    deities: ['cintamanicakra'], frontDoor: true, backDoor: false, seats: 40, thangkas: 3, roofTiers: 1,
-    couplet: ['寶珠如意隨心滿', '慈航普渡出迷津'],
-  },
-  {
-    id: 'north', kind: 'hall', nameKey: 'hall.north',
-    x: 0, z: -50, width: 24, depth: 24, wallHeight: 6.5,
-    deities: ['cundi'], frontDoor: true, backDoor: false, seats: 40, thangkas: 3, roofTiers: 1,
-    couplet: ['準提神咒消災障', '佛母慈心護眾生'],
-  },
-  {
-    id: 'northeast', kind: 'hall', nameKey: 'hall.northeast',
-    x: 44, z: -50, width: 24, depth: 24, wallHeight: 6.5,
-    deities: ['daikokuten'], frontDoor: true, backDoor: false, seats: 40, thangkas: 3, roofTiers: 1,
-    couplet: ['福德莊嚴資道業', '慈悲護法佑僧伽'],
   },
 ];
 
@@ -100,24 +72,20 @@ export interface Rect {
 
 /** Stone-paved walkways and courtyards. */
 export const PAVED: Rect[] = [
-  { minX: -9, maxX: 9, minZ: 102, maxZ: 116 }, // spawn plaza
-  { minX: -3, maxX: 3, minZ: 74, maxZ: 102 }, // approach to South Hall
-  { minX: -15, maxX: 15, minZ: 13, maxZ: 50 }, // Marīcī courtyard
-  { minX: -3, maxX: 3, minZ: -38, maxZ: -13 }, // center → north hall
-  { minX: -50, maxX: 50, minZ: -34, maxZ: -28 }, // north cross path
-  { minX: -47, maxX: -41, minZ: -38, maxZ: -28 },
-  { minX: 41, maxX: 47, minZ: -38, maxZ: -28 },
-  { minX: -38.5, maxX: -15, minZ: 19, maxZ: 23 }, // to the lotus pond
-  { minX: 15, maxX: 39, minZ: 19, maxZ: 23 }, // to the orchard
+  { minX: -9, maxX: 9, minZ: 48, maxZ: 61 }, // spawn plaza
+  { minX: -3, maxX: 3, minZ: 18, maxZ: 48 }, // the approach
+  { minX: -15, maxX: 15, minZ: -13, maxZ: 18 }, // courtyard before the hall
+  { minX: -35.5, maxX: -15, minZ: 0, maxZ: 4 }, // to the lotus pond
+  { minX: 15, maxX: 35, minZ: 0, maxZ: 4 }, // to the orchard
 ];
 
-export const MOUNTAIN_GATE = { x: 0, z: 100, width: 8, height: 6, couplet: ['佛日增輝光普照', '法輪常轉道恆昌'] as [string, string] };
+export const MOUNTAIN_GATE = { x: 0, z: 47, width: 8, height: 6, couplet: ['佛日增輝光普照', '法輪常轉道恆昌'] as [string, string] };
 
-export const POND = { x: -54, z: 21, radius: 15 };
+export const POND = { x: -50.5, z: 2, radius: 15 };
 
-export const ORCHARD: Rect & { spacing: number } = { minX: 41, maxX: 64, minZ: -4, maxZ: 36, spacing: 7.5 };
+export const ORCHARD: Rect & { spacing: number } = { minX: 37, maxX: 59.5, minZ: -22, maxZ: 15.5, spacing: 7.5 };
 
-export const BODHI_TREE = { x: -24, z: 38 };
+export const BODHI_TREE = { x: -24, z: 12 };
 
 /** Waterfall in the western mountains, facing east toward the temple. */
 export const WATERFALL = { x: -146, z: 18, width: 10, height: 48 };
@@ -127,7 +95,21 @@ export const WATERFALL = { x: -146, z: 18, width: 10, height: 48 };
  * Terrain is carved along it: a ravine through the slope, then a shallow swale across the valley.
  */
 export const STREAM: [number, number][] = [
-  [-144, 18], [-131, 21], [-119, 16], [-107, 19], [-95, 24], [-83, 20], [-73, 21], [-66.5, 21],
+  [-144, 18], [-131, 21], [-119, 16], [-107, 14], [-95, 10], [-84, 6], [-74, 4], [-66, 2.5],
+];
+
+/**
+ * All rivers, upstream first. The falls stream feeds the pond; the west river leaves the pond to the
+ * south; the east river comes down a gorge from the north-east mountains, runs south past the orchard
+ * and joins the west river below the spawn; together they leave the valley through a southern gorge.
+ * Where a river runs outside the valley floor its bed is carved into the slopes (upstream ends rise,
+ * downstream ends fall), so the water always runs downhill.
+ */
+export interface RiverDef { id: string; points: [number, number][]; halfWidth: number; falls?: boolean }
+export const RIVERS: RiverDef[] = [
+  { id: 'falls', points: STREAM, halfWidth: 1.5, falls: true },
+  { id: 'west', halfWidth: 2.1, points: [[-50.5, 16.5], [-47, 28], [-52, 42], [-45, 56], [-35, 68], [-28, 82], [-17, 95], [-4, 106], [0, 120], [5, 142], [1, 168], [0, 215]] },
+  { id: 'east', halfWidth: 1.8, points: [[98, -124], [83, -90], [71, -63], [66, -38], [72, -14], [68, 12], [72, 36], [64, 60], [50, 80], [30, 96], [12, 104], [-4, 106]] },
 ];
 
 export interface WheelRowDef {
@@ -141,12 +123,12 @@ export interface WheelRowDef {
   side: 'east' | 'west';
 }
 
-/** Rows of prayer wheels along the approach path and around the Marīcī shrine. */
+/** Rows of prayer wheels along the approach path and in the courtyard. */
 export const WHEEL_ROWS: WheelRowDef[] = [
-  { id: 'aw', x: -4.4, zStart: 84, count: 8, spacing: 1.3, side: 'east' },
-  { id: 'ae', x: 4.4, zStart: 84, count: 8, spacing: 1.3, side: 'west' },
-  { id: 'mw', x: -9.5, zStart: 25.5, count: 7, spacing: 1.3, side: 'east' },
-  { id: 'me', x: 9.5, zStart: 25.5, count: 7, spacing: 1.3, side: 'west' },
+  { id: 'aw', x: -4.4, zStart: 30, count: 8, spacing: 1.3, side: 'east' },
+  { id: 'ae', x: 4.4, zStart: 30, count: 8, spacing: 1.3, side: 'west' },
+  { id: 'mw', x: -9.5, zStart: -5, count: 7, spacing: 1.3, side: 'east' },
+  { id: 'me', x: 9.5, zStart: -5, count: 7, spacing: 1.3, side: 'west' },
 ];
 
 export interface BenchDef {
@@ -156,28 +138,28 @@ export interface BenchDef {
   face: number;
 }
 
-const E = Math.PI / 2, W = -Math.PI / 2, N = Math.PI;
+const E = Math.PI / 2, W = -Math.PI / 2;
 /** Benches on a circle, all facing its centre. */
 const ring = (cx: number, cz: number, r: number, angles: number[]): BenchDef[] =>
   angles.map((a) => ({ x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r, face: Math.atan2(-Math.cos(a), -Math.sin(a)) }));
 
 export const BENCHES: BenchDef[] = [
   // spawn plaza
-  { x: -7.5, z: 109, face: E }, { x: 7.5, z: 109, face: W },
+  { x: -7.5, z: 57, face: E }, { x: 7.5, z: 57, face: W },
   // approach, between the prayer-wheel galleries and the cherry trees
-  { x: -7.5, z: 97, face: E }, { x: 7.5, z: 97, face: W },
-  { x: -7.5, z: 79, face: E }, { x: 7.5, z: 79, face: W },
-  // Marīcī courtyard
-  { x: -13.5, z: 44, face: E }, { x: 13.5, z: 44, face: W },
-  { x: -13.5, z: 16, face: E }, { x: 13.5, z: 16, face: W },
+  { x: -7.5, z: 24, face: E }, { x: 7.5, z: 24, face: W },
+  { x: -7.5, z: 43, face: E }, { x: 7.5, z: 43, face: W },
+  // courtyard
+  { x: -13.5, z: 15, face: E }, { x: 13.5, z: 15, face: W },
+  { x: -13.5, z: -10, face: E }, { x: 13.5, z: -10, face: W },
   // under the Bodhi tree
   { x: BODHI_TREE.x + 4, z: BODHI_TREE.z, face: W }, { x: BODHI_TREE.x - 4, z: BODHI_TREE.z, face: E },
-  // north path, facing the northern halls
-  { x: -22, z: -25, face: N }, { x: 22, z: -25, face: N },
   // orchard edge
-  { x: 37.5, z: 10, face: E }, { x: 37.5, z: 30, face: E },
-  // around the lotus pond (path arrives from the east at angle 0, the stream from the west at π)
-  ...ring(POND.x, POND.z, POND.radius + 3.5, [0.75, 1.57, 2.3, 3.95, 4.71, 5.5]),
+  { x: 33.5, z: -10, face: E }, { x: 33.5, z: 12, face: E },
+  // around the lotus pond (path from the east at angle 0, falls stream from the west at π, river out to the south at π/2)
+  ...ring(POND.x, POND.z, POND.radius + 3.5, [0.75, 2.3, 3.95, 4.71, 5.5]),
+  // viewing benches at the rock garden, facing west over the gravel
+  { x: -16, z: 30, face: -Math.PI / 2 }, { x: -16, z: 36, face: -Math.PI / 2 },
 ];
 
 /**
@@ -195,86 +177,89 @@ const pondPoles = [0.4, 1.95, 2.75, 3.55, 4.3, 5.9].map((a) => pole(POND.x + Mat
 
 /** Strings of prayer flags in the temple grounds (the ridge strings between stupas are added automatically). */
 export const FLAG_LINES: [FlagAnchor, FlagAnchor][] = [
-  // across the approach just inside the mountain gate
-  [pole(-9.6, 97), pole(9.6, 97)],
-  // a ring around the lotus pond, crossing the path and the stream
+  // across the spawn plaza, just outside the mountain gate
+  [pole(-9.6, 50.5), pole(9.6, 50.5)],
+  // a ring around the lotus pond, crossing the path and the streams
   ...pondPoles.map((p, i) => [p, pondPoles[(i + 1) % pondPoles.length]] as [FlagAnchor, FlagAnchor]),
-  // radiating from the Marīcī shrine roof to the courtyard corners
-  ...[pole(-14.5, 20, 4.5), pole(14.5, 20, 4.5), pole(-14.5, 40, 4.5), pole(14.5, 40, 4.5)].map((p) => [{ x: 0, z: 30, h: 9.6 }, p] as [FlagAnchor, FlagAnchor]),
+  // across the courtyard entrance
+  [pole(-11, 17.5, 4.8), pole(11, 17.5, 4.8)],
   // from the Bodhi tree's crown
   [{ x: BODHI_TREE.x, z: BODHI_TREE.z, h: 6.5 }, pole(BODHI_TREE.x - 7, BODHI_TREE.z + 7, 4.5)],
-  [{ x: BODHI_TREE.x, z: BODHI_TREE.z, h: 6.5 }, pole(BODHI_TREE.x - 7, BODHI_TREE.z - 7, 4.5)],
+  [{ x: BODHI_TREE.x, z: BODHI_TREE.z, h: 6.5 }, pole(BODHI_TREE.x - 6, BODHI_TREE.z - 5.5, 4.5)],
   // across the ravine below the waterfall
   [pole(WATERFALL.x + 16, WATERFALL.z - 14, 6), pole(WATERFALL.x + 16, WATERFALL.z + 16, 6)],
-  // along the north path between the northern halls
-  [pole(-29.5, -35, 5), pole(-14.5, -35, 5)],
-  [pole(14.5, -35, 5), pole(29.5, -35, 5)],
 ];
-
-/**
- * Cloud rides: a cloud bobs to the right of the entrance and another just right of the
- * Cundī hall's front steps; each carries you to the other along a scenic route.
- */
-export const CLOUD_STATIONS = {
-  gate: { x: 6, z: 103.5 },
-  cundi: { x: 9, z: -31.5 },
-};
-
-/**
- * Fast travel (~5 s): waypoints (x, height, z) from the gate to Cundī; the return flies it backwards.
- * One swooping arc that peaks over the courtyard for a view of the whole temple, pond and waterfall.
- */
-export const CLOUD_ROUTE: [number, number, number][] = [
-  [8.5, 8, 99], // lift off beside the mountain gate
-  [0, 24, 76], // over the Hall of Mañjuśrī
-  [-12, 40, 46],
-  [-14, 46, 10], // peak above the courtyard
-  [-4, 32, -16], // over the Hall of the Five Tathāgatas
-  [6, 12, -25], // glide down to Cundī
-];
-export const CLOUD_RIDE_SECONDS = 5;
 
 /** Stone lanterns (石燈籠) along the paths. */
 export const STONE_LANTERNS: [number, number][] = [
-  [-3.8, 77], [3.8, 77], [-3.8, 81], [3.8, 81], [-3.8, 98], [3.8, 98], // approach
-  [-14.3, 26], [14.3, 26], [-14.3, 34], [14.3, 34], // Marīcī courtyard
-  [-5.5, 17.6], [5.5, 17.6], // before the Hall of the Five Tathāgatas
-  [-20, 24.3], [-32, 24.3], [20, 24.3], [32, 24.3], // paths to the pond and orchard
-  [-36, -26.6], [-8, -26.6], [8, -26.6], [36, -26.6], // north path
-  [-87.7, 13.6], [-84.3, 28.4], // ends of the stream bridge
+  [-3.8, 22], [3.8, 22], [-3.8, 26], [3.8, 26], [-3.8, 45], [3.8, 45], // approach
+  [-14.3, -5], [14.3, -5], [-14.3, 3], [14.3, 3], // courtyard
+  [-5.5, -8.4], [5.5, -8.4], // before the hall
+  [-20, 5.3], [-31, 5.3], [20, 5.3], [31, 5.3], // paths to the pond and orchard
+  [-87.7, -0.6], [-84.3, 14], // ends of the stream bridge
+  [-54.6, -39.2], [-68, -42], // tea corner
+  [20.6, 25], [20.6, 51], [45.4, 25], [45.4, 51], // wish-lantern garden corners
 ];
 
-/** Large bronze incense burner (香爐) on the axis between the Hall of Mañjuśrī and the Marīcī shrine, with its incense table. */
-export const INCENSE_BURNER = { x: 0, z: 41.4, tableZ: 43.4, standZ: 44.4 };
+/** Large bronze incense burner (香爐) at the front of the courtyard, on the axis, with its incense table. */
+export const INCENSE_BURNER = { x: 0, z: 11, tableZ: 13, standZ: 14 };
 
 /** Arched stone bridge over the stream (runs north–south across it). */
-export const BRIDGE = { x: -86, z0: 15, z1: 27, width: 2.6, rise: 1.15 };
+export const BRIDGE = { x: -86, z0: 0.8, z1: 12.8, width: 2.6, rise: 1.15 };
 
 /** Stone tablet (石碑) at the mountain gate, facing arriving visitors. */
-export const STELE = { x: -7, z: 104 };
+export const STELE = { x: -7, z: 49.5 };
 
 /**
  * Canopy of colourful lotus lanterns (燃燈, as at Buddha's Birthday) over the approach:
  * two rows of posts carry a beam each; wires strung across between them hold the lanterns.
  */
-export const LANTERN_CANOPY = { x: 5.9, z0: 75.5, z1: 95.5, posts: 5, height: 4.8, wireSpacing: 1.6, lanternSpacing: 1.45 };
+export const LANTERN_CANOPY = { x: 5.9, z0: 20, z1: 44, posts: 5, height: 4.8, wireSpacing: 1.6, lanternSpacing: 1.45 };
 
-/** More strings of lotus lanterns, [x, z, height] to [x, z, height]. The courtyard ones hang from the prayer-flag poles. */
+/** More strings of lotus lanterns, [x, z, height] to [x, z, height], each between two red posts. */
 export const LANTERN_STRINGS: [[number, number, number], [number, number, number]][] = [
-  [[-14.5, 20, 4.2], [-14.5, 40, 4.2]],
-  [[14.5, 20, 4.2], [14.5, 40, 4.2]],
+  [[-14.5, -9, 4.2], [-14.5, 11, 4.2]],
+  [[14.5, -9, 4.2], [14.5, 11, 4.2]],
 ];
 
 /** Low paper path lanterns (行燈): straight runs [x0, z0] → [x1, z1] with a light every `step` metres. */
 export const PATH_LIGHT_RUNS: { from: [number, number]; to: [number, number]; step: number }[] = [
   // paths to the lotus pond and the orchard (both edges)
-  { from: [-37, 18.6], to: [-16, 18.6], step: 5.25 }, { from: [-37, 23.4], to: [-16, 23.4], step: 5.25 },
-  { from: [16, 18.6], to: [37, 18.6], step: 5.25 }, { from: [16, 23.4], to: [37, 23.4], step: 5.25 },
-  // north cross path
-  { from: [-48, -27.6], to: [48, -27.6], step: 6 },
-  { from: [-48, -34.4], to: [48, -34.4], step: 6 },
-  // from the Hall of the Five Tathāgatas to Cundī
-  { from: [-3.4, -18.5], to: [-3.4, -24.5], step: 6 }, { from: [3.4, -18.5], to: [3.4, -24.5], step: 6 },
+  { from: [-34, -0.4], to: [-16, -0.4], step: 6 }, { from: [-34, 4.4], to: [-16, 4.4], step: 6 },
+  { from: [16, -0.4], to: [34, -0.4], step: 6 }, { from: [16, 4.4], to: [34, 4.4], step: 6 },
+  // spawn plaza edges
+  { from: [-9.4, 52], to: [-9.4, 60], step: 8 }, { from: [9.4, 52], to: [9.4, 60], step: 8 },
 ];
 /** And a ring of them around the lotus pond. */
 export const POND_LIGHT_RING = { radius: 17.2, count: 22 };
+
+/** Map board (告示牌) on the left as you arrive, angled toward the spawn point. */
+export const MAP_BOARD = { x: -4.8, z: 51.6 };
+
+// ---------- Garden rooms ----------
+
+/** Winding gravel path through a bamboo grove north-east of the hall. */
+export const BAMBOO_PATH: [number, number][] = [[18, -44], [24, -54], [34, -58], [42, -67], [52, -70], [60, -77]];
+
+/** Raked-gravel rock garden (枯山水) on the south lawn, west of the approach. */
+export const ZEN_GARDEN = { minX: -32, maxX: -17.5, minZ: 24, maxZ: 42 };
+
+/** Pavilion (亭) out on the lotus pond, reached by a covered walkway continuing the courtyard path. */
+export const POND_PAVILION = { x: POND.x + 6.6, z: POND.z, r: 2.6, walkX0: POND.x + 9, walkX1: POND.x + 15.6, walkZ0: POND.z - 1.4, walkZ1: POND.z + 1.4 };
+
+/** Maple and moss corner with a little tea hut (north-west). */
+export const TEA_CORNER = { x: -60, z: -48, r: 10, hut: { x: -64.5, z: -50.5 } };
+
+/** Wish-lantern garden (south-east): racks of lanterns over gravel, with a writing desk. */
+export const WISH_GARDEN = { minX: 20, maxX: 46, minZ: 24, maxZ: 52, racks: [28, 33, 38, 43, 48], rackX0: 24, rackX1: 42, desk: { x: 21.6, z: 38 } };
+
+/** Lawns where the deer roam (each deer keeps to one). */
+export const DEER_RANGES: Rect[] = [
+  { minX: -50, maxX: -32, minZ: -34, maxZ: -16 }, // north of the pond
+  { minX: -40, maxX: -20, minZ: 46, maxZ: 64 }, // south-west meadow
+  { minX: 48, maxX: 60, minZ: 22, maxZ: 48 }, // between the wish garden and the east river
+  { minX: 32, maxX: 56, minZ: -36, maxZ: -26 }, // north of the orchard
+];
+
+/** The cat naps on the hall's front steps, off to one side. */
+export const CAT_SPOT = { x: 2.9, z: -10.35, h: 0.4 };

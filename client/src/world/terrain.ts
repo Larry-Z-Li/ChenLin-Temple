@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BASIN, POND, TERRAIN_SIZE } from '../config/layout';
 import { fbm, lerp, noise2, smoothstep } from '../core/math';
-import { nearestOnStream, nearStream } from './stream';
+import { nearestOnStream, nearestRiver, nearStream } from './stream';
 
 /**
  * Valley floor is flat; the ring of mountains rises beyond BASIN.radius.
@@ -32,6 +32,18 @@ export function terrainHeight(x: number, z: number) {
     const bed = 7.5 * (1 - smoothstep(0, 44, q.s)) - 0.35;
     const k = Math.exp(-(q.d * q.d) / (2 * w * w)) * smoothstep(-6, 0, q.behind);
     if (k > 0.001) h = lerp(h, Math.min(h, bed + noise2(x * 0.1, z * 0.1) * 0.4 * ravine), k);
+  }
+
+  // The other rivers: a shallow swale on the valley floor; outside it, a gorge whose bed climbs
+  // upstream (water comes down into the valley) or drops downstream (water leaves it).
+  const q = nearestRiver(x, z);
+  if (!q.def.falls && q.d < 40) {
+    const R0 = BASIN.radius - 8;
+    const out = Math.max(0, Math.hypot(q.px - BASIN.x, q.pz - BASIN.z) - R0);
+    const bed = -0.35 + out * (q.s < q.len * 0.5 ? 0.16 : -0.05);
+    const w = 3.6 + smoothstep(0, 45, out) * 9;
+    const k = Math.exp(-(q.d * q.d) / (2 * w * w));
+    if (k > 0.001) h = lerp(h, Math.min(h, bed + noise2(x * 0.1, z * 0.1) * 0.3 * smoothstep(0, 30, out)), k);
   }
 
   // Lotus pond depression

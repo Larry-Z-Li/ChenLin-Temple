@@ -1,95 +1,69 @@
 import type * as THREE from 'three';
-import { BASIN, CLOUD_STATIONS, HALLS, ORCHARD, PAVED, PLAY_RADIUS, POND, WHEEL_ROWS } from '../config/layout';
 import { t } from '../i18n';
 import { h } from './dom';
+import { drawTempleMap } from './mapDraw';
 
-/**
- * Map drawn SOUTH-UP (traditional orientation): south at the top, so east is on the left.
- * screenX = cx − x·s, screenY = cy − z·s
- */
+/** Small round map in the corner (south-up). Click it for the big map. */
 export class Minimap {
   readonly el: HTMLCanvasElement;
   private g: CanvasRenderingContext2D;
   private size = 200;
-  private open = true;
   private dpr = Math.min(2, window.devicePixelRatio || 1);
 
-  constructor(parent: HTMLElement) {
-    this.el = h('canvas', { class: 'minimap' }) as HTMLCanvasElement;
+  constructor(parent: HTMLElement, onClick: () => void) {
+    this.el = h('canvas', { class: 'minimap', onclick: onClick }) as HTMLCanvasElement;
     this.el.width = this.el.height = this.size * this.dpr;
     this.g = this.el.getContext('2d')!;
     parent.append(this.el);
   }
 
+  draw(me: THREE.Vector3, myYaw: number, others: THREE.Vector3[]) {
+    const g = this.g;
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    g.clearRect(0, 0, this.size, this.size);
+    drawTempleMap(g, this.size, { me: { x: me.x, z: me.z, yaw: myYaw }, others });
+    this.el.title = t('hud.map');
+  }
+}
+
+/** Full-screen temple map with place names, opened from the top bar, M, or the map board. */
+export class BigMap {
+  readonly el: HTMLElement;
+  private canvas: HTMLCanvasElement;
+  private g: CanvasRenderingContext2D;
+  isOpen = false;
+
+  constructor(parent: HTMLElement) {
+    this.canvas = h('canvas', { class: 'bigmap-canvas' }) as HTMLCanvasElement;
+    this.g = this.canvas.getContext('2d')!;
+    this.el = h(
+      'div',
+      { class: 'bigmap hidden', onclick: (e: MouseEvent) => e.target === this.el && this.show(false) },
+      h('div', { class: 'bigmap-card' }, h('div', { class: 'bigmap-title', i18n: 'map.title' }), this.canvas, h('button', { class: 'icon-btn bigmap-close', i18nTitle: 'map.close', onclick: () => this.show(false) }, '✕')),
+    );
+    parent.append(this.el);
+  }
+
+  show(open: boolean) {
+    this.isOpen = open;
+    this.el.classList.toggle('hidden', !open);
+  }
+
   toggle() {
-    this.open = !this.open;
-    this.el.classList.toggle('hidden', !this.open);
+    this.show(!this.isOpen);
   }
 
   draw(me: THREE.Vector3, myYaw: number, others: THREE.Vector3[]) {
-    if (!this.open) return;
-    const g = this.g, S = this.size, s = (S / 2 - 8) / PLAY_RADIUS;
-    const cx = S / 2 + BASIN.x * s, cy = S / 2 + BASIN.z * s;
-    const X = (x: number) => cx - x * s, Y = (z: number) => cy - z * s;
-    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    g.clearRect(0, 0, S, S);
-
-    g.fillStyle = 'rgba(48,72,40,0.85)';
-    g.beginPath();
-    g.arc(X(BASIN.x), Y(BASIN.z), PLAY_RADIUS * s, 0, Math.PI * 2);
-    g.fill();
-
-    g.fillStyle = 'rgba(190,182,166,0.9)';
-    for (const r of PAVED) g.fillRect(X(r.maxX), Y(r.maxZ), (r.maxX - r.minX) * s, (r.maxZ - r.minZ) * s);
-
-    g.fillStyle = '#4c8fa3';
-    g.beginPath();
-    g.arc(X(POND.x), Y(POND.z), POND.radius * s, 0, Math.PI * 2);
-    g.fill();
-
-    g.fillStyle = 'rgba(232,140,40,0.7)';
-    for (let z = ORCHARD.minZ; z <= ORCHARD.maxZ; z += ORCHARD.spacing) for (let x = ORCHARD.minX; x <= ORCHARD.maxX; x += ORCHARD.spacing) g.fillRect(X(x) - 1, Y(z) - 1, 2.5, 2.5);
-
-    g.fillStyle = '#d9a441';
-    for (const w of WHEEL_ROWS) g.fillRect(X(w.x) - 1, Y(w.zStart + (w.count - 1) * w.spacing), 2, (w.count - 1) * w.spacing * s);
-
-    for (const hall of HALLS) {
-      g.fillStyle = hall.kind === 'shrine' ? '#b0473a' : '#8e2b1f';
-      g.fillRect(X(hall.x + hall.width / 2), Y(hall.z + hall.depth / 2), hall.width * s, hall.depth * s);
+    if (!this.isOpen) return;
+    const css = Math.floor(Math.min(window.innerHeight * 0.8, window.innerWidth * 0.9 - 32));
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (this.canvas.width !== css * dpr) {
+      this.canvas.width = this.canvas.height = css * dpr;
+      this.canvas.style.width = this.canvas.style.height = `${css}px`;
     }
-
-    // Cloud stations (fast travel)
-    g.fillStyle = 'rgba(255,248,230,0.95)';
-    for (const c of Object.values(CLOUD_STATIONS)) {
-      g.beginPath();
-      g.arc(X(c.x), Y(c.z), 3.2, 0, Math.PI * 2);
-      g.fill();
-    }
-
-    g.fillStyle = '#fff';
-    for (const o of others) {
-      g.beginPath();
-      g.arc(X(o.x), Y(o.z), 2, 0, Math.PI * 2);
-      g.fill();
-    }
-
-    // Me: arrow. World forward (−sin ψ, −cos ψ) → screen (+sin ψ, +cos ψ) after the south-up flip.
-    const px = X(me.x), py = Y(me.z), fx = Math.sin(myYaw), fy = Math.cos(myYaw);
-    g.fillStyle = '#ffd36b';
-    g.beginPath();
-    g.moveTo(px + fx * 6, py + fy * 6);
-    g.lineTo(px - fy * 3.5 - fx * 3, py + fx * 3.5 - fy * 3);
-    g.lineTo(px + fy * 3.5 - fx * 3, py - fx * 3.5 - fy * 3);
-    g.closePath();
-    g.fill();
-
-    g.fillStyle = 'rgba(255,255,255,0.85)';
-    g.font = '600 11px system-ui, sans-serif';
-    g.textAlign = 'center';
-    g.fillText(t('map.s'), S / 2, 12);
-    g.fillText(t('map.n'), S / 2, S - 4);
-    g.fillText(t('map.e'), 9, S / 2 + 4);
-    g.fillText(t('map.w'), S - 9, S / 2 + 4);
-    this.el.title = t('hud.map');
+    const g = this.g;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, css, css);
+    drawTempleMap(g, css, { me: { x: me.x, z: me.z, yaw: myYaw }, others, labels: true });
   }
 }

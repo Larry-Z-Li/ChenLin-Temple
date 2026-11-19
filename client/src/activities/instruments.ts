@@ -1,4 +1,4 @@
-import { bell, drum, oink, woodFish } from '../audio/sfx';
+import { bell, drum, purr, woodFish } from '../audio/sfx';
 import type { Instrument, WorldContext } from '../core/context';
 import { t, type I18nKey } from '../i18n';
 import type { NetClient } from '../net/netClient';
@@ -9,13 +9,13 @@ const PROMPT: Record<Instrument['kind'], I18nKey> = {
   woodfish: 'prompt.strikeWoodfish',
   drum: 'prompt.beatDrum',
   bell: 'prompt.strikeBell',
-  boar: 'prompt.petBoar',
+  cat: 'prompt.petCat',
 };
-const RADIUS: Record<Instrument['kind'], number> = { bowl: 1.15, woodfish: 1.15, drum: 1.5, bell: 1.5, boar: 1.45 };
+const RADIUS: Record<Instrument['kind'], number> = { bowl: 1.15, woodfish: 1.15, drum: 1.5, bell: 1.5, cat: 1.6 };
 /** How far each instrument carries (metres until silent). */
-const REACH: Record<Instrument['kind'], number> = { bowl: 45, woodfish: 30, drum: 80, bell: 90, boar: 25 };
+const REACH: Record<Instrument['kind'], number> = { bowl: 45, woodfish: 30, drum: 80, bell: 90, cat: 15 };
 
-/** Bowl bells, wooden fish, the drum, the bell and Marīcī's boar: anyone nearby hears them. */
+/** Bowl bells, wooden fish, the drum, the bell and the cat: anyone nearby hears them. */
 export class Instruments {
   private byId = new Map<string, Instrument>();
   private last = 0;
@@ -56,7 +56,7 @@ export class Instruments {
       case 'bell': return bell(118, 10, vol * 1.3);
       case 'drum': return drum(vol);
       case 'woodfish': return woodFish(vol);
-      case 'boar': return oink(vol);
+      case 'cat': return purr(vol);
     }
   }
 }

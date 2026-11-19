@@ -34,13 +34,13 @@ export interface OfferingTable {
   ambientSmoke?: boolean;
 }
 
-/** Things anyone can strike (or pet): the hall instruments and Marīcī's boar. The sound is shared. */
+/** Things anyone can strike (or pet): the hall instruments and the cat. The sound is shared. */
 export interface Instrument {
   id: string;
-  kind: 'bowl' | 'woodfish' | 'drum' | 'bell' | 'boar';
+  kind: 'bowl' | 'woodfish' | 'drum' | 'bell' | 'cat';
   x: number;
   z: number;
-  /** Visual reaction when struck or petted (sway, ripple, a sleepy boar stirring…). */
+  /** Visual reaction when struck or petted (sway, ripple, a sleepy cat stirring…). */
   onStrike: () => void;
 }
 

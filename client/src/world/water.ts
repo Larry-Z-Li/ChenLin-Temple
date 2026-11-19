@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { POND, STREAM, WATERFALL } from '../config/layout';
+import { POND, RIVERS, STREAM, WATERFALL } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range, smoothstep } from '../core/math';
 import { glowTexture, waterfallTexture } from '../core/textures';
 import { colourGlowMaterial, haloPoints, nightGlow, whiteColors } from './nightGlow';
 import { lighting } from './sky';
-import { STREAM_LENGTH } from './stream';
+import { riverLength } from './stream';
 import { terrainHeight } from './terrain';
 
 const WATER_Y = -0.45;
@@ -20,7 +20,12 @@ export function buildPond(ctx: WorldContext) {
   water.position.set(POND.x, WATER_Y, POND.z);
   water.receiveShadow = true;
   ctx.scene.add(water);
-  ctx.collisions.addCircle(POND.x, POND.z, POND.radius - 0.8);
+  // Keep people out of the water: a ring of colliders with a gap in the east where the pavilion walkway starts.
+  const R = POND.radius - 0.8;
+  for (let a = 0; a < Math.PI * 2; a += 0.9 / R) {
+    if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < 0.16) continue;
+    ctx.collisions.addCircle(POND.x + Math.cos(a) * R, POND.z + Math.sin(a) * R, 0.6);
+  }
 
   // Shore stones (with a gap where the stream flows in from the west)
   const stoneGeo = new THREE.DodecahedronGeometry(0.6, 0);
@@ -30,7 +35,7 @@ export function buildPond(ctx: WorldContext) {
   let used = 0;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + range(rng, -0.03, 0.03), r = POND.radius + range(rng, -0.6, 0.4);
-    if (Math.abs(a - Math.PI) < 0.16) continue; // stream mouth
+    if (Math.abs(a - Math.PI) < 0.16 || Math.abs(a - Math.PI / 2) < 0.18 || a < 0.14 || a > Math.PI * 2 - 0.14) continue; // stream mouth, river outlet, pavilion walkway
     const x = POND.x + Math.cos(a) * r, z = POND.z + Math.sin(a) * r, s = range(rng, 0.5, 1.2);
     stones.setMatrixAt(used++, m.compose(new THREE.Vector3(x, terrainHeight(x, z) - 0.1, z), q.setFromEuler(e.set(rng(), rng() * 6, rng())), new THREE.Vector3(s * 1.3, s * 0.6, s)));
   }
@@ -101,7 +106,7 @@ function buildWaterLanterns(ctx: WorldContext, flowerGeo: THREE.BufferGeometry) 
   blooms.frustumCulled = bases.frustumCulled = false;
   const boats = Array.from({ length: N }, (_, i) => {
     blooms.setColorAt(i, new THREE.Color(COLS[i % COLS.length]));
-    return { r: range(rng, 3, POND.radius - 3), a: rng() * Math.PI * 2, w: range(rng, 0.012, 0.03) * (rng() < 0.5 ? -1 : 1), wob: rng() * 6, spin: range(rng, -0.2, 0.2) };
+    return { r: range(rng, 3, POND.radius - 3), a: 0, a0: rng() * 6, amp: range(rng, 1.8, 2.5), w: range(rng, 0.012, 0.03) * (rng() < 0.5 ? -1 : 1), wob: rng() * 6, spin: range(rng, -0.2, 0.2) };
   });
   // A bright candle core and a wide soft halo for each.
   const corePos = new Float32Array(N * 3), haloPos = new Float32Array(N * 3);
@@ -111,10 +116,10 @@ function buildWaterLanterns(ctx: WorldContext, flowerGeo: THREE.BufferGeometry) 
   cores.frustumCulled = halos.frustumCulled = false;
 
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(2.1, 2.1, 2.1), one = new THREE.Vector3(1, 1, 1);
-  ctx.updaters.push((dt, time) => {
+  ctx.updaters.push((_dt, time) => {
     const cp = cores.geometry.attributes.position as THREE.BufferAttribute, hp = halos.geometry.attributes.position as THREE.BufferAttribute;
     boats.forEach((b, i) => {
-      b.a += b.w * dt;
+      b.a = Math.PI + b.amp * Math.sin(time * b.w + b.a0); // drift back and forth, never under the pavilion (east)
       const r = b.r + Math.sin(time * 0.05 + b.wob) * 1.5;
       const x = POND.x + Math.cos(b.a) * r, z = POND.z + Math.sin(b.a) * r, y = WATER_Y + 0.02 + Math.sin(time * 1.1 + b.wob) * 0.012;
       q.setFromEuler(e.set(Math.sin(time * 0.9 + b.wob) * 0.04, b.wob + time * b.spin, Math.cos(time * 0.8 + b.wob) * 0.04));
@@ -191,45 +196,47 @@ export function buildWaterfall(ctx: WorldContext) {
 
 /** The stream as a flowing ribbon laid on the carved channel, from the falls into the lotus pond. */
 export function buildStream(ctx: WorldContext) {
-  const curve = new THREE.CatmullRomCurve3(STREAM.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
-  const N = Math.ceil(STREAM_LENGTH);
-  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
-  const p = new THREE.Vector3(), tan = new THREE.Vector3();
-  for (let i = 0; i <= N; i++) {
-    const u = i / N;
-    curve.getPointAt(u, p);
-    curve.getTangentAt(u, tan);
-    const s = u * STREAM_LENGTH;
-    // Narrow mountain stream that widens where it meets the pond.
-    const half = 1.5 + 0.9 * smoothstep(STREAM_LENGTH - 14, STREAM_LENGTH, s);
-    const nx = -tan.z, nz = tan.x, nl = Math.hypot(nx, nz) || 1;
-    const lx = p.x + (nx / nl) * half, lz = p.z + (nz / nl) * half;
-    const rx = p.x - (nx / nl) * half, rz = p.z - (nz / nl) * half;
-    // Sit just above the highest of centre/banks so the bed never pokes through.
-    const y = Math.max(terrainHeight(p.x, p.z), terrainHeight(lx, lz), terrainHeight(rx, rz)) + 0.12;
-    pos.push(lx, y, lz, rx, y, rz);
-    uv.push(0, s / 4, 1, s / 4);
-    if (i < N) {
-      const a = i * 2;
-      idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geo.setIndex(idx);
-  geo.computeVertexNormals();
-
   const tex = waterfallTexture();
   tex.repeat.set(1, 1);
   const mat = new THREE.MeshStandardMaterial({
     map: tex, color: 0x8fc6d4, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.88,
     depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
-  const ribbon = new THREE.Mesh(geo, mat);
-  ribbon.receiveShadow = true;
-  ctx.scene.add(ribbon);
+  for (const river of RIVERS) {
+    const L = riverLength(river);
+    const curve = new THREE.CatmullRomCurve3(river.points.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+    const N = Math.ceil(L / (river.falls ? 1 : 1.5));
+    const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+    const p = new THREE.Vector3(), tan = new THREE.Vector3();
+    for (let i = 0; i <= N; i++) {
+      const u = i / N;
+      curve.getPointAt(u, p);
+      curve.getTangentAt(u, tan);
+      const s = u * L;
+      // Falls stream widens into the pond; rivers breathe a little along their course.
+      const half = river.falls ? 1.5 + 0.9 * smoothstep(L - 14, L, s) : river.halfWidth * (0.85 + 0.3 * Math.sin(s * 0.07 + river.points.length));
+      const nx = -tan.z, nz = tan.x, nl = Math.hypot(nx, nz) || 1;
+      const lx = p.x + (nx / nl) * half, lz = p.z + (nz / nl) * half;
+      const rx = p.x - (nx / nl) * half, rz = p.z - (nz / nl) * half;
+      // Sit just above the highest of centre/banks so the bed never pokes through.
+      const y = Math.max(terrainHeight(p.x, p.z), terrainHeight(lx, lz), terrainHeight(rx, rz)) + 0.12;
+      pos.push(lx, y, lz, rx, y, rz);
+      uv.push(0, s / 4, 1, s / 4);
+      if (i < N) {
+        const a = i * 2;
+        idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const ribbon = new THREE.Mesh(geo, mat);
+    ribbon.receiveShadow = true;
+    ctx.scene.add(ribbon);
+  }
   ctx.updaters.push((dt) => {
-    tex.offset.y -= dt * 0.55; // flows from the falls toward the pond
+    tex.offset.y -= dt * 0.55; // flows downstream
   });
 }

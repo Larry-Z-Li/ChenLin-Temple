@@ -8,10 +8,10 @@ All content lives in `client/public/assets/`. Each folder has an `index.json` ma
 | `chants/` | `.mp3`, `.m4a`, `.ogg` | `{ "id", "title": {"en": "…"}, "file" }` |
 | `ambient/` | `.mp3`, `.m4a`, `.ogg` | `{ "id", "title", "file" }` (shuffled, looped) |
 | `thangkas/` | `.jpg`, `.webp`, `.png` (portrait, ≤ 2048 px tall) | `{ "file", "hall"? }`: `hall` pins it to one hall id |
-| `models/` | `.glb` | `{ "manjushri": "manjushri.glb", … }` (deity id → file) |
+| `models/` | `.glb` | `{ "vairocana": "vairocana.glb", … }` (deity id → file) |
 | `sfx/` | `.mp3`, `.m4a`, `.ogg` | `{ "waterfall", "stream", "bell": file, "birds": [files], "chimes": [files] }` (each optional; synthesized when absent) |
 
-Deity ids: `manjushri`, `cintamanicakra`, `cundi`, `daikokuten`, `marici`, `vairocana`, `akshobhya`, `ratnasambhava`, `amitabha`, `amoghasiddhi`. Hall ids: `south`, `marici`, `center`, `northwest`, `north`, `northeast`.
+Deity ids (the Five Tathāgatas, west → east on the altar): `amitabha`, `amoghasiddhi`, `vairocana`, `ratnasambhava`, `akshobhya`. Hall id: `center` (the one hall).
 
 **Translations:** give the same sutra in several languages the same `group` and a different `lang` (e.g. `heart.en.md`, `heart.zh.md`). The reader picks the visitor's language and falls back to English.
 
@@ -27,7 +27,7 @@ No statues are drawn in code. Each altar shows a plain plinth with a name plate 
 - **Smithsonian 3D** (3d.si.edu): a small CC0 collection, including some Asian art.
 - **Commission a 3D artist** (ArtStation, Fiverr, Upwork): the best route for consistent style and correct iconography. Give them reference images, a target of < 100k triangles, and GLB output.
 
-**Search tip:** Japanese and Chinese names find far more material. Cintāmaṇicakra = Nyoirin Kannon (如意輪観音), Cundī = Juntei Kannon (准胝観音), Marīcī = Marishiten (摩利支天), Mañjuśrī = Monju (文殊), Daikokuten (大黒天), Vairocana = Dainichi (大日如来).
+**Search tip:** Japanese and Chinese names find far more material, and the five are often sold or scanned as a matched set (五智如来 / 五方佛). Vairocana = Dainichi (大日如来), Akṣobhya = Ashuku (阿閦如来), Ratnasambhava = Hōshō (宝生如来), Amitābha = Amida (阿弥陀如来), Amoghasiddhi = Fukūjōju (不空成就如来). A matched set keeps the five consistent in style and scale.
 
 **Technical:** GLB, facing +Z (the glTF default, which is south here), ideally < 10 MB. Compress with `npx @gltf-transform/cli optimize in.glb out.glb`. Models are auto-scaled to the heights in `client/src/config/deities.ts`.
 
@@ -43,7 +43,7 @@ Until images are supplied, each hanging is blank silk in a brocade mount.
 
 **Free with conditions**
 - **Wikimedia Commons** (search "Category:Thangkas"): check each file's licence.
-- **ColBase** (colbase.nich.go.jp): Japan's national museums. Strong on Shingon/esoteric paintings (Nyoirin, Juntei, Daikokuten). Free use with credit; check each item's terms.
+- **ColBase** (colbase.nich.go.jp): Japan's national museums. Strong on Shingon/esoteric paintings, including Five Tathāgata (五智如来) sets and mandalas. Free use with credit; check each item's terms.
 
 **Reference only**
 - **Himalayan Art Resources** (himalayanart.org): the best place to identify and verify iconography, but its images aren't freely licensed.

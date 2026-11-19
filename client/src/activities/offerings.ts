@@ -48,6 +48,14 @@ export class Offerings {
   private regrowAcc = 0;
   private ritual: { table: OfferingTable; step: number; t: number } | null = null;
   private zero = new THREE.Matrix4().makeScale(0, 0, 0);
+
+  /** Take one fruit of a kind out of the basket (e.g. fed to a deer). */
+  removeFruit(f: Fruit) {
+    const i = this.inventory.indexOf(f);
+    if (i < 0) return;
+    this.inventory.splice(i, 1);
+    this.hud.setInventory(this.inventory);
+  }
   private m = new THREE.Matrix4();
   private stickGeo = new THREE.CylinderGeometry(0.0045, 0.0045, 0.3, 5).translate(0, 0.15, 0);
   private stickMat = new THREE.MeshStandardMaterial({ color: 0x9c4a2a, roughness: 0.9 });

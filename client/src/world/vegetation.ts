@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BASIN, BODHI_TREE, ORCHARD } from '../config/layout';
+import { BAMBOO_PATH, BASIN, BODHI_TREE, ORCHARD, TEA_CORNER } from '../config/layout';
 import { FRUIT_TYPES, type FruitType } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32, pick, range, type Rng } from '../core/math';
 import { terrainHeight } from './terrain';
-import { basinDist, inStreamVista, isReserved } from './zones';
+import { basinDist, inStreamVista, isReserved, nearBambooPath } from './zones';
 
 // ---------- Instancing helper ----------
 
@@ -170,15 +170,15 @@ export function buildVegetation(ctx: WorldContext) {
   }
 
   // Cherry avenue along the approach.
-  for (let z = 78; z <= 116; z += 7) {
+  for (let z = 20; z <= 62; z += 7) {
     place(sp.cherry, -11, z, 1, pick(rng, BLOSSOM));
     place(sp.cherry, 11, z, 1, pick(rng, BLOSSOM));
   }
 
   // Groves close to the halls so there's greenery near the centre, not only at the valley rim.
   const GROVES: [number, number][] = [
-    [-30, 72], [30, 72], [-36, 48], [36, 50], [-24, 96], [24, 96],
-    [-72, 0], [-74, 40], [76, 8], [74, 44], [-64, -16], [64, -20], [-30, -24], [30, -24],
+    [-26, 60], [24, 64], [-12, 76], [14, 80], [-46, 84], [40, 86], [-58, 52], [34, 58],
+    [-80, -6], [-82, 34], [86, -4], [86, 40], [-36, -58], [8, -60], [-24, -46], [-74, 18]
   ];
   for (const [gx, gz] of GROVES)
     for (let k = 0; k < 8; k++) {
@@ -192,8 +192,25 @@ export function buildVegetation(ctx: WorldContext) {
       else place(sp.bush, x, z, range(rng, 0.8, 1.3), pick(rng, GREENS), false);
     }
 
+  // Bamboo grove along the winding north-east path: dense on both sides.
+  for (let i = 0; i + 1 < BAMBOO_PATH.length; i++) {
+    const [ax, az] = BAMBOO_PATH[i], [bx, bz] = BAMBOO_PATH[i + 1];
+    const len = Math.hypot(bx - ax, bz - az), nx = -(bz - az) / len, nz = (bx - ax) / len;
+    for (let d = 0; d < len; d += 1.1)
+      for (const side of [-1, 1]) {
+        const off = side * range(rng, 2.0, 6.5), x = ax + ((bx - ax) * d) / len + nx * off, z = az + ((bz - az) * d) / len + nz * off;
+        if (nearBambooPath(x, z) < 1.8 || basinDist(x, z) > BASIN.radius - 4) continue;
+        place(sp.bamboo, x, z, range(rng, 0.9, 1.35));
+      }
+  }
+  // Maples around the moss garden and tea hut.
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 9) * Math.PI * 2 + 0.3, r = TEA_CORNER.r - range(rng, 0.5, 2.5);
+    place(sp.maple, TEA_CORNER.x + Math.cos(a) * r, TEA_CORNER.z + Math.sin(a) * r, range(rng, 0.8, 1.15), pick(rng, MAPLE));
+  }
+
   // Bamboo groves behind the northern halls.
-  for (const gx of [-60, -20, 20, 60]) for (let k = 0; k < 4; k++) place(sp.bamboo, gx + range(rng, -6, 6), -70 + range(rng, -4, 3), range(rng, 0.9, 1.2), undefined, true);
+  for (const gx of [-60, -20]) for (let k = 0; k < 4; k++) place(sp.bamboo, gx + range(rng, -6, 6), -70 + range(rng, -4, 3), range(rng, 0.9, 1.2), undefined, true);
 
   // Bodhi tree (large broadleaf) in the courtyard.
   place(sp.broad, BODHI_TREE.x, BODHI_TREE.z, 2.4, new THREE.Color(0x4d8a3a));

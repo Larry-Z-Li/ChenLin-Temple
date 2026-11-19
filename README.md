@@ -37,17 +37,16 @@ Production: `npm run build && npm start` serves everything from http://localhost
 All buildings and statues face south; players spawn in the south. The map is drawn south-up, so east appears on the left.
 
 ```
-                 S  (spawn, mountain gate)
-            [prayer wheels on the approach]
-              SOUTH HALL: Mañjuśrī
-              MARĪCĪ SHRINE  (+ prayer wheels)
- E  orchard    CENTER HALL: Five Tathāgatas    lotus pond  W
-   NE: Daikokuten   N: Cundī   NW: Cintāmaṇicakra
-                 ~ waterfall ~
+                 S  (spawn, mountain gate, map board)
+      [lantern canopy + prayer wheels on the approach]
+   rock garden                        wish lanterns
+          COURTYARD (incense burner, prayer wheels)
+ E  orchard   HALL OF THE FIVE TATHĀGATAS   lotus pond + pavilion  W
+   bamboo grove                       tea corner   ~ waterfall ~
                  N
 ```
 
-Everything is data-driven from [client/src/config/layout.ts](client/src/config/layout.ts): move a hall, resize it, change seat counts or deity order there. Each hall has 40 kneeling cushions (60 in the Center Hall); the South and Center halls have front and back doors.
+Everything is data-driven from [client/src/config/layout.ts](client/src/config/layout.ts): move or resize the hall, change seat counts or deity order there. The one hall has 60 kneeling cushions and front and back doors.
 
 ## Project structure
 
@@ -79,8 +78,9 @@ Default is Traditional Chinese (`zh-Hant`), with English selectable. Every UI st
 - **Day & night:** the sky follows the temple's clock (`TEMPLE_TZ`): dawn and dusk glow, a moonlit night with stars, lanterns lit after dark, crickets instead of birds. ⚙ → *Always day* opts out.
 - **Furnishings:** bronze incense burner, stone lanterns, red lanterns and wind bells on the eaves, column couplets (placeholder texts in `config/layout.ts`), stone tablet at the gate, arched bridge over the stream, koi, mani stones on the ridge, painted ceilings, canopies and water bowls in the halls, drifting leaves.
 - **Lights:** a canopy of colourful lotus lanterns over the approach, more along the courtyard and in the Bodhi tree, palace lanterns inside the halls, paper path lanterns, glowing lotus flowers and drifting water lanterns on the pond.
-- **Hall instruments:** strike the bowl bell (磬) and wooden fish (木魚) in every hall, and the drum and bell in the Center Hall; everyone nearby hears it. Marīcī's boar sleeps beside her altar: pet it.
-- **Cloud fast travel:** clouds by the gate and the Hall of Cundī fly you between them in ~5 s.
+- **Hall instruments:** strike the bowl bell (磬), wooden fish (木魚), drum and bell in the hall; everyone nearby hears it.
+- **Gardens & life:** a bamboo grove path (NE), a raked rock garden (SW), a pavilion on the lotus pond, a maple-and-moss tea corner (NW); deer you can feed apples, a cat napping on the steps, butterflies by day and fireflies at night. A map board by the gate (E, M or ◫ for the big map).
+- **Wish lanterns (SE garden):** write a title and wish at the desk, pick a colour and hang it for everyone. Lanterns stay 30 days; when all 90 hooks are full the oldest comes down. Stored in `server/data/wishes.json` (set `DATA_DIR` to move it) — on hosts without a persistent disk (e.g. Render's free plan) they reset whenever the server restarts.
 - **Graphics:** ⚙ settings has High / Low (Low is the default on phones), plus ambient and effects volume.
 
 ## Roadmap

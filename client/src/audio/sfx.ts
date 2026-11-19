@@ -86,41 +86,45 @@ export function drum(vol = 1) {
   noiseBurst(a, out, 500, 0.12, 0.5);
 }
 
-/** A pig's grunt: a nasal buzz whose vowel slides "oi→nk", sometimes twice. */
-export function oink(vol = 1) {
-  const a = ctx(), t = a.currentTime;
+/** A contented purr, and now and then a sleepy little mew. */
+export function purr(vol = 1) {
+  const a = ctx(), t = a.currentTime, len = 1.6;
   const out = a.createGain();
-  out.gain.value = 0.32 * settings.sfxVolume * vol;
+  out.gain.value = 0.5 * settings.sfxVolume * vol;
   out.connect(a.destination);
-  const grunt = (t0: number, dur: number, f0: number, f1: number) => {
-    const o = a.createOscillator(), bp = a.createBiquadFilter(), g = a.createGain();
+  const buf = a.createBuffer(1, Math.floor(a.sampleRate * len), a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = a.createBufferSource(), lp = a.createBiquadFilter(), g = a.createGain(), am = a.createGain(), lfo = a.createOscillator(), depth = a.createGain();
+  src.buffer = buf;
+  lp.type = 'lowpass';
+  lp.frequency.value = 260;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(1, t + 0.15);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  am.gain.value = 0.5;
+  lfo.frequency.value = 24;
+  depth.gain.value = 0.5;
+  lfo.connect(depth).connect(am.gain);
+  src.connect(lp).connect(g).connect(am).connect(out);
+  src.start(t);
+  lfo.start(t);
+  lfo.stop(t + len);
+  if (Math.random() < 0.4) {
+    const o = a.createOscillator(), bp = a.createBiquadFilter(), mg = a.createGain(), t0 = t + 0.5;
     o.type = 'sawtooth';
-    o.frequency.setValueAtTime(f0, t0);
-    o.frequency.linearRampToValueAtTime(f1, t0 + dur * 0.35);
-    o.frequency.linearRampToValueAtTime(f0 * 0.75, t0 + dur);
+    o.frequency.setValueAtTime(560, t0);
+    o.frequency.linearRampToValueAtTime(820, t0 + 0.12);
+    o.frequency.linearRampToValueAtTime(520, t0 + 0.4);
     bp.type = 'bandpass';
-    bp.Q.value = 3.5;
-    bp.frequency.setValueAtTime(650, t0);
-    bp.frequency.linearRampToValueAtTime(1350, t0 + dur * 0.35);
-    bp.frequency.linearRampToValueAtTime(520, t0 + dur);
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(1, t0 + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    // Gravelly throat: wobble the level quickly.
-    const rough = a.createGain(), lfo = a.createOscillator(), depth = a.createGain();
-    rough.gain.value = 0.65;
-    lfo.frequency.value = 34;
-    depth.gain.value = 0.35;
-    lfo.connect(depth).connect(rough.gain);
-    o.connect(bp).connect(g).connect(rough).connect(out);
+    bp.frequency.value = 1400;
+    bp.Q.value = 2;
+    mg.gain.setValueAtTime(0.0001, t0);
+    mg.gain.exponentialRampToValueAtTime(0.35, t0 + 0.04);
+    mg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+    o.connect(bp).connect(mg).connect(out);
     o.start(t0);
-    o.stop(t0 + dur + 0.05);
-    lfo.start(t0);
-    lfo.stop(t0 + dur + 0.05);
-  };
-  noiseBurst(a, out, 420, 0.07, 0.6); // snuffle
-  grunt(t + 0.03, 0.26, 190 + Math.random() * 30, 290);
-  if (Math.random() < 0.55) grunt(t + 0.36, 0.19, 175, 255);
+    o.stop(t0 + 0.45);
+  }
 }
 
 function noiseBurst(a: AudioContext, out: AudioNode, freq: number, length: number, level: number) {

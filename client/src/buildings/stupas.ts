@@ -4,7 +4,7 @@ import { BASIN, STUPA_RIDGE, WATERFALL } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { lerp, mulberry32, range } from '../core/math';
-import { nearestOnStream, nearStream } from '../world/stream';
+import { nearestRiver } from '../world/stream';
 import { terrainHeight } from '../world/terrain';
 
 export interface StupaSpot { x: number; z: number; y: number; yaw: number; s: number }
@@ -61,7 +61,7 @@ export function buildStupas(ctx: WorldContext) {
     prevR = r;
     const p = at(az + range(rng, -0.01, 0.01), r);
     // Keep clear of the waterfall and its ravine.
-    if (Math.hypot(p.x - WATERFALL.x, p.z - WATERFALL.z) < 32 || (nearStream(p.x, p.z) && nearestOnStream(p.x, p.z).d < 16)) {
+    if (Math.hypot(p.x - WATERFALL.x, p.z - WATERFALL.z) < 32 || nearestRiver(p.x, p.z).d < 16) {
       az += 14 / r;
       continue;
     }

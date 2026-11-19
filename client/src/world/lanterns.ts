@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { box, cylinder, mat } from '../buildings/materials';
 import {
-  BENCHES, BODHI_TREE, CLOUD_STATIONS, FLAG_LINES, HALLS, LANTERN_CANOPY, LANTERN_STRINGS, PATH_LIGHT_RUNS, POND, POND_LIGHT_RING, STONE_LANTERNS,
+  BENCHES, BODHI_TREE, FLAG_LINES, HALLS, LANTERN_CANOPY, LANTERN_STRINGS, PATH_LIGHT_RUNS, POND, POND_LIGHT_RING, STONE_LANTERNS,
 } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
@@ -60,7 +60,7 @@ function string(a: THREE.Vector3, b: THREE.Vector3, sag: number, spacing: number
 }
 
 /**
- * Colourful lotus lanterns: a canopy over the approach, strings along the Marīcī courtyard and
+ * Colourful lotus lanterns: a canopy over the approach, strings along the courtyard and
  * lanterns hanging in the Bodhi tree. Plus low paper lanterns along the paths and around the pond.
  */
 export function buildLanterns(ctx: WorldContext) {
@@ -90,6 +90,11 @@ export function buildLanterns(ctx: WorldContext) {
 
   // ---- Strings along the courtyard ----
   for (const [a, b] of LANTERN_STRINGS) {
+    for (const [px, pz, ph] of [a, b]) {
+      const y0 = ctx.ground.heightAt(px, pz);
+      ctx.scene.add(cylinder(0.09, 0.11, ph + 0.15, red, px, y0, pz, 8), cylinder(0.12, 0.12, 0.08, gold, px, y0 + ph + 0.15, pz, 8));
+      ctx.collisions.addCircle(px, pz, 0.2);
+    }
     const A = new THREE.Vector3(a[0], ctx.ground.heightAt(a[0], a[1]) + a[2], a[1]);
     const B = new THREE.Vector3(b[0], ctx.ground.heightAt(b[0], b[1]) + b[2], b[1]);
     hooks.push(...string(A, B, A.distanceTo(B) * 0.045, 1.6, lines));
@@ -165,8 +170,6 @@ function pathLightSpots() {
     if (STONE_LANTERNS.some(([lx, lz]) => Math.hypot(x - lx, z - lz) < 1.8)) return false;
     if (BENCHES.some((b) => Math.hypot(x - b.x, z - b.z) < 1.9)) return false;
     if (poles.some((p) => Math.hypot(x - p.x, z - p.z) < 1.2)) return false;
-    if (Object.values(CLOUD_STATIONS).some((s) => Math.hypot(x - s.x, z - s.z) < 2.6)) return false;
-    if (Math.abs(x) < 4.5 && z < -26 && z > -36) return false; // where the centre path meets the cross path
     for (const h of HALLS) {
       const front = h.z + h.depth / 2, back = h.z - h.depth / 2;
       if (Math.abs(x - h.x) < h.width / 2 + 2 && z > back - 4.5 && z < front + 4.5) return false; // the hall, its porch and stairs

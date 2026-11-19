@@ -51,6 +51,13 @@ kbd { display: inline-grid; place-items: center; min-width: 1.7em; height: 1.7em
 .toast.out { opacity: 0; }
 
 body.reading .minimap { display: none; }
+.minimap { cursor: pointer; }
+.bigmap { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(10, 8, 6, 0.55); }
+.bigmap.hidden { display: none; }
+.bigmap-card { position: relative; padding: 14px 16px 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(10px); text-align: center; }
+.bigmap-title { font: 600 20px var(--serif); color: var(--accent); margin-bottom: 8px; letter-spacing: 0.1em; }
+.bigmap-canvas { display: block; border-radius: 50%; background: rgba(20, 16, 12, 0.6); }
+.bigmap-close { position: absolute; top: 10px; right: 10px; }
 .minimap { position: fixed; right: 16px; bottom: 16px; width: 200px; height: 200px; border-radius: 50%; border: 1px solid var(--panel-border); background: rgba(20, 16, 12, 0.5); }
 
 /* ---------- Panels ---------- */
@@ -126,3 +133,19 @@ body.touch .seatbar { bottom: 16px; }
   .brand .title { font-size: 16px; }
   .bead-btns { gap: 48px; }
 }
+
+/* Wish lanterns */
+.wish-overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(10, 8, 6, 0.5); }
+.wish-overlay.hidden { display: none; }
+.wish-card { width: min(420px, calc(100vw - 32px)); display: grid; gap: 10px; padding: 18px; border-radius: 16px; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(10px); }
+.wish-heading { font: 600 20px var(--serif); color: var(--accent); text-align: center; letter-spacing: 0.06em; }
+.wish-input { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--panel-border); background: rgba(255, 248, 235, 0.08); color: var(--ink); font: 15px var(--serif); }
+.wish-text { resize: vertical; }
+.wish-swatches { display: flex; gap: 8px; justify-content: center; }
+.wish-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.wish-swatch.on { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.wish-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.wish-body { margin: 0; font: 16px/1.6 var(--serif); white-space: pre-wrap; word-break: break-word; }
+.wish-meta { font-size: 13px; opacity: 0.75; text-align: right; }
+.pill-btn { height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--ink); font: 600 15px var(--sans); cursor: pointer; }
+.wish-actions .primary-btn { height: 40px; padding: 0 20px; }

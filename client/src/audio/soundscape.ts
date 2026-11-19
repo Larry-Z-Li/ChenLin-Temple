@@ -3,7 +3,7 @@ import { HALLS, PAVED, PLATFORM_H, WATERFALL } from '../config/layout';
 import { settings } from '../config/settings';
 import { assetUrl } from '../content/manifest';
 import { lighting } from '../world/sky';
-import { nearestOnStream, nearStream } from '../world/stream';
+import { nearestRiver } from '../world/stream';
 import { audioCtx } from './sfx';
 
 interface SfxManifest { waterfall?: string | null; stream?: string | null; birds?: string[]; chimes?: string[]; bell?: string | null }
@@ -251,7 +251,7 @@ export class Soundscape {
 
   /** What the listener is walking on. */
   surfaceAt(p: THREE.Vector3): Surface {
-    if (nearStream(p.x, p.z) && nearestOnStream(p.x, p.z).d < 2.2) return 'water';
+    if (nearestRiver(p.x, p.z).d < 2.2) return 'water';
     const inHall = HALLS.some((h) => h.kind === 'hall' && Math.abs(p.x - h.x) < h.width / 2 && Math.abs(p.z - h.z) < h.depth / 2);
     if (inHall && p.y > PLATFORM_H * 0.7) return 'wood';
     if (p.y > PLATFORM_H * 0.7) return 'stone'; // platforms and stairs
@@ -303,8 +303,8 @@ export class Soundscape {
     const df = Math.hypot(listener.x - WATERFALL.x, listener.z - WATERFALL.z);
     this.falls!.gain.gain.setTargetAtTime(0.9 * clamp01(1 - df / 150) ** 2 * out, now, 0.2);
     this.falls!.pan.pan.setTargetAtTime(this.panFor(listener, camYaw, WATERFALL.x, WATERFALL.z), now, 0.2);
-    if (nearStream(listener.x, listener.z)) {
-      const q = nearestOnStream(listener.x, listener.z);
+    const q = nearestRiver(listener.x, listener.z);
+    if (q.d < 30) {
       this.stream!.gain.gain.setTargetAtTime(0.5 * clamp01(1 - q.d / 30) ** 2 * out, now, 0.2);
       this.stream!.pan.pan.setTargetAtTime(this.panFor(listener, camYaw, q.px, q.pz), now, 0.2);
     } else this.stream!.gain.gain.setTargetAtTime(0, now, 0.3);

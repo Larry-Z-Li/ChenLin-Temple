@@ -7,6 +7,7 @@ import {
   type ServerMsg,
   type Transform,
   type WelcomeMsg,
+  type Wish,
 } from '../../../shared/protocol';
 
 export type NetStatus = 'connecting' | 'online' | 'offline';
@@ -22,6 +23,10 @@ export interface NetEvents {
   push: (wheel: string, by: string, speed: number) => void;
   picked: (fruit: string, by: string) => void;
   strike: (inst: string, by: string) => void;
+  wishAdded: (wish: Wish) => void;
+  wishRemoved: (id: string) => void;
+  wishDenied: (reason: 'slow' | 'empty') => void;
+  fed: (deer: string, by: string) => void;
   pickDenied: (fruit: string, reason: 'gone' | 'full') => void;
   offered: (hall: string, offering: Offering, by: string) => void;
   offerDenied: (reason: 'noFruit' | 'full') => void;
@@ -111,6 +116,10 @@ export class NetClient {
       case 'push': return this.emit('push', msg.wheel, msg.by, msg.speed);
       case 'picked': return this.emit('picked', msg.fruit, msg.by);
       case 'strike': return this.emit('strike', msg.inst, msg.by);
+      case 'wishAdded': return this.emit('wishAdded', msg.wish);
+      case 'wishRemoved': return this.emit('wishRemoved', msg.id);
+      case 'wishDenied': return this.emit('wishDenied', msg.reason);
+      case 'fed': return this.emit('fed', msg.deer, msg.by);
       case 'pickDenied': return this.emit('pickDenied', msg.fruit, msg.reason);
       case 'offered': return this.emit('offered', msg.hall, msg.offering, msg.by);
       case 'offerDenied': return this.emit('offerDenied', msg.reason);
@@ -146,6 +155,15 @@ export class NetClient {
   /** Already played locally; the server relays it to everyone else. */
   strike(inst: string) {
     this.send({ t: 'strike', inst });
+  }
+
+  /** Offline the lantern goes up locally (lost on reload). */
+  hangWish(title: string, text: string, color: number, name: string, slot: number) {
+    if (!this.send({ t: 'wish', title, text, color })) this.emit('wishAdded', { id: `l${++this.localSeq}`, slot, title, text, color, name, at: Date.now() });
+  }
+
+  feedDeer(deer: string) {
+    if (!this.send({ t: 'feed', deer })) this.emit('fed', deer, this.id);
   }
 
   /** Callers check inventory space first; offline the pick is granted locally. */

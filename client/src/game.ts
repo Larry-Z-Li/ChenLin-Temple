@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, SNAPSHOT_HZ } from '../../shared/protocol';
+import { FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, SNAPSHOT_HZ } from '../../shared/protocol';
 import { ChantPanel } from './activities/chantPanel';
 import { Mala } from './activities/beads';
-import { CloudRide } from './activities/cloudRide';
 import { Instruments } from './activities/instruments';
+import { WishLanterns } from './activities/wishLanterns';
 import { Offerings } from './activities/offerings';
 import { SeatSession } from './activities/seatSession';
 import { SutraReader } from './activities/sutraReader';
@@ -15,6 +15,7 @@ import { buildBenches } from './buildings/benches';
 import { buildDecor } from './buildings/decor';
 import { buildDecorations } from './buildings/decorations';
 import { buildHall } from './buildings/hall';
+import { buildMapBoard } from './buildings/mapBoard';
 import { PrayerWheels } from './buildings/prayerWheels';
 import { buildStupas } from './buildings/stupas';
 import { BASIN, BODHI_TREE, HALLS } from './config/layout';
@@ -31,8 +32,9 @@ import { RemotePlayers } from './net/remotePlayers';
 import { CameraRig } from './player/cameraRig';
 import { LocalPlayer } from './player/localPlayer';
 import { Hud } from './ui/hud';
-import { Minimap } from './ui/minimap';
+import { BigMap, Minimap } from './ui/minimap';
 import { mountJoystick } from './ui/touch';
+import { buildGardens } from './world/gardens';
 import { buildKoi } from './world/koi';
 import { buildLanterns } from './world/lanterns';
 import { buildLeaves } from './world/leaves';
@@ -40,6 +42,7 @@ import { buildPrayerFlags } from './world/prayerFlags';
 import { buildSky, setDebugHours, setTempleTimeZone } from './world/sky';
 import { buildTerrain } from './world/terrain';
 import { buildVegetation } from './world/vegetation';
+import { Wildlife } from './world/wildlife';
 import { buildPond, buildStream, buildWaterfall } from './world/water';
 
 export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: string, color: string) {
@@ -89,6 +92,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   buildPrayerFlags(ctx, stupas);
   buildDecorations(ctx, stupas);
   buildLanterns(ctx);
+  buildGardens(ctx);
   buildKoi(ctx);
   buildLeaves(ctx, camera);
   const { orchard } = buildVegetation(ctx);
@@ -122,17 +126,19 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   const birdPoints = [
     ...orchard.trees.map((t) => new THREE.Vector3(t.x, 3, t.z)),
     new THREE.Vector3(BODHI_TREE.x, 6, BODHI_TREE.z),
-    ...[80, 95, 110].flatMap((z) => [new THREE.Vector3(-11, 4, z), new THREE.Vector3(11, 4, z)]),
+    ...[24, 36, 50].flatMap((z) => [new THREE.Vector3(-11, 4, z), new THREE.Vector3(11, 4, z)]),
     ...Array.from({ length: 28 }, (_, i) => new THREE.Vector3(BASIN.x + Math.sin(i * 0.2244) * (BASIN.radius - 6), 5, BASIN.z + Math.cos(i * 0.2244) * (BASIN.radius - 6))),
   ];
   const soundscape = new Soundscape(birdPoints);
 
-  const minimap = new Minimap(uiEl);
+  const bigMap = new BigMap(uiEl);
+  const minimap = new Minimap(uiEl, () => bigMap.toggle());
+  buildMapBoard(ctx, () => bigMap.show(true));
   const hud: Hud = new Hud(uiEl, {
     onMusic: (on) => ambient.setOn(on),
     onSeatAction: (a) => seat.action(a),
     onChants: () => chantPanel.show(!chantPanel.isOpen),
-    onMap: () => minimap.toggle(),
+    onMap: () => bigMap.toggle(),
     onPrompt: () => !seat.seated && ctx.interactions.trigger(),
     onBow: () => bow(),
     onBeadStep: (dir) => mala.step(dir),
@@ -157,8 +163,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
 
   const seat: SeatSession = new SeatSession({ ctx, net, player, rig, hud, mala, sutra });
   const offerings = new Offerings(ctx, net, hud, orchard, player);
-  const cloud = new CloudRide(ctx, player, rig, hud);
+  const wildlife = new Wildlife(ctx, net, offerings, player); // registers the cat before the instruments pick it up
   const instruments = new Instruments(ctx, net, player);
+  const wishes = new WishLanterns(ctx, net, hud, player, uiEl, name);
   const bow = (): void => (seat.seated ? seat.bow() : player.gesture("bow", 2.4));
 
   // Networking
@@ -186,7 +193,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
       return true;
     }
     if (e.code === 'KeyB') return !e.repeat && bow(), true;
-    if (e.code === 'KeyM') return minimap.toggle(), true;
+    if (e.code === 'KeyM') return bigMap.toggle(), true;
+    if (e.code === 'Escape' && bigMap.isOpen) return bigMap.show(false), true;
+    if (e.code === 'Escape' && wishes.isOpen) return wishes.close(), true;
     if (e.code === 'KeyC') return chantPanel.show(!chantPanel.isOpen), true; // listening works anywhere
     if (e.code === 'Escape' && chantPanel.isOpen) return chantPanel.show(false), true;
     if (e.code === 'Escape' && hud.settingsOpen) return hud.toggleSettings(false), true;
@@ -202,10 +211,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
     const dt = Math.min(clock.getDelta(), 0.1);
     const time = clock.elapsedTime;
 
-    cloud.update(dt, time);
     player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground);
 
-    if (!seat.seated && !cloud.riding && !offerings.busy) {
+    if (!seat.seated && !offerings.busy) {
       const it = ctx.interactions.update(player.pos.x, player.pos.z);
       const p = it?.prompt();
       hud.setPrompt(p?.text ?? null, p?.busy);
@@ -232,7 +240,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
     sendAcc += dt;
     if (sendAcc >= 1 / SNAPSHOT_HZ) {
       sendAcc = 0;
-      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0) | (cloud.riding ? FLAG_CLOUD : 0);
+      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0);
       const tr = player.transform(flags), key = tr.join(',');
       if (key !== lastSent) {
         net.sendMove(tr);
@@ -243,10 +251,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
     if (mapAcc > 0.1) {
       mapAcc = 0;
       minimap.draw(player.pos, player.yaw, remotes.positions());
+      bigMap.draw(player.pos, player.yaw, remotes.positions());
     }
     renderer.render(scene, camera);
   });
 
   // Debug handle for the console during development.
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, setDebugHours };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, instruments, wildlife, wishes, setDebugHours };
 }

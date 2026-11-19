@@ -8,7 +8,6 @@ import { ceilingTexture, textTexture, verticalTextTexture } from '../core/textur
 import type { ThangkaEntry } from '../content/manifest';
 import { inscription, onLocaleChange, t, type I18nKey } from '../i18n';
 import { clamp } from '../core/math';
-import { buildBoar } from './boar';
 import { furnishHall, type CushionBlock } from './hallFurnishings';
 import { box, cylinder, hipRoofGeometry, mat } from './materials';
 import { buildOfferingTable } from './offeringTable';
@@ -231,9 +230,6 @@ export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string
   });
 
   g.add(bowlMesh, waterMesh);
-
-  // Marīcī's boar sleeps on the floor beside her altar (east side), head toward the visitors.
-  if (def.deities.includes('marici')) buildBoar(ctx, g, `${def.id}-boar`, hx + altarW / 2 + 1.3, F + 0.04, altarZ + 0.15, -0.3);
 
   // ---- Offering table ----
   const tableZ = altarZ + altarD / 2 + (isShrine ? 0.9 : 1.4);

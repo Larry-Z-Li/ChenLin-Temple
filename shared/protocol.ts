@@ -1,6 +1,6 @@
 // Wire protocol shared by client and server. Keep this file dependency-free.
 
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -68,6 +68,26 @@ export interface Offering {
   ago: number;
 }
 
+/** Wish lanterns in the south-east garden: anyone can hang one; they stay 30 days. */
+export const WISH_SLOTS = 90;
+export const WISH_TTL_MS = 30 * 24 * 3600 * 1000;
+export const WISH_TITLE_MAX = 24;
+export const WISH_TEXT_MAX = 140;
+export const WISH_COLOURS = 8;
+export const WISH_COOLDOWN_MS = 60 * 1000;
+export interface Wish {
+  id: string;
+  /** Which hook on the racks (0 … WISH_SLOTS-1). */
+  slot: number;
+  title: string;
+  text: string;
+  /** Index into the lantern palette. */
+  color: number;
+  name: string;
+  /** When it was hung (epoch ms). */
+  at: number;
+}
+
 export type ClientMsg =
   | { t: 'hello'; v: number; name: string; color: string }
   | { t: 'move'; tr: Transform }
@@ -76,6 +96,9 @@ export type ClientMsg =
   | { t: 'pick'; fruit: string }
   /** Strike a hall instrument (bell, drum, singing bowl, wooden fish). */
   | { t: 'strike'; inst: string }
+  | { t: 'wish'; title: string; text: string; color: number }
+  /** Give one apple from your basket to a deer. */
+  | { t: 'feed'; deer: string }
   | { t: 'offer'; hall: string; kind: 'incense' }
   | { t: 'offer'; hall: string; kind: 'fruit'; fruit: Fruit };
 
@@ -93,6 +116,7 @@ export type ServerMsg =
       picked: Record<string, number>;
       /** hallId -> today's offerings */
       offerings: Record<string, Offering[]>;
+      wishes: Wish[];
     }
   | { t: 'join'; player: PlayerInfo & { tr: Transform } }
   | { t: 'leave'; id: string }
@@ -103,6 +127,10 @@ export type ServerMsg =
   | { t: 'push'; wheel: string; by: string; speed: number }
   | { t: 'picked'; fruit: string; by: string }
   | { t: 'strike'; inst: string; by: string }
+  | { t: 'wishAdded'; wish: Wish }
+  | { t: 'wishRemoved'; id: string }
+  | { t: 'wishDenied'; reason: 'slow' | 'empty' }
+  | { t: 'fed'; deer: string; by: string }
   | { t: 'pickDenied'; fruit: string; reason: 'gone' | 'full' }
   | { t: 'offered'; hall: string; offering: Offering; by: string }
   | { t: 'offerDenied'; reason: 'noFruit' | 'full' }
@@ -117,6 +145,12 @@ export const ID_RE = /^[a-z0-9-]{1,48}$/;
 export const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 export const isFruit = (v: unknown): v is Fruit => typeof v === 'string' && (FRUITS as readonly string[]).includes(v);
+
+/** Free text (wish titles and wishes): no control chars or angle brackets, trimmed, length-capped. */
+export function sanitizeText(raw: unknown, max: number): string {
+  if (typeof raw !== 'string') return '';
+  return [...raw.replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/[ \t]+/g, ' ').trim()].slice(0, max).join('');
+}
 
 export function sanitizeName(raw: unknown): string {
   if (typeof raw !== 'string') return 'Pilgrim';
