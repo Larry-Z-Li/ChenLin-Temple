@@ -4,6 +4,7 @@ import { ChantPanel } from './activities/chantPanel';
 import { Mala } from './activities/beads';
 import { CloudRide } from './activities/cloudRide';
 import { Instruments } from './activities/instruments';
+import { HallLanterns } from './activities/hallLanterns';
 import { WishLanterns } from './activities/wishLanterns';
 import { Offerings } from './activities/offerings';
 import { SeatSession } from './activities/seatSession';
@@ -106,7 +107,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   buildDecorations(ctx, stupas);
   buildLanterns(ctx);
   buildGardens(ctx, models);
-  const ridge = buildRidgePath(ctx, stupas);
+  const ridge = buildRidgePath(ctx);
   buildPagodas(ctx);
   buildHuts(ctx);
   buildKoi(ctx);
@@ -195,6 +196,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const wildlife = new Wildlife(ctx, net, offerings, player, () => remotes.positions()); // registers the cat before the instruments pick it up
   const instruments = new Instruments(ctx, net, player);
   const wishes = new WishLanterns(ctx, net, hud, player, uiEl, settings.name);
+  const hallWishes = new HallLanterns(ctx, net, hud, player, uiEl, settings.name);
   const bow = (): void => (seat.seated ? seat.bow() : player.gesture("bow", 2.4));
 
   // Networking
@@ -232,6 +234,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     if (e.code === 'KeyM') return bigMap.toggle(), true;
     if (e.code === 'Escape' && bigMap.isOpen) return bigMap.show(false), true;
     if (e.code === 'Escape' && wishes.isOpen) return wishes.close(), true;
+    if (e.code === 'Escape' && hallWishes.isOpen) return hallWishes.close(), true;
     if (e.code === 'KeyC') return chantPanel.show(!chantPanel.isOpen), true; // listening works anywhere
     if (e.code === 'Escape' && chantPanel.isOpen) return chantPanel.show(false), true;
     if (e.code === 'Escape' && hud.settingsOpen) return hud.toggleSettings(false), true;
@@ -318,7 +321,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   }
 
   // Debug handle for the console during development.
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, wishes, setDebugHours, intro };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, wishes, hallWishes, setDebugHours, intro };
 
   return {
     /** The entry screen's robe picker: recolour the pacing monk. */
@@ -330,7 +333,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       player.avatar.setColor(color);
       player.avatar.clasp = false;
       player.avatar.root.name = name;
-      wishes.myName = name;
+      wishes.myName = hallWishes.myName = name;
       joinAs = { name, color };
       phase = 'play';
       landing = true;

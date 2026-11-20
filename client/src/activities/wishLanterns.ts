@@ -6,7 +6,7 @@ import { WISH_GARDEN } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { canvasTexture } from '../core/textures';
-import { t } from '../i18n';
+import { t, type I18nKey } from '../i18n';
 import type { NetClient } from '../net/netClient';
 import type { LocalPlayer } from '../player/localPlayer';
 import { h } from '../ui/dom';
@@ -24,6 +24,64 @@ function slotPos(slot: number) {
   return { x: G.rackX0 + 0.5 + (i * (G.rackX1 - G.rackX0 - 1)) / (PER_RACK - 1), z: G.racks[rack] };
 }
 
+/** A wish lantern hanging from its hook at the origin: white glow body (tinted per instance) + string, gold caps and tassel. */
+export function lanternGeometries() {
+  return {
+    body: whiteColors(new THREE.SphereGeometry(0.22, 14, 10).scale(1, 1.15, 1).translate(0, -0.55, 0)),
+    trim: mergeGeometries([
+      paint(new THREE.CylinderGeometry(0.005, 0.005, 0.3, 3).translate(0, -0.15, 0), 0x2a1a10),
+      paint(new THREE.CylinderGeometry(0.11, 0.11, 0.05, 12).translate(0, -0.31, 0), THEME.goldLeaf),
+      paint(new THREE.CylinderGeometry(0.11, 0.11, 0.05, 12).translate(0, -0.8, 0), THEME.goldLeaf),
+      paint(new THREE.CylinderGeometry(0.02, 0.045, 0.28, 6).translate(0, -0.97, 0), 0xc0221a),
+    ]),
+  };
+}
+
+export const lanternHex = (color: number) => LOTUS_COLOURS[color] ?? LOTUS_COLOURS[0];
+
+/** The writing form (title, wish, colour) shown in `panel`; `onHang` gets the trimmed title (non-empty). */
+export function showWishForm(panel: HTMLElement, hud: Hud, headingKey: I18nKey, onHang: (title: string, text: string, color: number) => void, close: () => void) {
+  let color = 0;
+  const title = h('input', { class: 'wish-input', maxlength: String(WISH_TITLE_MAX), placeholder: t('wish.title') }) as HTMLInputElement;
+  const text = h('textarea', { class: 'wish-input wish-text', maxlength: String(WISH_TEXT_MAX), placeholder: t('wish.text'), rows: '4' }) as HTMLTextAreaElement;
+  const swatches = LOTUS_COLOURS.map((c, i) =>
+    h('button', {
+      class: `wish-swatch${i === 0 ? ' on' : ''}`,
+      style: `background:#${c.toString(16).padStart(6, '0')}`,
+      onclick: (e: MouseEvent) => {
+        color = i;
+        swatches.forEach((s) => s.classList.remove('on'));
+        (e.currentTarget as HTMLElement).classList.add('on');
+      },
+    }),
+  );
+  const submit = () => {
+    const tt = title.value.trim();
+    if (!tt) return hud.toast(t('wish.empty'));
+    onHang(tt.slice(0, WISH_TITLE_MAX), text.value.trim(), color);
+    close();
+  };
+  panel.replaceChildren(
+    h('div', { class: 'wish-card' },
+      h('div', { class: 'wish-heading', i18n: headingKey }),
+      title, text,
+      h('div', { class: 'wish-swatches' }, ...swatches),
+      h('div', { class: 'wish-actions' },
+        h('button', { class: 'pill-btn', i18n: 'wish.cancel', onclick: close }),
+        h('button', { class: 'primary-btn', i18n: 'wish.hang', onclick: submit }),
+      ),
+    ),
+  );
+  panel.classList.remove('hidden');
+  title.focus();
+}
+
+/** "— name · date · N days left" for a wish. */
+export function wishMeta(w: Wish) {
+  const days = Math.max(0, Math.ceil((w.at + WISH_TTL_MS - Date.now()) / 86400000));
+  return t('wish.by', { name: w.name, date: new Date(w.at).toLocaleDateString(), days });
+}
+
 function paint(geo: THREE.BufferGeometry, hex: number) {
   const g = geo.index ? geo.toNonIndexed() : geo;
   const c = new THREE.Color(hex), n = g.attributes.position.count, arr = new Float32Array(n * 3);
@@ -32,7 +90,7 @@ function paint(geo: THREE.BufferGeometry, hex: number) {
 }
 
 /**
- * The wish-lantern garden: write a title and a wish at the desk, pick a colour and hang it on the
+ * The wish-lantern garden on the plaza: write a title and a wish at the desk, pick a colour and hang it on the
  * racks for everyone to see. Lanterns stay 30 days; when every hook is taken the oldest comes down.
  */
 export class WishLanterns {
@@ -49,14 +107,8 @@ export class WishLanterns {
     this.buildGarden();
 
     // Lanterns: one instance per hook, hidden until a wish hangs there.
-    const body = whiteColors(new THREE.SphereGeometry(0.22, 14, 10).scale(1, 1.15, 1).translate(0, -0.55, 0));
+    const { body, trim } = lanternGeometries();
     this.bodies = new THREE.InstancedMesh(body, colourGlowMaterial({ roughness: 0.6 }, (n) => 0.2 + 1.3 * n), WISH_SLOTS);
-    const trim = mergeGeometries([
-      paint(new THREE.CylinderGeometry(0.005, 0.005, 0.3, 3).translate(0, -0.15, 0), 0x2a1a10),
-      paint(new THREE.CylinderGeometry(0.11, 0.11, 0.05, 12).translate(0, -0.31, 0), THEME.goldLeaf),
-      paint(new THREE.CylinderGeometry(0.11, 0.11, 0.05, 12).translate(0, -0.8, 0), THEME.goldLeaf),
-      paint(new THREE.CylinderGeometry(0.02, 0.045, 0.28, 6).translate(0, -0.97, 0), 0xc0221a),
-    ]);
     this.trims = new THREE.InstancedMesh(trim, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }), WISH_SLOTS);
     for (let s = 0; s < WISH_SLOTS; s++) {
       this.bodies.setMatrixAt(s, this.hidden);
@@ -82,6 +134,7 @@ export class WishLanterns {
       for (const w of msg.wishes) this.add(w);
     });
     net.on('wishAdded', (w) => {
+      if ((w.board ?? 'garden') !== 'garden') return;
       this.add(w);
       if (this.pendingTitle !== null && w.title === this.pendingTitle && w.name === this.myName) {
         this.pendingTitle = null;
@@ -90,6 +143,7 @@ export class WishLanterns {
     });
     net.on('wishRemoved', (id) => this.remove(id));
     net.on('wishDenied', (reason) => {
+      if (this.pendingTitle === null) return; // the hall's wall
       this.pendingTitle = null;
       this.hud.toast(t(reason === 'slow' ? 'wish.slow' : 'wish.empty'));
     });
@@ -120,12 +174,12 @@ export class WishLanterns {
   }
 
   private add(w: Wish) {
-    if (this.wishes.has(w.id)) return;
+    if (this.wishes.has(w.id) || (w.board ?? 'garden') !== 'garden') return;
     const prev = this.bySlot.get(w.slot);
     if (prev) this.remove(prev.id);
     this.wishes.set(w.id, w);
     this.bySlot.set(w.slot, w);
-    this.bodies.setColorAt(w.slot, new THREE.Color(LOTUS_COLOURS[w.color] ?? LOTUS_COLOURS[0]));
+    this.bodies.setColorAt(w.slot, new THREE.Color(lanternHex(w.color)));
     this.bodies.instanceColor!.needsUpdate = true;
     // Paper tag with the title, hanging under the lantern.
     const tex = canvasTexture(320, 72, (g) => {
@@ -169,51 +223,19 @@ export class WishLanterns {
 
   /** The writing desk form. */
   private openForm() {
-    let color = 0;
-    const title = h('input', { class: 'wish-input', maxlength: String(WISH_TITLE_MAX), placeholder: t('wish.title') }) as HTMLInputElement;
-    const text = h('textarea', { class: 'wish-input wish-text', maxlength: String(WISH_TEXT_MAX), placeholder: t('wish.text'), rows: '4' }) as HTMLTextAreaElement;
-    const swatches = LOTUS_COLOURS.map((c, i) =>
-      h('button', {
-        class: `wish-swatch${i === 0 ? ' on' : ''}`,
-        style: `background:#${c.toString(16).padStart(6, '0')}`,
-        onclick: (e: MouseEvent) => {
-          color = i;
-          swatches.forEach((s) => s.classList.remove('on'));
-          (e.currentTarget as HTMLElement).classList.add('on');
-        },
-      }),
-    );
-    const submit = () => {
-      const tt = title.value.trim();
-      if (!tt) return this.hud.toast(t('wish.empty'));
-      this.pendingTitle = tt.slice(0, WISH_TITLE_MAX);
-      this.net.hangWish(tt, text.value.trim(), color, this.myName, this.freeSlot());
+    showWishForm(this.panel, this.hud, 'wish.heading', (title, text, color) => {
+      this.pendingTitle = title;
+      this.net.hangWish(title, text, color, this.myName, this.freeSlot());
       this.player.gesture('reach', 0.8);
-      this.close();
-    };
-    this.panel.replaceChildren(
-      h('div', { class: 'wish-card' },
-        h('div', { class: 'wish-heading', i18n: 'wish.heading' }),
-        title, text,
-        h('div', { class: 'wish-swatches' }, ...swatches),
-        h('div', { class: 'wish-actions' },
-          h('button', { class: 'pill-btn', i18n: 'wish.cancel', onclick: () => this.close() }),
-          h('button', { class: 'primary-btn', i18n: 'wish.hang', onclick: submit }),
-        ),
-      ),
-    );
-    this.panel.classList.remove('hidden');
-    title.focus();
+    }, () => this.close());
   }
 
   private read(w: Wish) {
-    const days = Math.max(0, Math.ceil((w.at + WISH_TTL_MS - Date.now()) / 86400000));
-    const date = new Date(w.at).toLocaleDateString();
     this.panel.replaceChildren(
-      h('div', { class: 'wish-card', style: `border-color:#${(LOTUS_COLOURS[w.color] ?? 0xffffff).toString(16).padStart(6, '0')}` },
+      h('div', { class: 'wish-card', style: `border-color:#${lanternHex(w.color).toString(16).padStart(6, '0')}` },
         h('div', { class: 'wish-heading' }, w.title),
         w.text ? h('p', { class: 'wish-body' }, w.text) : null,
-        h('div', { class: 'wish-meta' }, t('wish.by', { name: w.name, date, days })),
+        h('div', { class: 'wish-meta' }, wishMeta(w)),
         h('div', { class: 'wish-actions' }, h('button', { class: 'pill-btn', i18n: 'wish.close', onclick: () => this.close() })),
       ),
     );

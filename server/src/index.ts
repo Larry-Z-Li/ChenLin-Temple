@@ -30,6 +30,7 @@ import {
   WISH_COLOURS,
   WISH_COOLDOWN_MS,
   WISH_SLOTS,
+  HALL_WISH_SLOTS,
   WISH_TEXT_MAX,
   WISH_TITLE_MAX,
   WISH_TTL_MS,
@@ -280,20 +281,24 @@ function handle(c: Client, msg: ClientMsg) {
       const now = Date.now();
       const title = sanitizeText(msg.title, WISH_TITLE_MAX), text = sanitizeText(msg.text, WISH_TEXT_MAX);
       if (!title) return send(c, { t: 'wishDenied', reason: 'empty' });
+      const board = msg.board === 'hall' ? 'hall' : 'garden';
+      const onBoard = () => [...wishes.values()].filter((w) => (w.board ?? 'garden') === board);
+      pruneWishes(now);
+      const used = new Set(onBoard().map((w) => w.slot));
+      let slot = [...Array(board === 'hall' ? HALL_WISH_SLOTS : WISH_SLOTS).keys()].find((s) => !used.has(s));
+      // The hall's wall turns you away when every hook is taken.
+      if (slot === undefined && board === 'hall') return send(c, { t: 'wishDenied', reason: 'full' });
       if (now - c.lastWish < WISH_COOLDOWN_MS) return send(c, { t: 'wishDenied', reason: 'slow' });
       c.lastWish = now;
-      pruneWishes(now);
-      // Full: take down the oldest lantern and reuse its hook.
-      const used = new Set([...wishes.values()].map((w) => w.slot));
-      let slot = [...Array(WISH_SLOTS).keys()].find((s) => !used.has(s));
+      // The garden, when full: take down the oldest lantern and reuse its hook.
       if (slot === undefined) {
-        const oldest = [...wishes.values()].reduce((a, b) => (a.at <= b.at ? a : b));
+        const oldest = onBoard().reduce((a, b) => (a.at <= b.at ? a : b));
         wishes.delete(oldest.id);
         broadcast({ t: 'wishRemoved', id: oldest.id });
         slot = oldest.slot;
       }
       const color = Number.isInteger(msg.color) && msg.color >= 0 && msg.color < WISH_COLOURS ? msg.color : 0;
-      const wish: Wish = { id: randomUUID().slice(0, 12), slot, title, text, color, name: c.info.name, at: now };
+      const wish: Wish = { id: randomUUID().slice(0, 12), board, slot, title, text, color, name: c.info.name, at: now };
       wishes.set(wish.id, wish);
       saveWishes();
       broadcast({ t: 'wishAdded', wish });

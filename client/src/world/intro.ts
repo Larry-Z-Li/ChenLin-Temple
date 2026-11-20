@@ -88,12 +88,12 @@ export class Intro {
     // (which slide past as he walks) to the valley and the temple, him on the right of the frame.
     const vl = Math.hypot(STUPA_COURT.x - p.x, STUPA_COURT.z - p.z) || 1;
     const vx = (STUPA_COURT.x - p.x) / vl, vz = (STUPA_COURT.z - p.z) / vl, rx = -vz, rz = vx;
-    const cx = p.x - vx * 7 - rx * 2.6, cz = p.z - vz * 7 - rz * 2.6;
+    const cx = p.x - vx * 9 - rx * 3, cz = p.z - vz * 9 - rz * 3;
     // High enough to see over the knolls the stupas stand on.
     let knoll = -Infinity;
     for (const d of [4, 8, 12, 16]) knoll = Math.max(knoll, g.heightAt(p.x + vx * d, p.z + vz * d));
-    const wantCam = new THREE.Vector3(cx, Math.max(y + 4.2, g.heightAt(cx, cz) + 2.5, knoll + 3), cz);
-    const wantLook = new THREE.Vector3(p.x + vx * 50, y - 6, p.z + vz * 50);
+    const wantCam = new THREE.Vector3(cx, Math.max(y + 6, g.heightAt(cx, cz) + 2.5, knoll + 4), cz);
+    const wantLook = new THREE.Vector3(p.x + vx * 50, y - 10, p.z + vz * 50);
     if (!this.started) {
       this.camPos.copy(wantCam);
       this.look.copy(wantLook);

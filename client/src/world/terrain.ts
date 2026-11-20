@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BASIN, POND, TERRAIN_SIZE } from '../config/layout';
 import { fbm, lerp, noise2, smoothstep } from '../core/math';
+import { shapeRidge } from './ridgeWalk';
 import { nearestOnStream, nearestRiver, nearStream } from './stream';
 
 /**
@@ -8,6 +9,11 @@ import { nearestOnStream, nearestRiver, nearStream } from './stream';
  * Mountains are lower to the south so the view behind the spawn opens into a distant valley.
  */
 export function terrainHeight(x: number, z: number) {
+  return shapeRidge(x, z, rawTerrainHeight(x, z));
+}
+
+/** The ground before the ridge terrace is cut into it (what the stupa ridge is planned on). */
+export function rawTerrainHeight(x: number, z: number) {
   const dx = x - BASIN.x, dz = z - BASIN.z;
   const r = Math.hypot(dx, dz);
   let h = 0;

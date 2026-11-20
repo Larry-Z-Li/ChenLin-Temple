@@ -8,6 +8,7 @@ import {
   type Transform,
   type WelcomeMsg,
   type Wish,
+  type WishBoard,
 } from '../../../shared/protocol';
 
 export type NetStatus = 'connecting' | 'online' | 'offline';
@@ -25,7 +26,7 @@ export interface NetEvents {
   strike: (inst: string, by: string) => void;
   wishAdded: (wish: Wish) => void;
   wishRemoved: (id: string) => void;
-  wishDenied: (reason: 'slow' | 'empty') => void;
+  wishDenied: (reason: 'slow' | 'empty' | 'full') => void;
   fed: (deer: string, by: string, fruit: Fruit) => void;
   pickDenied: (fruit: string, reason: 'gone' | 'full') => void;
   offered: (hall: string, offering: Offering, by: string) => void;
@@ -158,8 +159,8 @@ export class NetClient {
   }
 
   /** Offline the lantern goes up locally (lost on reload). */
-  hangWish(title: string, text: string, color: number, name: string, slot: number) {
-    if (!this.send({ t: 'wish', title, text, color })) this.emit('wishAdded', { id: `l${++this.localSeq}`, slot, title, text, color, name, at: Date.now() });
+  hangWish(title: string, text: string, color: number, name: string, slot: number, board: WishBoard = 'garden') {
+    if (!this.send({ t: 'wish', title, text, color, board })) this.emit('wishAdded', { id: `l${++this.localSeq}`, board, slot, title, text, color, name, at: Date.now() });
   }
 
   feedDeer(deer: string, fruit: Fruit) {

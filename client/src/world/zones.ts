@@ -1,20 +1,15 @@
 import { hallHalf, ABBOT, BASIN, BENCHES, BODHI_TREE, DORM, DRAGON_POOL, DRAGON_SPRING, FOOT_BRIDGES, FOOTPATHS, PAGODAS, PICNIC_TABLES, POND_PAVILION, STUPA_COURT, WISH_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WATERFALL, WHEEL_ROWS, type Rect } from '../config/layout';
 import { smoothstep } from '../core/math';
+import { onRidgeTerrace } from './ridgeWalk';
 import { nearestOnStream, nearestRiver, nearStream } from './stream';
 
 const POLES = FLAG_LINES.flat().filter((a) => a.pole);
 
 const inRect = (x: number, z: number, r: Rect, m: number) => x >= r.minX - m && x <= r.maxX + m && z >= r.minZ - m && z <= r.maxZ + m;
 
-/** Extra clear circles registered at build time (the ridge walk) — [x, z, r]. */
-const CLEARINGS: [number, number, number][] = [];
-export function addClearing(x: number, z: number, r: number) {
-  CLEARINGS.push([x, z, r]);
-}
-
 /** True if (x,z) is reserved for buildings, paths, water etc. — keep vegetation out. */
 export function isReserved(x: number, z: number, margin = 1.5, includeOrchard = true) {
-  for (const [cx, cz, r] of CLEARINGS) if (Math.abs(x - cx) < r && Math.abs(z - cz) < r && Math.hypot(x - cx, z - cz) < r) return true;
+  if (onRidgeTerrace(x, z)) return true;
   for (const h of HALLS) {
     // halls + stairs + porch (whichever way they face)
     const [ex, ez] = hallHalf(h);

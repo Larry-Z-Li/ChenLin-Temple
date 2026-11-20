@@ -1,6 +1,6 @@
 // Wire protocol shared by client and server. Keep this file dependency-free.
 
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -70,8 +70,14 @@ export interface Offering {
   ago: number;
 }
 
-/** Wish lanterns in the south-east garden: anyone can hang one; they stay 30 days. */
+/**
+ * Wish lanterns: anyone can hang one; they stay 30 days. Two walls: the garden racks on the plaza
+ * (when full, the oldest comes down) and the lantern wall in the first hall (when full, it says so).
+ */
+export type WishBoard = 'garden' | 'hall';
 export const WISH_SLOTS = 90;
+/** The hall's lantern wall: two 7×7 grids either side of the back door. */
+export const HALL_WISH_SLOTS = 98;
 export const WISH_TTL_MS = 30 * 24 * 3600 * 1000;
 export const WISH_TITLE_MAX = 24;
 export const WISH_TEXT_MAX = 140;
@@ -79,7 +85,9 @@ export const WISH_COLOURS = 8;
 export const WISH_COOLDOWN_MS = 60 * 1000;
 export interface Wish {
   id: string;
-  /** Which hook on the racks (0 … WISH_SLOTS-1). */
+  /** Which wall it hangs on (absent: the garden — lanterns saved before the hall wall existed). */
+  board?: WishBoard;
+  /** Which hook on that wall (0 … its slot count − 1). */
   slot: number;
   title: string;
   text: string;
@@ -98,7 +106,7 @@ export type ClientMsg =
   | { t: 'pick'; fruit: string }
   /** Strike a hall instrument (bell, drum, singing bowl, wooden fish). */
   | { t: 'strike'; inst: string }
-  | { t: 'wish'; title: string; text: string; color: number }
+  | { t: 'wish'; title: string; text: string; color: number; board?: WishBoard }
   /** Give one fruit from your basket to a deer (they eat any kind). */
   | { t: 'feed'; deer: string; fruit: Fruit }
   | { t: 'offer'; hall: string; kind: 'incense' }
@@ -132,7 +140,7 @@ export type ServerMsg =
   | { t: 'strike'; inst: string; by: string }
   | { t: 'wishAdded'; wish: Wish }
   | { t: 'wishRemoved'; id: string }
-  | { t: 'wishDenied'; reason: 'slow' | 'empty' }
+  | { t: 'wishDenied'; reason: 'slow' | 'empty' | 'full' }
   | { t: 'fed'; deer: string; by: string; fruit: Fruit }
   | { t: 'pickDenied'; fruit: string; reason: 'gone' | 'full' }
   | { t: 'offered'; hall: string; offering: Offering; by: string }

@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BASIN, STUPA_RIDGE, WATERFALL } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
-import { lerp, mulberry32, range } from '../core/math';
-import { nearestRiver } from '../world/stream';
+import { lerp } from '../core/math';
+import { ridgePlan } from '../world/ridgeWalk';
 import { terrainHeight } from '../world/terrain';
 
 export interface StupaSpot { x: number; z: number; y: number; yaw: number; s: number }
@@ -58,38 +57,12 @@ export function smallStupa(height: number) {
 }
 
 export function buildStupas(ctx: WorldContext) {
-  const { count, bearingFrom, bearingTo, rMin, rMax, seed } = STUPA_RIDGE;
-  const rng = mulberry32(seed);
-  const at = (az: number, r: number) => ({ x: BASIN.x + Math.sin(az) * r, z: BASIN.z + Math.cos(az) * r });
-
-  const spots: StupaSpot[] = [];
-  let az = bearingFrom, prevR: number | null = null;
-  while (spots.length < count && az < bearingTo) {
-    // Best knoll along this bearing: highest point once the general outward rise is discounted.
-    let best = -Infinity, bestR = rMin;
-    for (let r = rMin; r <= rMax; r += 3) {
-      const p = at(az, r), score = terrainHeight(p.x, p.z) - 0.3 * r;
-      if (score > best) [best, bestR] = [score, r];
-    }
-    // Let the string meander instead of jumping between distant knolls.
-    const r: number = prevR === null ? bestR : lerp(prevR, bestR, 0.55) + range(rng, -7, 7);
-    prevR = r;
-    const p = at(az + range(rng, -0.01, 0.01), r);
-    // Keep clear of the waterfall and its ravine.
-    if (Math.hypot(p.x - WATERFALL.x, p.z - WATERFALL.z) < 32 || nearestRiver(p.x, p.z).d < 16) {
-      az += 14 / r;
-      continue;
-    }
-    // Sit on the highest point under the base so the whitewash is never buried in the slope;
-    // the stone terrace below fills in down to the ground on the downhill side.
+  // Placed by the ridge plan; they stand on its level terrace (the stone foundation covers any edge).
+  const spots: StupaSpot[] = ridgePlan().stupas.map((p) => {
     let y = terrainHeight(p.x, p.z);
-    for (let k = 0; k < 12; k++) y = Math.max(y, terrainHeight(p.x + Math.cos(k * 0.5236) * 4.4, p.z + Math.sin(k * 0.5236) * 4.4));
-    spots.push({ ...p, y: y + 0.05, yaw: Math.atan2(BASIN.x - p.x, BASIN.z - p.z) + range(rng, -0.25, 0.25), s: range(rng, 0.9, 1.1) });
-    // Irregular spacing: mostly 12–26 m, sometimes a close pair, sometimes a longer gap.
-    const roll = rng();
-    const gap = roll < 0.18 ? range(rng, 7, 10) : roll < 0.85 ? range(rng, 12, 26) : range(rng, 32, 48);
-    az += gap / r;
-  }
+    for (let k = 0; k < 12; k++) y = Math.max(y, terrainHeight(p.x + Math.cos(k * 0.5236) * 3.1 * p.s, p.z + Math.sin(k * 0.5236) * 3.1 * p.s));
+    return { ...p, y: y + 0.05 };
+  });
 
   const geos = stupaGeometries();
   const mats = {
