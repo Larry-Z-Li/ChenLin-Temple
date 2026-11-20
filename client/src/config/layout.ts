@@ -153,7 +153,10 @@ export const POND = { ...at(-70, -24), radius: 14 };
 
 export const ORCHARD: Rect & { spacing: number } = { ...moved({ minX: 88, maxX: 110.5, minZ: -8, maxZ: 29.5 }), spacing: 7.5 };
 
-export const BODHI_TREE = at(-56, 28);
+/** 菩提樹: on the lawn just north of the Wenchang pagoda. */
+export const BODHI_TREE = at(58, 51.3);
+/** The great bell (梵鐘) in its frame on the west meadow, by the path to the west bridge; rung when a wish lantern is hung. */
+export const BODHI_BELL = { ...at(-62.5, 23), yaw: 0 };
 
 /** Waterfall in the western mountains, facing east toward the temple. */
 export const WATERFALL = { x: -200, z: 12, width: 10, height: 48 };
@@ -264,7 +267,15 @@ export const WISH_GARDEN = {
 };
 
 /** Stone lanterns (石燈籠). */
+/** A pair of stone lanterns beside a hall's front (or back) steps, turned with the hall. */
+const stairLanterns = (h: HallDef, back = false): [number, number][] => {
+  const yaw = hallYaw(h), c = Math.cos(yaw), s = Math.sin(yaw);
+  const lz = (h.depth / 2 + 1.6 + 1.2) * (back ? -1 : 1), half = (back ? 5 : h.kind === 'shrine' ? 4 : 7) / 2 + 1.2;
+  return [-1, 1].map((k): [number, number] => [h.x + k * half * c + lz * s, h.z - k * half * s + lz * c]);
+};
+
 export const STONE_LANTERNS: [number, number][] = [
+  ...HALLS.flatMap((h) => [...stairLanterns(h), ...(h.backDoor ? stairLanterns(h, true) : [])]),
   [-4.2, -13.5], [4.2, -13.5], [-4.2, 31.6], [4.2, 31.6], [-22.6, 4.8], [-22.6, 13.2], [22.6, 4.8], [22.6, 13.2], // the court's gates
   [-9.5, 106 + DZ], [9.5, 106 + DZ], // plaza, by the gate
   [DRAGON_POOL.x - 6.5, DRAGON_POOL.z + 6], [DRAGON_POOL.x + 6.5, DRAGON_POOL.z + 6], // dragon pool
@@ -385,7 +396,7 @@ export const FOOTPATHS: [number, number][][] = ([
   [[-29, 34], [-29, 50], [-36, 57.6], [-44.5, 58.8]], // ring → Dizang's door
   [[-24, -16], [-31, -21], [-39.5, -18.5]], [[24, -16], [31, -21], [39.5, -18.5]], // ring → Guanyin's and Caishen's doors
   [[-62, -40.5], [-57, -46], [-50, -47]], // pond's north shore → the abbot's path
-  [[-52.5, 31], [-59, 31.5], [-66, 35], [-72, 38]], [[-81.4, 38], [-86, 39.5]], // Bodhi tree → west bridge → west meadow
+  [[-52.5, 31], [-59, 31.5], [-66, 35], [-72, 38]], [[-81.4, 38], [-86, 39.5]], // west loop → west bridge → west meadow
   [[-50, 60.5], [-52.5, 76], [-60, 74.5], [-63.4, 72]], [[-73.4, 72], [-79, 75]], // round Linggu to the south-west bridge
   [[-27, 106], [-36, 104], [-44, 96], [-50, 86], [-52.5, 76]], // riverside walk from the plaza's corner
   // east: from Caishen down behind Dongmi, past the monks' courtyard, to the ring's south-east corner

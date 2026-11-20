@@ -11,11 +11,12 @@ import type { LocalPlayer } from '../player/localPlayer';
 import { h } from '../ui/dom';
 import type { Hud } from '../ui/hud';
 import { LOTUS_COLOURS } from '../world/lanterns';
+import { addLamp, type Lamp } from '../world/lightPool';
 import { colourGlowMaterial, haloPoints } from '../world/nightGlow';
 import { lanternGeometries, lanternHex, showWishForm, wishMeta } from './wishLanterns';
 
 const GRID = 7; // 7 × 7 per side
-const COL = 0.85, ROW = 0.72, SCALE = 0.6;
+const COL = 0.95, ROW = 0.8, SCALE = 0.9;
 const PAGE = 20;
 
 /**
@@ -35,16 +36,21 @@ export class HallLanterns {
   private pending: string | null = null;
   private page = 0;
   private hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+  /** Your own lantern just went up (the Bodhi tree's bell rings for you). */
+  onHung: () => void = () => {};
+  private glow: Lamp[];
 
   constructor(ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string) {
     const hall = HALLS.find((x) => x.id === WISH_HALL)!;
     const F = PLATFORM_H, hw = hall.width / 2, wall = hall.z - hall.depth / 2 + 0.2; // inner face of the back wall
     const cx = (2 + hw) / 2; // middle of each wall stretch beside the 4 m back door
+    // Each grid casts real light into the hall, brighter as it fills.
+    this.glow = [-1, 1].map((s) => addLamp({ x: hall.x + s * cx, y: F + 3.4, z: wall + 1.2, color: 0xffb27a, intensity: 0, range: 8, decay: 1.6, indoor: true }));
 
     // ---- The hangers: lacquered rails on the wall with gold hooks, under a 光明燈 board ----
     const red = mat(THEME.column, { roughness: 0.55 });
     const gold = mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 });
-    const rail0 = F + 1.75, w = (GRID - 1) * COL + 0.7;
+    const rail0 = F + 1.6, w = (GRID - 1) * COL + 0.7;
     for (const s of [-1, 1]) {
       const gx = hall.x + s * cx;
       for (let r = 0; r < GRID; r++) ctx.scene.add(box(w, 0.07, 0.08, red, gx, rail0 + r * ROW - 0.035, wall + 0.06));
@@ -53,7 +59,7 @@ export class HallLanterns {
       sign.position.set(gx, rail0 + (GRID - 1) * ROW + 0.55, wall + 0.04);
       ctx.scene.add(sign);
       for (let r = 0; r < GRID; r++)
-        for (let c = 0; c < GRID; c++) this.hooks.push(new THREE.Vector3(gx + (c - (GRID - 1) / 2) * COL, rail0 + (GRID - 1 - r) * ROW, wall + 0.32));
+        for (let c = 0; c < GRID; c++) this.hooks.push(new THREE.Vector3(gx + (c - (GRID - 1) / 2) * COL, rail0 + (GRID - 1 - r) * ROW, wall + 0.36));
     }
     const hookMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.012, 0.012, 0.28, 5).rotateX(Math.PI / 2).translate(0, 0, -0.13), gold, HALL_WISH_SLOTS);
     this.hooks.forEach((p, i) => hookMesh.setMatrixAt(i, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z)));
@@ -103,6 +109,7 @@ export class HallLanterns {
       if (this.pending !== null && w.title === this.pending && w.name === this.myName) {
         this.pending = null;
         this.hud.toast(t('wish.hung'));
+        this.onHung();
       }
     });
     net.on('wishRemoved', (id) => this.remove(id));
@@ -150,6 +157,7 @@ export class HallLanterns {
     this.bodies.setColorAt(w.slot, c);
     this.bodies.instanceColor!.needsUpdate = true;
     this.halo(w.slot, c);
+    this.relight();
   }
 
   private remove(id: string) {
@@ -162,6 +170,15 @@ export class HallLanterns {
     this.trims.setMatrixAt(w.slot, this.hidden);
     this.bodies.instanceMatrix.needsUpdate = this.trims.instanceMatrix.needsUpdate = true;
     this.halo(w.slot, new THREE.Color(0, 0, 0));
+    this.relight();
+  }
+
+  private relight() {
+    for (let side = 0; side < 2; side++) {
+      let n = 0;
+      for (const s of this.bySlot.keys()) if ((s < HALL_WISH_SLOTS / 2 ? 0 : 1) === side) n++;
+      this.glow[side].intensity = 7 * Math.min(1, n / 18);
+    }
   }
 
   private halo(slot: number, c: THREE.Color) {

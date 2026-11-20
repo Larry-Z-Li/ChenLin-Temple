@@ -4,6 +4,8 @@ import { ChantPanel } from './activities/chantPanel';
 import { Mala } from './activities/beads';
 import { CloudRide } from './activities/cloudRide';
 import { Instruments } from './activities/instruments';
+import { buildFloodlights, buildNightLights, LightPool } from './world/lightPool';
+import { BodhiBell } from './activities/bodhiBell';
 import { HallLanterns } from './activities/hallLanterns';
 import { WishLanterns } from './activities/wishLanterns';
 import { Offerings } from './activities/offerings';
@@ -114,9 +116,13 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   buildLeaves(ctx, camera);
   const { orchard } = buildVegetation(ctx);
 
-  // High / low graphics: pixel ratio, shadows, grass & flowers.
+  // Real lights for the hall interiors nearest you (8, or 4 on low graphics); outdoor lamps use the night light map. See lightPool.
+  const lights = new LightPool(scene, 8);
+
+  // High / low graphics: pixel ratio, shadows, grass & flowers, how many lamps really light.
   const applyGraphics = () => {
     const low = graphicsLevel() === 'low';
+    lights.setActive(low ? 4 : 8);
     renderer.setPixelRatio(low ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = !low;
     sky.sun.castShadow = !low;
@@ -197,6 +203,10 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const instruments = new Instruments(ctx, net, player);
   const wishes = new WishLanterns(ctx, net, hud, player, uiEl, settings.name);
   const hallWishes = new HallLanterns(ctx, net, hud, player, uiEl, settings.name);
+  const bodhiBell = new BodhiBell(ctx);
+  wishes.onHung = hallWishes.onHung = () => bodhiBell.ring();
+  buildNightLights(); // every lamp is registered by now
+  buildFloodlights(ctx);
   const bow = (): void => (seat.seated ? seat.bow() : player.gesture("bow", 2.4));
 
   // Networking
@@ -218,7 +228,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
 
   // Global keys (lowest priority — the seat handler, registered after, gets first pick while seated)
   input.onKey((e) => {
-    if (phase !== 'play' || landing) return false; // the entry screen and the flight down
+    if (phase !== 'play' || landing || bodhiBell.active) return false; // the entry screen, the flight down, the bell
     if (e.code === 'KeyE') {
       if (!e.repeat) ctx.interactions.trigger(); // each tap counts; holding doesn't auto-push
       return true;
@@ -253,6 +263,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
 
     if (phase === 'intro') {
       intro.update(dt);
+      lights.update(dt, player.pos);
       for (const u of ctx.updaters) u(dt, time);
       remotes.update(dt, camera);
       sky.update(dt);
@@ -267,9 +278,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     }
 
     cloud.update(dt);
-    player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground);
+    lights.update(dt, player.pos);
+    if (!bodhiBell.active) player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground); // stand still while the bell rings
 
-    if (!seat.seated && !cloud.riding && !offerings.busy) {
+    if (bodhiBell.active) hud.setPrompt(null);
+    else if (!seat.seated && !cloud.riding && !offerings.busy) {
       const it = ctx.interactions.update(player.pos.x, player.pos.z);
       const p = it?.prompt();
       hud.setPrompt(p?.text ?? null, p?.busy);
@@ -290,6 +303,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     soundscape.update(dt, player.pos, rig.yaw, player.mode === 'free' ? player.speed : 0);
 
     rig.update(dt, player.pos, seat.seated ? 1.0 : 1.55, ctx.cameraBlockers, ctx.ground);
+    bodhiBell.applyCamera(camera);
     sky.update(dt);
     sky.follow(player.pos);
 
@@ -321,7 +335,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   }
 
   // Debug handle for the console during development.
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, wishes, hallWishes, setDebugHours, intro };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, wishes, hallWishes, lights, bodhiBell, setDebugHours, intro };
 
   return {
     /** The entry screen's robe picker: recolour the pacing monk. */

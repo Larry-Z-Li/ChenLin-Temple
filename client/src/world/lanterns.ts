@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { box, cylinder, mat } from '../buildings/materials';
 import {
-  BENCHES, BODHI_TREE, FLAG_LINES, hallHalf, HALLS, LANTERN_CANOPY, LANTERN_STRINGS, PATH_LIGHT_RUNS, POND, POND_LIGHT_RING, STONE_LANTERNS,
+  BENCHES, BODHI_TREE, FLAG_LINES, FOOT_BRIDGES, FOOTPATHS, hallHalf, HALLS, LANTERN_CANOPY, LANTERN_STRINGS, PAGODAS, PATH_LIGHT_RUNS, PAVED, POND, POND_LIGHT_RING, STONE_LANTERNS, STUPA_COURT,
 } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32 } from '../core/math';
 import { colourGlowMaterial, haloPoints, nightGlow, whiteColors } from './nightGlow';
+import { addLamp } from './lightPool';
+import { nearestRiver } from './stream';
 
 /** Lotus-lantern colours: pink, red, orange, yellow, green, blue, violet, white. */
 export const LOTUS_COLOURS = [0xff6fa5, 0xe8343a, 0xff8a2a, 0xffd23f, 0x5ccf6a, 0x4a8cff, 0xa066e0, 0xfff1e0];
@@ -127,6 +129,7 @@ export function buildLanterns(ctx: WorldContext) {
     if (pick === last) pick = (pick + 1 + Math.floor(rng() * 3)) % LOTUS_COLOURS.length;
     last = pick;
     bodies.setColorAt(i, col.setHex(LOTUS_COLOURS[pick]));
+    if (i % 3 === 0) addLamp({ x: h.x, y: h.y + BODY_Y, z: h.z, color: LOTUS_COLOURS[pick], intensity: 8, range: 10, decay: 1.5 });
     haloPos.push(h.x, h.y + BODY_Y, h.z);
     col.lerp(white, 0.25);
     haloCol.push(col.r, col.g, col.b);
@@ -165,8 +168,47 @@ function pathLightSpots() {
     if (skipAngles.some((s) => Math.abs(Math.atan2(Math.sin(a - s), Math.cos(a - s))) < 0.2)) continue;
     spots.push([POND.x + Math.cos(a) * POND_LIGHT_RING.radius, POND.z + Math.sin(a) * POND_LIGHT_RING.radius]);
   }
+  // More along the winding footpaths (alternating sides), at the footbridges and in front of the pagodas.
+  for (const path of FOOTPATHS) {
+    if (path.length < 2) continue;
+    const curve = new THREE.CatmullRomCurve3(path.map(([x, z]) => new THREE.Vector3(x, 0, z)));
+    const len = curve.getLength(), p = new THREE.Vector3(), tg = new THREE.Vector3();
+    for (let d = 4, k = 0; d < len - 3; d += 9, k++) {
+      curve.getPointAt(d / len, p);
+      curve.getTangentAt(d / len, tg);
+      const side = k % 2 ? 1 : -1;
+      spots.push([p.x - tg.z * 1.5 * side, p.z + tg.x * 1.5 * side]);
+    }
+  }
+  // Both edges of the paved walks (not the plaza or the court itself), every 9 m.
+  for (const r of PAVED) {
+    const w = r.maxX - r.minX, d = r.maxZ - r.minZ;
+    if (Math.min(w, d) > 8 || Math.max(w, d) < 8) continue;
+    const alongX = w > d, len = Math.max(w, d), n = Math.max(1, Math.round((len - 4) / 9));
+    for (let i = 0; i <= n; i++) {
+      const t = 2 + ((len - 4) * i) / n;
+      for (const side of [-0.9, 0.9]) {
+        if (alongX) spots.push([r.minX + t, side < 0 ? r.minZ + side : r.maxZ + side]);
+        else spots.push([side < 0 ? r.minX + side : r.maxX + side, r.minZ + t]);
+      }
+    }
+  }
+  for (const b of FOOT_BRIDGES)
+    for (const e of [-1, 1]) {
+      const along = e * (b.length / 2 + 0.9);
+      spots.push(b.axis === 'x' ? [b.x + along, b.z + e * 1.7] : [b.x + e * 1.7, b.z + along]);
+    }
+  for (const pg of PAGODAS) {
+    const dx = STUPA_COURT.x - pg.x, dz = STUPA_COURT.z - pg.z, l = Math.hypot(dx, dz) || 1, r = pg.stories ? 8.5 : 10;
+    for (const s of [-1, 1]) spots.push([pg.x + (dx / l) * r - (dz / l) * 2.6 * s, pg.z + (dz / l) * r + (dx / l) * 2.6 * s]);
+  }
   const poles = FLAG_LINES.flat().filter((p) => p.pole);
+  const kept: [number, number][] = [];
   return spots.filter(([x, z]) => {
+    if (kept.some(([kx, kz]) => Math.hypot(x - kx, z - kz) < 3.5)) return false;
+    if (Math.abs(x - STUPA_COURT.x) < STUPA_COURT.half + 1.2 && Math.abs(z - STUPA_COURT.z) < STUPA_COURT.half + 1.2) return false; // the court's walls
+    if (PAVED.some((r) => x > r.minX + 0.3 && x < r.maxX - 0.3 && z > r.minZ + 0.3 && z < r.maxZ - 0.3)) return false; // not out on the paving
+    if (nearestRiver(x, z).d < 2.2 || Math.hypot(x - POND.x, z - POND.z) < POND.radius + 1) return false;
     if (STONE_LANTERNS.some(([lx, lz]) => Math.hypot(x - lx, z - lz) < 1.8)) return false;
     if (BENCHES.some((b) => Math.hypot(x - b.x, z - b.z) < 1.9)) return false;
     if (poles.some((p) => Math.hypot(x - p.x, z - p.z) < 1.2)) return false;
@@ -174,6 +216,7 @@ function pathLightSpots() {
       const [ex, ez] = hallHalf(h);
       if (Math.abs(x - h.x) < ex + 4.5 && Math.abs(z - h.z) < ez + 4.5) return false; // the hall, its porch and stairs
     }
+    kept.push([x, z]);
     return true;
   });
 }
@@ -202,6 +245,7 @@ function buildPathLights(ctx: WorldContext) {
     papers.setMatrixAt(i, m);
     haloPos.push(x, yy + 0.74, z);
     haloCol.push(1, 0.78, 0.5);
+    addLamp({ x, y: yy + 0.74, z, color: 0xffc48a, intensity: 4, range: 6.5, decay: 1.6, ground: true });
     ctx.collisions.addCircle(x, z, 0.22);
   });
   frames.castShadow = true;

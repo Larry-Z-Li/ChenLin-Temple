@@ -102,6 +102,8 @@ export class WishLanterns {
   private panel: HTMLElement;
   private pendingTitle: string | null = null;
   private hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+  /** Your own lantern just went up (the Bodhi tree's bell rings for you). */
+  onHung: () => void = () => {};
 
   constructor(private ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string) {
     this.buildGarden();
@@ -139,6 +141,7 @@ export class WishLanterns {
       if (this.pendingTitle !== null && w.title === this.pendingTitle && w.name === this.myName) {
         this.pendingTitle = null;
         this.hud.toast(t('wish.hung'));
+        this.onHung();
       }
     });
     net.on('wishRemoved', (id) => this.remove(id));

@@ -14,6 +14,7 @@ import { buildOfferingTable } from './offeringTable';
 import { buildStatueSlot } from './statue';
 import { nightGlow } from '../world/nightGlow';
 import { buildThangka } from './thangka';
+import { addLampAt } from '../world/lightPool';
 
 const T = 0.4; // wall thickness
 const PORCH = 1.6; // platform margin around the walls
@@ -230,6 +231,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
     const l = buildRedLantern();
     l.position.set(hx + lx, F + H - 0.1, isShrine ? front + 0.9 : front + 1.85);
     g.add(l);
+    addLampAt(l, { color: 0xff7a40, intensity: 20, range: 11, decay: 1.5 }, new THREE.Vector3(0, -0.93, 0));
     swaying.push({ obj: l, amp: 0.04, speed: 1.1, phase: lx });
   }
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
@@ -312,11 +314,11 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
   g.add(table);
 
   // ---- Interior light ----
-  const lamp = new THREE.PointLight(0xffc887, isShrine ? 6 : n > 1 ? 30 : 18, isShrine ? 10 : n > 1 ? 40 : 26, 1.2);
+  // One of the pooled real lights (see lightPool): lit day and night, carrying further after dark.
+  const lamp = new THREE.Object3D();
   lamp.position.set(hx, F + (isShrine ? 2.6 : 3.6), tableZ + 1.5);
   g.add(lamp);
-  const lampBase = lamp.intensity;
-  nightGlow.track((night) => (lamp.intensity = lampBase * (1 + 0.9 * night))); // lamplight carries further after dark
+  addLampAt(lamp, { color: 0xffc887, intensity: isShrine ? 6 : n > 1 ? 30 : 18, range: isShrine ? 10 : n > 1 ? 40 : 26, decay: 1.2, indoor: true });
 
   // ---- Kneeling cushions, then the furnishings around them ----
   const thangkaZs = Array.from({ length: def.thangkas }, (_, i) => back + 4 + (i * (depth - 8)) / Math.max(1, def.thangkas - 1));

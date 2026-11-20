@@ -48,6 +48,35 @@ export function bell(pitch = 220, length = 6, vol = 1) {
   });
 }
 
+/** The great bell (梵鐘) struck with a log: a wooden thump, then a deep hum that slowly beats and fades. */
+export function templeBell(vol = 1) {
+  const a = ctx(), t = a.currentTime;
+  const master = a.createGain();
+  master.gain.value = 0.32 * settings.sfxVolume * vol;
+  master.connect(a.destination);
+  const len = 0.3, buf = a.createBuffer(1, Math.floor(a.sampleRate * len), a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+  const thump = a.createBufferSource(), lp = a.createBiquadFilter(), tg = a.createGain();
+  thump.buffer = buf;
+  lp.type = 'lowpass';
+  lp.frequency.value = 380;
+  tg.gain.value = 1.1;
+  thump.connect(lp).connect(tg).connect(master);
+  thump.start(t);
+  ([[1, 1], [2.0, 0.55], [2.76, 0.42], [4.07, 0.22], [5.4, 0.12]] as const).forEach(([ratio, amp], i) => {
+    for (const det of [-0.3, 0.3]) {
+      const osc = a.createOscillator(), g = a.createGain();
+      osc.frequency.value = 72 * ratio + det * (i + 1); // paired partials beat slowly, the bell's "wow"
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(amp * 0.5, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 16 / (1 + i * 0.5));
+      osc.connect(g).connect(master);
+      osc.start(t);
+      osc.stop(t + 16);
+    }
+  });
+}
+
 /** Hollow knock of a wooden fish (木魚): a short resonant body tone plus a click. */
 export function woodFish(vol = 1) {
   const a = ctx(), t = a.currentTime;

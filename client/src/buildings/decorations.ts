@@ -10,6 +10,7 @@ import { nightGlow } from '../world/nightGlow';
 import { terrainHeight } from '../world/terrain';
 import type { StupaSpot } from './stupas';
 import { box, cylinder, hipRoofGeometry, mat } from './materials';
+import { addLamp } from '../world/lightPool';
 
 const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
 const STONE = 0xa29d91;
@@ -42,8 +43,10 @@ function buildStoneLanterns(ctx: WorldContext) {
     stones.setMatrixAt(i, m);
     glow.setMatrixAt(i, m);
     ctx.collisions.addCircle(x, z, 0.35);
+    const gy = ctx.ground.heightAt(x, z);
+    addLamp({ x, y: gy + 1.16, z, color: 0xffc070, intensity: 6, range: 8, decay: 1.6, ground: true });
     const halo = new THREE.Sprite(nightGlow.stoneHalo); // pool of light after dark
-    halo.position.set(x, ctx.ground.heightAt(x, z) + 1.16, z);
+    halo.position.set(x, gy + 1.16, z);
     halo.scale.setScalar(2.2);
     ctx.scene.add(halo);
   });
