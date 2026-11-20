@@ -9,6 +9,7 @@ import type { WorldContext } from '../core/context';
 import { mulberry32 } from '../core/math';
 import { colourGlowMaterial, haloPoints, nightGlow, whiteColors } from './nightGlow';
 import { addLamp } from './lightPool';
+import { ridgePlan } from './ridgeWalk';
 import { nearestRiver } from './stream';
 
 /** Lotus-lantern colours: pink, red, orange, yellow, green, blue, violet, white. */
@@ -193,6 +194,9 @@ function pathLightSpots() {
       }
     }
   }
+  // Up the mountain: along the ridge walk, on the stupas' side.
+  const ridge = ridgePlan().samples;
+  for (let i = 2; i < ridge.length - 2; i += 5) spots.push([ridge[i].x + ridge[i].nx * 1.5, ridge[i].z + ridge[i].nz * 1.5]);
   for (const b of FOOT_BRIDGES)
     for (const e of [-1, 1]) {
       const along = e * (b.length / 2 + 0.9);

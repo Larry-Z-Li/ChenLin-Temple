@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ridgePlan } from './ridgeWalk';
 import { BASIN, BODHI_TREE, CHERRY_GROVE, ORCHARD, PLAZA, spreadPoint } from '../config/layout';
 import { FRUIT_TYPES, type FruitType } from '../config/theme';
 import type { WorldContext } from '../core/context';
@@ -169,7 +170,7 @@ export function buildVegetation(ctx: WorldContext) {
     else place(sp.bush, x, z, range(rng, 0.7, 1.4), pick(rng, GREENS), false);
   }
 
-  // Rows of trees down the plaza's east side (as on the site plan; the wish lanterns stand on the west).
+  // Rows of trees down the plaza's east side (as on the site plan; the sand garden is on the west).
   for (const z of [-10, -4, 2, 8].map((d) => PLAZA.z + d))
     for (const x of [12, 20]) place(Math.abs(x) === 12 ? sp.cherry : sp.broad, x, z, Math.abs(x) === 12 ? 0.95 : 1.1, Math.abs(x) === 12 ? pick(rng, BLOSSOM) : pick(rng, GREENS));
 
@@ -205,8 +206,20 @@ export function buildVegetation(ctx: WorldContext) {
     if (!isReserved(x, z, 0.5)) place(sp.bamboo, x, z, range(rng, 0.9, 1.2), undefined, true);
   }
 
-  // Bodhi tree (large broadleaf) on the west lawn.
+  // Bodhi tree (large broadleaf) beside the Wenchang pagoda.
   place(sp.broad, BODHI_TREE.x, BODHI_TREE.z, 2.4, new THREE.Color(0x4d8a3a));
+
+  // The mountain walk: shrubs along both edges (low near the walk, so the view from it stays open)
+  // and the odd small pine or cypress well up the bank, behind where the entry camera rides (~9 m up).
+  const ridge = ridgePlan();
+  for (let i = 0; i < ridge.samples.length; i += 2) {
+    const s = ridge.samples[i];
+    const at = (o: number): [number, number] => [s.x + s.nx * o, s.z + s.nz * o];
+    if (rng() < 0.7) place(sp.bush, ...at(-range(rng, 2.6, 4.2)), range(rng, 0.7, 1.2), pick(rng, GREENS), false);
+    if (rng() < 0.25) place(rng() < 0.5 ? sp.cypress : sp.pine, ...at(-range(rng, 18, 26)), range(rng, 0.7, 1.0), pick(rng, PINE_GREENS), false);
+    const [vx, vz] = at(range(rng, 2.8, 3.6));
+    if (rng() < 0.5 && !ridge.stupas.some((st) => Math.hypot(st.x - vx, st.z - vz) < 5)) place(sp.bush, vx, vz, range(rng, 0.6, 1.0), pick(rng, GREENS), false);
+  }
 
   Object.values(sp).forEach((s) => s.build(ctx.scene));
 
@@ -294,6 +307,18 @@ function buildFlowers(ctx: WorldContext, rng: Rng) {
     for (let i = 0; i < n; i++) {
       const x = cx + range(rng, -3, 3), z = cz + range(rng, -3, 3);
       if (!isReserved(x, z, 0.4)) addFlower(x, z, palette, shape);
+    }
+  }
+  // Wildflowers along both edges of the mountain walk
+  {
+    const S = ridgePlan().samples;
+    let palette = pick(rng, PALETTES);
+    for (let i = 0; i < S.length; i++) {
+      if (i % 12 === 0) palette = pick(rng, PALETTES);
+      for (const side of [-1, 1]) if (rng() < 0.6) {
+        const o = side * range(rng, 1.0, 1.9);
+        addFlower(S[i].x + S[i].nx * o + range(rng, -0.4, 0.4), S[i].z + S[i].nz * o + range(rng, -0.4, 0.4), palette, i % 3);
+      }
     }
   }
   // Borders along the paved courtyard and approach

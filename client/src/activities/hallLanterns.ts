@@ -8,16 +8,19 @@ import { canvasTexture } from '../core/textures';
 import { t } from '../i18n';
 import type { NetClient } from '../net/netClient';
 import type { LocalPlayer } from '../player/localPlayer';
+import type { LanternShot } from './bodhiBell';
 import { h } from '../ui/dom';
 import type { Hud } from '../ui/hud';
 import { LOTUS_COLOURS } from '../world/lanterns';
 import { addLamp, type Lamp } from '../world/lightPool';
 import { colourGlowMaterial, haloPoints } from '../world/nightGlow';
-import { lanternGeometries, lanternHex, showWishForm, wishMeta } from './wishLanterns';
+import { lanternGeometries, lanternHex, markHung, showWishForm, wishMeta, wishWait } from './wishLanterns';
 
 const GRID = 7; // 7 × 7 per side
 const COL = 0.95, ROW = 0.8, SCALE = 0.9;
 const PAGE = 20;
+const PER_WALL = GRID * GRID; // slots 0–48 the left wall (west), 49–97 the right
+const wallOf = (slot: number) => (slot < PER_WALL ? 0 : 1);
 
 /**
  * The lantern wall (光明燈) in the first hall: two 7×7 grids of small glowing lanterns on the back
@@ -36,9 +39,12 @@ export class HallLanterns {
   private pending: string | null = null;
   private page = 0;
   private hidden = new THREE.Matrix4().makeScale(0, 0, 0);
-  /** Your own lantern just went up (the Bodhi tree's bell rings for you). */
-  onHung: () => void = () => {};
+  /** Your own lantern just went up (the great bell rings for you, and the camera visits it). */
+  onHung: (shot: LanternShot) => void = () => {};
+  /** Lanterns being shaken: slot → start (ms). */
+  private shakes = new Map<number, number>();
   private glow: Lamp[];
+  private walls: { at: THREE.Vector3; view: THREE.Vector3 }[] = [];
 
   constructor(ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string) {
     const hall = HALLS.find((x) => x.id === WISH_HALL)!;
@@ -58,6 +64,9 @@ export class HallLanterns {
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.55), new THREE.MeshStandardMaterial({ map: signTexture() }));
       sign.position.set(gx, rail0 + (GRID - 1) * ROW + 0.55, wall + 0.04);
       ctx.scene.add(sign);
+      // The camera's framing of this whole wall, from the room.
+      const cy = rail0 + ((GRID - 1) * ROW) / 2 + 0.2;
+      this.walls.push({ at: new THREE.Vector3(gx, cy, wall), view: new THREE.Vector3(gx, cy - 0.3, wall + 7.4) });
       for (let r = 0; r < GRID; r++)
         for (let c = 0; c < GRID; c++) this.hooks.push(new THREE.Vector3(gx + (c - (GRID - 1) / 2) * COL, rail0 + (GRID - 1 - r) * ROW, wall + 0.36));
     }
@@ -80,20 +89,21 @@ export class HallLanterns {
     ctx.scene.add(this.bodies, this.trims, this.halos);
 
     // ---- Writing tables in the back corners ----
-    for (const s of [-1, 1]) {
+    // Each side is its own wall: its table hangs lanterns there, it fills up on its own, and lists its own wishes.
+    [-1, 1].forEach((s, side) => {
       const tx = hall.x + s * (hw - 1.4), tz = wall + 1.5;
       writingTable(ctx, tx, F, tz);
       ctx.interactions.add({
         id: `hallwish-table${s}`, x: tx, z: tz + 0.9, radius: 1.2,
-        prompt: () => ({ text: t(this.full ? 'prompt.hallWishFull' : 'prompt.hallWish') }),
-        onInteract: () => (this.full ? this.hud.toast(t('hallWish.full')) : this.openForm()),
+        prompt: () => ({ text: this.full(side) ? t('prompt.hallWishFull') : wishWait() ? t('prompt.wishWait', { s: wishWait() }) : t('prompt.hallWish') }),
+        onInteract: () => (this.full(side) ? this.hud.toast(t('hallWish.full')) : wishWait() ? this.hud.toast(t('wish.wait', { s: wishWait() })) : this.openForm(side)),
       });
       ctx.interactions.add({
         id: `hallwish-wall${s}`, x: hall.x + s * cx, z: wall + 1.5, radius: 2.1,
-        prompt: () => ({ text: t('prompt.hallList', { n: this.wishes.size }) }),
-        onInteract: () => this.openList(0),
+        prompt: () => ({ text: t('prompt.hallList', { n: this.onWall(side).length }) }),
+        onInteract: () => this.openList(side, 0),
       });
-    }
+    });
 
     this.panel = h('div', { class: 'wish-overlay hidden', onclick: (e: MouseEvent) => e.target === this.panel && this.close() });
     ui.append(this.panel);
@@ -109,7 +119,8 @@ export class HallLanterns {
       if (this.pending !== null && w.title === this.pending && w.name === this.myName) {
         this.pending = null;
         this.hud.toast(t('wish.hung'));
-        this.onHung();
+        markHung();
+        this.onHung(this.shotFor(w.slot));
       }
     });
     net.on('wishRemoved', (id) => this.remove(id));
@@ -126,13 +137,29 @@ export class HallLanterns {
       if ((acc += dt) < 0.05 || !this.bySlot.size) return;
       acc = 0;
       for (const w of this.bySlot.values()) {
-        q.setFromEuler(e.set(Math.sin(time * 1.1 + w.slot) * 0.04, w.slot, Math.sin(time * 0.8 + w.slot * 1.7) * 0.05));
+        const k = this.shakeAt(w.slot);
+        q.setFromEuler(e.set(Math.sin(time * 1.1 + w.slot) * 0.04 + k, w.slot, Math.sin(time * 0.8 + w.slot * 1.7) * 0.05 + k * 0.7));
         m.compose(this.hooks[w.slot], q, sc);
         this.bodies.setMatrixAt(w.slot, m);
         this.trims.setMatrixAt(w.slot, m);
       }
       this.bodies.instanceMatrix.needsUpdate = this.trims.instanceMatrix.needsUpdate = true;
     });
+  }
+
+  /** The camera's view of the whole wall your lantern is on (from the room), and how to shake it. */
+  private shotFor(slot: number): LanternShot {
+    const w = this.walls[wallOf(slot)];
+    return { at: w.at.clone(), view: w.view.clone(), shake: () => this.shakes.set(slot, performance.now()) };
+  }
+
+  /** Extra swing of a lantern that was just shaken (a few quick, dying wobbles). */
+  private shakeAt(slot: number) {
+    const start = this.shakes.get(slot);
+    if (start === undefined) return 0;
+    const age = (performance.now() - start) / 1000;
+    if (age > 2.5) return this.shakes.delete(slot), 0;
+    return 0.35 * Math.exp(-age * 2.2) * Math.sin(age * 15);
   }
 
   get isOpen() {
@@ -143,8 +170,12 @@ export class HallLanterns {
     this.panel.classList.add('hidden');
   }
 
-  private get full() {
-    return this.bySlot.size >= HALL_WISH_SLOTS;
+  private onWall(side: number) {
+    return [...this.wishes.values()].filter((w) => wallOf(w.slot) === side);
+  }
+
+  private full(side: number) {
+    return this.onWall(side).length >= PER_WALL;
   }
 
   private add(w: Wish) {
@@ -176,7 +207,7 @@ export class HallLanterns {
   private relight() {
     for (let side = 0; side < 2; side++) {
       let n = 0;
-      for (const s of this.bySlot.keys()) if ((s < HALL_WISH_SLOTS / 2 ? 0 : 1) === side) n++;
+      for (const s of this.bySlot.keys()) if (wallOf(s) === side) n++;
       this.glow[side].intensity = 7 * Math.min(1, n / 18);
     }
   }
@@ -187,17 +218,17 @@ export class HallLanterns {
     col.needsUpdate = true;
   }
 
-  private openForm() {
+  private openForm(side: number) {
     showWishForm(this.panel, this.hud, 'hallWish.heading', (title, text, color) => {
       this.pending = title;
-      this.net.hangWish(title, text, color, this.myName, this.freeSlot(), 'hall');
+      this.net.hangWish(title, text, color, this.myName, this.freeSlot(side), 'hall', side);
       this.player.gesture('reach', 0.8);
     }, () => this.close());
   }
 
-  /** Every wish on the wall, newest first, 20 to a page; ^ opens one up. */
-  private openList(page: number) {
-    const all = [...this.wishes.values()].sort((a, b) => b.at - a.at);
+  /** Every wish on this wall, newest first, 20 to a page; ^ opens one up. */
+  private openList(side: number, page: number) {
+    const all = this.onWall(side).sort((a, b) => b.at - a.at);
     const pages = Math.max(1, Math.ceil(all.length / PAGE));
     this.page = Math.max(0, Math.min(pages - 1, page));
     const rows = all.slice(this.page * PAGE, this.page * PAGE + PAGE).map((w) => {
@@ -215,12 +246,12 @@ export class HallLanterns {
     });
     this.panel.replaceChildren(
       h('div', { class: 'wish-card wishlist-card' },
-        h('div', { class: 'wish-heading' }, t('hallWish.listTitle', { n: all.length, max: HALL_WISH_SLOTS })),
+        h('div', { class: 'wish-heading' }, t('hallWish.listTitle', { n: all.length, max: PER_WALL })),
         h('div', { class: 'wishlist' }, ...(rows.length ? rows : [h('div', { class: 'wishlist-empty', i18n: 'hallWish.none' })])),
         h('div', { class: 'wish-actions wishlist-pager' },
-          h('button', { class: 'pill-btn', i18n: 'hallWish.prev', disabled: this.page === 0, onclick: () => this.openList(this.page - 1) }),
+          h('button', { class: 'pill-btn', i18n: 'hallWish.prev', disabled: this.page === 0, onclick: () => this.openList(side, this.page - 1) }),
           h('span', { class: 'wishlist-page' }, `${this.page + 1} / ${pages}`),
-          h('button', { class: 'pill-btn', i18n: 'hallWish.next', disabled: this.page >= pages - 1, onclick: () => this.openList(this.page + 1) }),
+          h('button', { class: 'pill-btn', i18n: 'hallWish.next', disabled: this.page >= pages - 1, onclick: () => this.openList(side, this.page + 1) }),
           h('button', { class: 'pill-btn', i18n: 'wish.close', onclick: () => this.close() }),
         ),
       ),
@@ -228,10 +259,10 @@ export class HallLanterns {
     this.panel.classList.remove('hidden');
   }
 
-  /** Offline only: the first empty hook. */
-  private freeSlot() {
-    for (let s = 0; s < HALL_WISH_SLOTS; s++) if (!this.bySlot.has(s)) return s;
-    return 0;
+  /** Offline only: the first empty hook on that wall. */
+  private freeSlot(side: number) {
+    for (let s = side * PER_WALL; s < (side + 1) * PER_WALL; s++) if (!this.bySlot.has(s)) return s;
+    return side * PER_WALL;
   }
 }
 

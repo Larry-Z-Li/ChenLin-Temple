@@ -229,6 +229,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
   const lanternXs = isShrine ? [-2.4, 2.4] : width > 40 ? [-20, -12, -4, 4, 12, 20] : [-8.6, -4.2, 4.2, 8.6];
   for (const lx of lanternXs) {
     const l = buildRedLantern();
+    l.userData.dynamic = l.userData.rigid = true; // sways as one piece
     l.position.set(hx + lx, F + H - 0.1, isShrine ? front + 0.9 : front + 1.85);
     g.add(l);
     addLampAt(l, { color: 0xff7a40, intensity: 20, range: 11, decay: 1.5 }, new THREE.Vector3(0, -0.93, 0));
@@ -236,6 +237,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
   }
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     const b = buildWindBell();
+    b.userData.dynamic = b.userData.rigid = true;
     b.position.set(hx + sx * (hw + eave - 0.3), F + H - 0.02, hz + sz * (hd + eave - 0.3));
     g.add(b);
     swaying.push({ obj: b, amp: 0.14, speed: 2.3, phase: sx * 3 + sz });

@@ -146,8 +146,8 @@ export function shapeRidge(x: number, z: number, h: number) {
   return w > 0 ? lerp(h, q.h - (q.off > 0 ? STEP_DOWN * smoothstep(BANK_FROM, BANK_TO, q.off) : 0), w) : h;
 }
 
-/** True on the flat of the terrace (keep trees off it). */
+/** True on the terrace or the bank above it where the entry camera rides (keep the forest off). */
 export function onRidgeTerrace(x: number, z: number) {
   const q = locate(x, z);
-  return !!q && q.over < 4 && q.off > -UPHILL_FLAT - 1 && q.off < VALLEY_FLAT + 1;
+  return !!q && q.over < 8 && q.off > -16 && q.off < VALLEY_FLAT + 1;
 }

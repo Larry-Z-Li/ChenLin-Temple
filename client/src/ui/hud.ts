@@ -12,6 +12,8 @@ export type SeatAction = 'beads' | 'sutra' | 'prostrate' | 'stand';
 export interface HudCallbacks {
   onMusic(on: boolean): void;
   onSeatAction(action: SeatAction): void;
+  /** Beads or a sutra while standing. */
+  onStandAction(action: 'beads' | 'sutra'): void;
   onChants(): void;
   onFastTravel(): void;
   onMap(): void;
@@ -30,6 +32,7 @@ export class Hud {
   private toasts: HTMLElement;
   private seatBar: HTMLElement;
   private seatBtns: Record<string, HTMLButtonElement> = {};
+  private standBtns: Record<string, HTMLButtonElement> = {};
   private musicBtn: HTMLButtonElement;
   private help: HTMLElement;
   private settingsPanel: HTMLElement;
@@ -122,12 +125,14 @@ export class Hud {
       this.seatBtns[action] = b;
       return b;
     };
+    // Seated: prostrations, beads, chants, sutras, stand up.
     this.seatBar = h(
       'nav',
       { class: 'seatbar hidden' },
-      mk('beads', '1', 'seat.beads'),
-      mk('sutra', '2', 'seat.sutras'),
-      mk('prostrate', '3', 'seat.prostrate'),
+      mk('prostrate', '1', 'seat.prostrate'),
+      mk('beads', '2', 'seat.beads'),
+      h('button', { class: 'seat-btn', onclick: () => cb.onChants() }, h('kbd', {}, 'C'), h('span', { i18n: 'hud.chants' })),
+      mk('sutra', '3', 'seat.sutras'),
       mk('stand', 'Esc', 'seat.stand'),
     );
     this.beadBtns = h(
@@ -137,12 +142,16 @@ export class Hud {
       h('button', { class: 'icon-btn big', i18nTitle: 'beads.next', onclick: () => cb.onBeadStep(1) }, '▶'),
     );
     this.inventory = h('div', { class: 'inventory hidden' });
-    // Bottom-left: bow and chants, always within reach.
+    // Standing: bow, beads, chants, sutras, fast travel.
+    this.standBtns.beads = h('button', { class: 'icon-btn', i18n: 'seat.beads', onclick: () => cb.onStandAction('beads') }) as HTMLButtonElement;
+    this.standBtns.sutra = h('button', { class: 'icon-btn', i18n: 'seat.sutras', onclick: () => cb.onStandAction('sutra') }) as HTMLButtonElement;
     const quick = h(
       'div',
       { class: 'quick-actions' },
       h('button', { class: 'icon-btn', i18n: 'bow.button', onclick: () => cb.onBow() }),
+      this.standBtns.beads,
       h('button', { class: 'icon-btn', i18n: 'hud.chants', onclick: () => cb.onChants() }),
+      this.standBtns.sutra,
       h('button', { class: 'icon-btn', i18n: 'hud.fastTravel', onclick: () => cb.onFastTravel() }),
     );
 
@@ -232,6 +241,7 @@ export class Hud {
 
   setSeatState(focus: Focus) {
     for (const [k, b] of Object.entries(this.seatBtns)) b.classList.toggle('active', k === focus);
+    for (const [k, b] of Object.entries(this.standBtns)) b.classList.toggle('active', k === focus);
   }
 
   /** Fruit being carried, grouped by kind. */

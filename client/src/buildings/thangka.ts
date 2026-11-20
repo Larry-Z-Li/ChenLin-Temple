@@ -17,6 +17,7 @@ export function buildThangka(entry: ThangkaEntry | null, width = 1.5, height = 2
 
   const panelMat = new THREE.MeshStandardMaterial({ color: 0xe9dfc6, roughness: 0.85 });
   const panel = new THREE.Mesh(new THREE.PlaneGeometry(width, height), panelMat);
+  panel.userData.dynamic = true; // its image (and size) arrive later: kept out of static merging
   panel.position.set(0, -height / 2 - border * 0.8, 0.025);
   g.add(panel);
 

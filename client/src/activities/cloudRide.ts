@@ -78,7 +78,7 @@ export class CloudRide {
     this.player.yaw = d.yaw;
     this.player.release();
     this.ctx.interactions.enabled = true;
-    this.rig.lookAlong(d.yaw, 0.3, 6);
+    this.rig.frame(0.3, 6); // back to walking distance; the camera doesn't turn
     whoosh(0.5, 1.0);
   }
 
@@ -93,8 +93,8 @@ export class CloudRide {
     const yaw = Math.atan2(-tan.x, -tan.z);
     this.player.pos.copy(p);
     this.player.yaw = dampAngle(this.player.yaw, yaw, 6, dt);
-    // Camera off to one side and pulled back, so you see the grounds go by.
-    if (!this.rig.userLooking()) this.rig.lookAlong(yaw + 0.6, 0.38, 12);
+    // Pulled back to see the grounds go by, but never turned: the view keeps facing the way it did.
+    this.rig.frame(0.38, 12);
 
     this.emitAcc += dt * 45;
     while (this.emitAcc >= 1) {

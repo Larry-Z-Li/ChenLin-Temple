@@ -285,7 +285,10 @@ function handle(c: Client, msg: ClientMsg) {
       const onBoard = () => [...wishes.values()].filter((w) => (w.board ?? 'garden') === board);
       pruneWishes(now);
       const used = new Set(onBoard().map((w) => w.slot));
-      let slot = [...Array(board === 'hall' ? HALL_WISH_SLOTS : WISH_SLOTS).keys()].find((s) => !used.has(s));
+      // The hall has two walls (left, right), each filling on its own; the garden is one set of racks.
+      const half = HALL_WISH_SLOTS / 2, side = board === 'hall' && (msg.side === 0 || msg.side === 1) ? msg.side : null;
+      const [lo, hi] = board === 'garden' ? [0, WISH_SLOTS] : side === null ? [0, HALL_WISH_SLOTS] : [side * half, side * half + half];
+      let slot = [...Array(hi - lo).keys()].map((s) => s + lo).find((s) => !used.has(s));
       // The hall's wall turns you away when every hook is taken.
       if (slot === undefined && board === 'hall') return send(c, { t: 'wishDenied', reason: 'full' });
       if (now - c.lastWish < WISH_COOLDOWN_MS) return send(c, { t: 'wishDenied', reason: 'slow' });

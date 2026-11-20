@@ -64,6 +64,7 @@ export function furnishHall(ctx: WorldContext, g: THREE.Group, f: HallFrame, blo
   const banners: THREE.Mesh[] = [];
   const hang = (x: number, z: number) => {
     const b = new THREE.Mesh(bannerGeo, bannerMat);
+    b.userData.dynamic = true; // sways
     b.position.set(x, F + f.H - 0.02, z);
     items.add(b);
     banners.push(b);
@@ -117,6 +118,7 @@ export function furnishHall(ctx: WorldContext, g: THREE.Group, f: HallFrame, blo
   const ix = tableLen / 2 + 1.9, iz = tableZ + 0.2;
   const kicks: { obj: THREE.Object3D; kind: Instrument['kind']; t: number; glow?: THREE.Sprite }[] = [];
   const addInstrument = (kind: Instrument['kind'], obj: THREE.Object3D, x: number, z: number, glow?: THREE.Sprite) => {
+    obj.userData.dynamic = true; // struck and shaken (kept out of static merging)
     const k = { obj, kind, t: 99, glow };
     kicks.push(k);
     ctx.instruments.push({ id: `${def.id}-${kind}`, kind, x, z, onStrike: () => (k.t = 0) });

@@ -260,10 +260,13 @@ export const FLAG_LINES: [FlagAnchor, FlagAnchor][] = [
 /** Arched stone bridge over the falls stream. */
 export const BRIDGE = { x: -163, z0: -15, z1: -3, width: 2.6, rise: 1.15 };
 
-/** Wish lanterns on the plaza's west (left) side: rows of racks on the paving, the writing desk by the central walk. */
-export const WISH_GARDEN = {
-  minX: -27, maxX: -8, minZ: 84 + DZ, maxZ: 110 + DZ, racks: [88, 93.5, 99, 104.5].map((z) => z + DZ), rackX0: -26, rackX1: -11,
-  desk: { x: -7.6, z: 96.25 + DZ },
+/** 枯山水: a dry garden of raked sand and rocks on the plaza's west (left) side, viewed from its stone kerb. */
+export const SAND_GARDEN = {
+  minX: -23.2, maxX: -11.8, minZ: 89.2 + DZ, maxZ: 104.8 + DZ,
+  /** Rock groups: centre and size (the sand is raked in rings around each). */
+  rocks: [
+    { x: -20.9, z: 92.9 + DZ, r: 1.2 }, { x: -14.3, z: 96.6 + DZ, r: 0.85 }, { x: -19.5, z: 101.3 + DZ, r: 1.0 },
+  ],
 };
 
 /** Stone lanterns (石燈籠). */
@@ -276,6 +279,10 @@ const stairLanterns = (h: HallDef, back = false): [number, number][] => {
 
 export const STONE_LANTERNS: [number, number][] = [
   ...HALLS.flatMap((h) => [...stairLanterns(h), ...(h.backDoor ? stairLanterns(h, true) : [])]),
+  // round the sand garden (corners and halfway along the long sides, just outside the kerb), and the same
+  // frame mirrored on the plaza's east side, round its rows of trees
+  ...([[SAND_GARDEN.minX - 1, SAND_GARDEN.minZ - 1], [SAND_GARDEN.maxX + 1, SAND_GARDEN.minZ - 1], [SAND_GARDEN.minX - 1, SAND_GARDEN.maxZ + 1], [SAND_GARDEN.maxX + 1, SAND_GARDEN.maxZ + 1],
+    [SAND_GARDEN.minX - 1, (SAND_GARDEN.minZ + SAND_GARDEN.maxZ) / 2], [SAND_GARDEN.maxX + 1, (SAND_GARDEN.minZ + SAND_GARDEN.maxZ) / 2]] as [number, number][]).flatMap(([x, z]): [number, number][] => [[x, z], [-x, z]]),
   [-4.2, -13.5], [4.2, -13.5], [-4.2, 31.6], [4.2, 31.6], [-22.6, 4.8], [-22.6, 13.2], [22.6, 4.8], [22.6, 13.2], // the court's gates
   [-9.5, 106 + DZ], [9.5, 106 + DZ], // plaza, by the gate
   [DRAGON_POOL.x - 6.5, DRAGON_POOL.z + 6], [DRAGON_POOL.x + 6.5, DRAGON_POOL.z + 6], // dragon pool

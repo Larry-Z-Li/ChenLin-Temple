@@ -73,6 +73,18 @@ export class CameraRig {
     return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
   }
 
+  /** Change pitch / distance only: the camera keeps facing where it faces (e.g. riding a cloud). */
+  frame(pitch: number, dist: number) {
+    this.pitch = pitch;
+    this.targetDist = dist;
+  }
+
+  /** Face this way now, with no easing toward any earlier goal. */
+  setYaw(yaw: number) {
+    this.yaw = yaw;
+    this.yawGoal = null;
+  }
+
   /** Smoothly turn to look along `yaw` (e.g. toward the altar when kneeling). */
   lookAlong(yaw: number, pitch?: number, dist?: number) {
     this.yawGoal = yaw;

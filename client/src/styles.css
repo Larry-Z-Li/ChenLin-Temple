@@ -143,6 +143,8 @@ body.intro .hud, body.intro .minimap, body.intro .minimap-btn, body.intro .joyst
 .quick-actions { position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; display: flex; gap: 8px; }
 .seatbar:not(.hidden) ~ .quick-actions { display: none; } /* the seated bar takes the bottom centre */
 .quick-actions .icon-btn { height: 44px; padding: 0 16px; font-family: var(--serif); }
+.quick-actions { flex-wrap: wrap; justify-content: center; width: max-content; max-width: calc(100vw - 24px); }
+.quick-actions .icon-btn.active { background: rgba(217, 164, 65, 0.22); border-color: var(--accent); }
 .inventory { position: absolute; left: 16px; bottom: 70px; display: flex; flex-wrap: wrap; gap: 6px; max-width: 50vw; }
 .fruit-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border); font-size: 13px; }
 .fruit-dot { width: 10px; height: 10px; border-radius: 50%; }

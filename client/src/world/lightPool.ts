@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BASIN, BODHI_BELL, GREAT_STUPA, hallHalf, HALLS, MOUNTAIN_GATE, PAGODAS, PLATFORM_H } from '../config/layout';
+import { BASIN, BODHI_BELL, GREAT_STUPA, hallHalf, HALLS, MOUNTAIN_GATE, PAGODAS, PLATFORM_H, SAND_GARDEN, STUPA_RIDGE } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import { damp, smoothstep } from '../core/math';
 import { nightGlow } from './nightGlow';
@@ -46,13 +46,16 @@ export function addLampAt(obj: THREE.Object3D, l: Omit<Lamp, 'x' | 'y' | 'z'>, o
 // ---------------------------------------------------------------------------------------------
 // The night light map (outdoor lamps)
 
-const SIZE = 1024;
-const HALF = BASIN.radius + 18;
+const SIZE = 2048;
+const HALF = STUPA_RIDGE.rMax + 30; // the valley and the ridge walk
+/** Ground heights under the lamps are stored in a second map (R = (y + H_LO) / H_SPAN) so light stays near the ground anywhere. */
+const H_LO = 50, H_SPAN = 300;
 const box = new THREE.Vector4(BASIN.x - HALF, BASIN.z - HALF, HALF * 2, HALF * 2);
-const MAX_FLOODS = 20;
+const MAX_FLOODS = 24;
 const NIGHT = {
   nightLightMap: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) as THREE.Texture },
   nightBox: { value: box },
+  nightHeightMap: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) as THREE.Texture },
   nightLevel: { value: 0 },
   // Floodlights: centre x/z + half extents of the lit box; base/top height, strength; colour; interior half extents.
   floodA: { value: Array.from({ length: MAX_FLOODS }, () => new THREE.Vector4()) },
@@ -88,6 +91,7 @@ THREE.MeshStandardMaterial.prototype.onBeforeCompile = function nightLight(shade
 varying vec3 vNightWorld;
 uniform sampler2D nightLightMap;
 uniform vec4 nightBox;
+uniform sampler2D nightHeightMap;
 uniform float nightLevel;
 uniform vec4 floodA[ ${MAX_FLOODS} ];
 uniform vec4 floodB[ ${MAX_FLOODS} ];
@@ -100,7 +104,8 @@ uniform int floodCount;`,
       `#include <emissivemap_fragment>
 	vec2 nightUv = ( vNightWorld.xz - nightBox.xy ) / nightBox.zw;
 	if ( nightLevel > 0.001 && nightUv.x > 0.0 && nightUv.y > 0.0 && nightUv.x < 1.0 && nightUv.y < 1.0 ) {
-		float nightH = 1.0 - smoothstep( 3.0, 9.0, vNightWorld.y ); // lamplight stays near the ground
+		float nightBase = texture2D( nightHeightMap, nightUv ).r * 300.0 - 50.0;
+		float nightH = 1.0 - smoothstep( 3.0, 9.0, vNightWorld.y - nightBase ); // lamplight stays near the ground under it
 		totalEmissiveRadiance += diffuseColor.rgb * texture2D( nightLightMap, nightUv ).rgb * ( nightLevel * nightH * 1.3 );
 	}
 	if ( nightLevel > 0.001 ) {
@@ -127,6 +132,9 @@ export function buildNightLights() {
   const g = canvas.getContext('2d')!;
   g.fillStyle = '#000';
   g.fillRect(0, 0, SIZE, SIZE);
+  const hc = document.createElement('canvas');
+  hc.width = hc.height = SIZE / 4;
+  const hg = hc.getContext('2d')!;
   const px = SIZE / box.z;
   const X = (x: number) => (x - box.x) * px, Y = (z: number) => (z - box.y) * px;
   g.globalCompositeOperation = 'lighter';
@@ -142,6 +150,12 @@ export function buildNightLights() {
     grad.addColorStop(1, `rgba(${rgb},0)`);
     g.fillStyle = grad;
     g.fillRect(X(l.x) - r, Y(l.z) - r, r * 2, r * 2);
+    // the ground height there (lamps stand on the ground, or hang a few metres above it)
+    const base = Math.round(THREE.MathUtils.clamp((l.y - (l.ground ? 1 : 4.5) + H_LO) / H_SPAN, 0, 1) * 255);
+    hg.fillStyle = `rgb(${base},0,0)`;
+    hg.beginPath();
+    hg.arc(X(l.x) / 4, Y(l.z) / 4, r / 4 + 1, 0, Math.PI * 2);
+    hg.fill();
   }
   // Light doesn't come through hall walls: the interiors have their own lamps.
   g.globalCompositeOperation = 'source-over';
@@ -154,6 +168,12 @@ export function buildNightLights() {
   tex.flipY = false; // canvas rows run along +z
   tex.colorSpace = THREE.NoColorSpace;
   NIGHT.nightLightMap.value = tex;
+  const htex = new THREE.CanvasTexture(hc);
+  htex.flipY = false;
+  htex.colorSpace = THREE.NoColorSpace;
+  htex.magFilter = htex.minFilter = THREE.NearestFilter;
+  htex.generateMipmaps = false;
+  NIGHT.nightHeightMap.value = htex;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -192,6 +212,12 @@ export function buildFloodlights(ctx: WorldContext) {
   const by = ctx.ground.heightAt(BODHI_BELL.x, BODHI_BELL.z);
   addFlood({ x: BODHI_BELL.x, z: BODHI_BELL.z, hx: 4, hz: 3.5, base: by, top: by + 6.5, strength: 0.55, color: 0xffd6a0 });
   corners(BODHI_BELL.x, BODHI_BELL.z, 3.3, 2.8);
+  // the sand garden's rocks, uplit from the sand
+  for (const r of SAND_GARDEN.rocks) {
+    const ry = ctx.ground.heightAt(r.x, r.z) + 0.1;
+    addFlood({ x: r.x, z: r.z, hx: r.r * 1.6, hz: r.r * 1.6, base: ry, top: ry + r.r * 2, strength: 0.75, color: 0xfff0d8 });
+    fixtures.push([r.x - r.r * 1.3, r.z + r.r * 1.3]);
+  }
   const g = MOUNTAIN_GATE;
   addFlood({ x: g.x, z: g.z, hx: g.width / 2 + 1.5, hz: 2.2, base: 0, top: g.height + 1.5, strength: 0.6, color: 0xffd6a0 });
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) fixtures.push([g.x + sx * (g.width / 2 - 0.6), g.z + sz * 1.6]);

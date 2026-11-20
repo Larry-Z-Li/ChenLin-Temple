@@ -1,6 +1,7 @@
+import { cullFar } from '../core/farCull';
 import * as THREE from 'three';
 import type { Offerings } from '../activities/offerings';
-import { hallHalf, spreadPoint, PLAZA, ABBOT, BODHI_TREE, CAT_SPOTS, CHERRY_GROVE, DEER_RANGES, DORM, DRAGON_POOL, DRAGON_SPRING, FOOTPATHS, HALLS, ORCHARD, PAVED, POND, STUPA_COURT, WISH_GARDEN } from '../config/layout';
+import { hallHalf, spreadPoint, PLAZA, ABBOT, BODHI_TREE, CAT_SPOTS, CHERRY_GROVE, DEER_RANGES, DORM, DRAGON_POOL, DRAGON_SPRING, FOOTPATHS, HALLS, ORCHARD, PAVED, POND, STUPA_COURT, SAND_GARDEN } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import type { Interactable } from '../core/interaction';
 import { mulberry32, range } from '../core/math';
@@ -159,6 +160,7 @@ function buildCat(ctx: WorldContext, spot: (typeof CAT_SPOTS)[number], index: nu
   root.position.set(x, h, z);
   root.rotation.y = 0.6 + index * 1.9;
   ctx.scene.add(root);
+  cullFar(root, 55);
   const body = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1).scale(0.2, 0.12, 0.25), fur);
   body.position.y = 0.11;
   body.castShadow = true;
@@ -203,7 +205,7 @@ function buildCat(ctx: WorldContext, spot: (typeof CAT_SPOTS)[number], index: nu
 function buildButterflies(ctx: WorldContext) {
   const spots: [number, number][] = [
     [BODHI_TREE.x + 3, BODHI_TREE.z - 2], [CHERRY_GROVE.x - 16, CHERRY_GROVE.z + 6], [CHERRY_GROVE.x + 16, CHERRY_GROVE.z + 6],
-    [WISH_GARDEN.minX - 3, WISH_GARDEN.maxZ - 4], [POND.x + 4, POND.z + 18], [DRAGON_POOL.x + 8, DRAGON_POOL.z], [DRAGON_SPRING.x + 4, DRAGON_SPRING.z],
+    [SAND_GARDEN.minX - 3, SAND_GARDEN.maxZ - 4], [POND.x + 4, POND.z + 18], [DRAGON_POOL.x + 8, DRAGON_POOL.z], [DRAGON_SPRING.x + 4, DRAGON_SPRING.z],
     [-34, PLAZA.z], [34, PLAZA.z], [ORCHARD.minX - 3, (ORCHARD.minZ + ORCHARD.maxZ) / 2], [ABBOT.x + 8, ABBOT.z + 6], [(DORM.minX + DORM.maxX) / 2 - 4, (DORM.minZ + DORM.maxZ) / 2],
   ];
   const N = spots.length * 3;
@@ -326,6 +328,8 @@ export class Wildlife {
       wps.push(...near);
       const { root, legs, neck, head } = deerModel(i % 2 === 0);
       ctx.scene.add(root);
+      root.userData.rigid = true; // legs, neck and head move; the pieces within them don't
+      cullFar(root, 75);
       const id = `deer-${i}`;
       const d: Deer = { id, root, legs, neck, head, wps, seed: i * 7919 + 13, happy: 99, stride: 0, item: null!, friendly: i % 3 === 0, pos: new THREE.Vector3(), started: false };
       d.item = {

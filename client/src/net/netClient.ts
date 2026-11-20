@@ -159,8 +159,8 @@ export class NetClient {
   }
 
   /** Offline the lantern goes up locally (lost on reload). */
-  hangWish(title: string, text: string, color: number, name: string, slot: number, board: WishBoard = 'garden') {
-    if (!this.send({ t: 'wish', title, text, color, board })) this.emit('wishAdded', { id: `l${++this.localSeq}`, board, slot, title, text, color, name, at: Date.now() });
+  hangWish(title: string, text: string, color: number, name: string, slot: number, board: WishBoard = 'garden', side?: number) {
+    if (!this.send({ t: 'wish', title, text, color, board, side })) this.emit('wishAdded', { id: `l${++this.localSeq}`, board, slot, title, text, color, name, at: Date.now() });
   }
 
   feedDeer(deer: string, fruit: Fruit) {

@@ -1,6 +1,6 @@
 // Wire protocol shared by client and server. Keep this file dependency-free.
 
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -15,6 +15,8 @@ export const ANIMS = [
   'reach', // reaching to the offering table (incense)
   // sitting cross-legged on a cushion: plain, with beads, reading, bowing
   'cross', 'crossBeads', 'crossRead', 'crossBow',
+  // standing with prayer beads / reading a sutra
+  'standBeads', 'standRead',
 ] as const;
 export type Anim = (typeof ANIMS)[number];
 
@@ -106,7 +108,8 @@ export type ClientMsg =
   | { t: 'pick'; fruit: string }
   /** Strike a hall instrument (bell, drum, singing bowl, wooden fish). */
   | { t: 'strike'; inst: string }
-  | { t: 'wish'; title: string; text: string; color: number; board?: WishBoard }
+  /** `side`: the hall's left (0) or right (1) wall. */
+  | { t: 'wish'; title: string; text: string; color: number; board?: WishBoard; side?: number }
   /** Give one fruit from your basket to a deer (they eat any kind). */
   | { t: 'feed'; deer: string; fruit: Fruit }
   | { t: 'offer'; hall: string; kind: 'incense' }

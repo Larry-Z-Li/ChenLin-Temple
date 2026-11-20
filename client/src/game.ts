@@ -7,7 +7,6 @@ import { Instruments } from './activities/instruments';
 import { buildFloodlights, buildNightLights, LightPool } from './world/lightPool';
 import { BodhiBell } from './activities/bodhiBell';
 import { HallLanterns } from './activities/hallLanterns';
-import { WishLanterns } from './activities/wishLanterns';
 import { Offerings } from './activities/offerings';
 import { SeatSession } from './activities/seatSession';
 import { SutraReader } from './activities/sutraReader';
@@ -48,6 +47,9 @@ import { buildLeaves } from './world/leaves';
 import { buildPrayerFlags } from './world/prayerFlags';
 import { buildSky, setDebugHours, setTempleTimeZone } from './world/sky';
 import { buildTerrain } from './world/terrain';
+import { updateFarCull } from './core/farCull';
+import { mergeRigid, mergeStatic } from './core/staticMerge';
+import { buildSandGarden } from './world/sandGarden';
 import { buildVegetation } from './world/vegetation';
 import { Wildlife } from './world/wildlife';
 import { buildPond, buildRiverColliders, buildStream, buildWaterfall } from './world/water';
@@ -97,21 +99,30 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const sky = buildSky(scene, renderer);
   buildTerrain(scene);
   const [models, thangkas] = await Promise.all([loadModelMap(), loadThangkas()]);
-  buildDecor(ctx);
-  buildBenches(ctx);
-  for (const def of HALLS) buildHall(ctx, def, models, thangkas);
+  // Builders whose output never moves (apart from parts flagged userData.dynamic): merged into big meshes later.
+  const staticRoots: THREE.Object3D[] = [];
+  const staticBuild = <T>(fn: () => T): T => {
+    const before = new Set(scene.children);
+    const r = fn();
+    for (const c of scene.children) if (!before.has(c)) staticRoots.push(c);
+    return r;
+  };
+  staticBuild(() => buildDecor(ctx));
+  staticBuild(() => buildBenches(ctx));
+  staticBuild(() => HALLS.forEach((def) => buildHall(ctx, def, models, thangkas)));
   buildPond(ctx);
   buildWaterfall(ctx);
   buildStream(ctx);
   buildRiverColliders(ctx);
   const stupas = buildStupas(ctx);
   buildPrayerFlags(ctx, stupas);
-  buildDecorations(ctx, stupas);
-  buildLanterns(ctx);
-  buildGardens(ctx, models);
-  const ridge = buildRidgePath(ctx);
-  buildPagodas(ctx);
-  buildHuts(ctx);
+  staticBuild(() => buildDecorations(ctx, stupas));
+  staticBuild(() => buildLanterns(ctx));
+  staticBuild(() => buildGardens(ctx, models));
+  const ridge = staticBuild(() => buildRidgePath(ctx));
+  staticBuild(() => buildPagodas(ctx));
+  staticBuild(() => buildHuts(ctx));
+  staticBuild(() => buildSandGarden(ctx));
   buildKoi(ctx);
   buildLeaves(ctx, camera);
   const { orchard } = buildVegetation(ctx);
@@ -166,8 +177,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const hud: Hud = new Hud(uiEl, {
     onMusic: (on) => ambient.setOn(on),
     onSeatAction: (a) => seat.action(a),
+    onStandAction: (a) => phase === 'play' && !landing && !cloud.riding && !bodhiBell.active && seat.standAction(a),
     onChants: () => chantPanel.show(!chantPanel.isOpen),
-    onFastTravel: () => (insideHall() ? hud.toast(t('travel.inside')) : bigMap.toggle(true)),
+    onFastTravel: () => (insideHall() ? hud.toast(t('travel.inside')) : (seat.endStanding(), bigMap.toggle(true))),
     onMap: () => bigMap.toggle(),
     onPrompt: () => !seat.seated && ctx.interactions.trigger(),
     onBow: () => bow(),
@@ -201,13 +213,17 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   };
   const wildlife = new Wildlife(ctx, net, offerings, player, () => remotes.positions()); // registers the cat before the instruments pick it up
   const instruments = new Instruments(ctx, net, player);
-  const wishes = new WishLanterns(ctx, net, hud, player, uiEl, settings.name);
-  const hallWishes = new HallLanterns(ctx, net, hud, player, uiEl, settings.name);
-  const bodhiBell = new BodhiBell(ctx);
-  wishes.onHung = hallWishes.onHung = () => bodhiBell.ring();
+  const hallWishes = staticBuild(() => new HallLanterns(ctx, net, hud, player, uiEl, settings.name));
+  const bodhiBell = staticBuild(() => new BodhiBell(ctx));
+  hallWishes.onHung = (shot) => bodhiBell.ring(shot);
   buildNightLights(); // every lamp is registered by now
   buildFloodlights(ctx);
-  const bow = (): void => (seat.seated ? seat.bow() : player.gesture("bow", 2.4));
+  // Thousands of small static meshes → a few hundred (draw calls are what phones struggle with).
+  const merged = mergeStatic(scene, staticRoots, { skip: new Set(ctx.detailMeshes), keepForRaycast: new Set(ctx.cameraBlockers) });
+  let rigid = 0;
+  scene.traverse((o) => o.userData.rigid && (rigid += mergeRigid(o)));
+  if (import.meta.env.DEV) console.info(`[static merge] ${merged.before} meshes → ${merged.after}; ${rigid} fewer in moving things`);
+  const bow = (): void => (seat.seated || seat.standingFocus ? seat.bow() : player.gesture("bow", 2.4));
 
   // Networking
   net.on('status', (s) => hud.setStatus(s, remotes.count + 1));
@@ -234,6 +250,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       return true;
     }
     if (e.code === 'KeyB') return !e.repeat && bow(), true;
+    // Standing: 2 beads, 3 sutra (seated, the seat bar handles the number keys).
+    if (!seat.seated && (e.code === 'Digit2' || e.code === 'Digit3')) return !e.repeat && seat.standAction(e.code === 'Digit2' ? 'beads' : 'sutra'), true;
     // Dev preview only: F toggles flying (never in the live build).
     if (import.meta.env.DEV && e.code === 'KeyF' && !e.repeat && !seat.seated && !cloud.riding) {
       player.flying = !player.flying;
@@ -243,7 +261,6 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     }
     if (e.code === 'KeyM') return bigMap.toggle(), true;
     if (e.code === 'Escape' && bigMap.isOpen) return bigMap.show(false), true;
-    if (e.code === 'Escape' && wishes.isOpen) return wishes.close(), true;
     if (e.code === 'Escape' && hallWishes.isOpen) return hallWishes.close(), true;
     if (e.code === 'KeyC') return chantPanel.show(!chantPanel.isOpen), true; // listening works anywhere
     if (e.code === 'Escape' && chantPanel.isOpen) return chantPanel.show(false), true;
@@ -274,13 +291,17 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     if (landing && !cloud.riding) {
       landing = false;
       document.body.classList.remove('intro'); // landed: show the HUD
+      rig.lookAlong(SPAWN.yaw, 0.3, 6); // one slow pan round to face the temple (only after the start trip)
       join();
     }
 
     cloud.update(dt);
     lights.update(dt, player.pos);
+    updateFarCull(dt, camera.position, graphicsLevel() === 'low' ? 1 : 2);
     if (!bodhiBell.active) player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground); // stand still while the bell rings
 
+    // Walking puts standing beads or a sutra away.
+    if (seat.standingFocus && (input.isDown('KeyW', 'KeyA', 'KeyS', 'KeyD') || Math.hypot(input.stick.x, input.stick.y) > 0.3)) seat.endStanding();
     if (bodhiBell.active) hud.setPrompt(null);
     else if (!seat.seated && !cloud.riding && !offerings.busy) {
       const it = ctx.interactions.update(player.pos.x, player.pos.z);
@@ -335,7 +356,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   }
 
   // Debug handle for the console during development.
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, wishes, hallWishes, lights, bodhiBell, setDebugHours, intro };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, hallWishes, lights, bodhiBell, renderer, setDebugHours, intro };
 
   return {
     /** The entry screen's robe picker: recolour the pacing monk. */
@@ -347,11 +368,13 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       player.avatar.setColor(color);
       player.avatar.clasp = false;
       player.avatar.root.name = name;
-      wishes.myName = hallWishes.myName = name;
+      hallWishes.myName = name;
       joinAs = { name, color };
       phase = 'play';
       landing = true;
-      rig.yaw = intro.position ? Math.atan2(-(SPAWN.x - player.pos.x), -(SPAWN.z - player.pos.z)) : 0;
+      // Keep facing the way the start screen looked (out over the valley); the flight doesn't turn the view.
+      const f = camera.getWorldDirection(new THREE.Vector3());
+      rig.setYaw(Math.atan2(-f.x, -f.z));
       if (!cloud.flyTo({ x: SPAWN.x, z: SPAWN.z, yaw: SPAWN.yaw })) {
         player.pos.set(SPAWN.x, ctx.ground.heightAt(SPAWN.x, SPAWN.z), SPAWN.z);
         landing = false;

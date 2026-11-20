@@ -58,6 +58,7 @@ export function buildDecor(ctx: WorldContext) {
   });
   const lanterns = [-2.4, 2.4].map((lx) => {
     const l = buildRedLantern(0.35);
+    l.userData.dynamic = l.userData.rigid = true; // sways as one piece
     l.position.set(x + lx, H - 1.4, z);
     g.add(l);
     return l;

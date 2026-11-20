@@ -69,6 +69,8 @@ export const POSES: Record<Anim, Pose> = {
   reach: { ...STAND, torso: 0.15, head: 0.2, rArm: 1.0, rArmZ: 0.05, rFore: 0.35 },
   cross: CROSS,
   crossBeads: { ...CROSS, rArm: 0.5, rArmZ: 0.05, rFore: 1.7, head: 0.18 },
+  standBeads: { ...STAND, rArm: 0.5, rArmZ: 0.05, rFore: 1.7, head: 0.18 },
+  standRead: { ...STAND, lArm: 0.45, rArm: 0.45, lArmZ: -0.04, rArmZ: 0.04, lFore: 1.55, rFore: 1.55, head: 0.35 },
   crossRead: { ...CROSS, lArm: 0.45, rArm: 0.45, lArmZ: -0.04, rArmZ: 0.04, lFore: 1.55, rFore: 1.55, head: 0.35 },
   crossBow: { ...CROSS, ...HEART, torso: 0.6, head: 0.25 },
 };
