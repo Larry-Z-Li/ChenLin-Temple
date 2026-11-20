@@ -43,6 +43,9 @@ const H = Math.PI / 2;
 const P_DOWN: Pose = { ...STAND, hipY: 0.5, torso: 2.0, head: 0.35, lThigh: 0.3, rThigh: 0.3, lShin: -1.87, rShin: -1.87, lArm: 3.15, rArm: 3.15, lArmZ: -0.35, rArmZ: 0.35, lFore: 0.2, rFore: 0.2, lPalm: -H, rPalm: H };
 
 /** Named poses; the avatar blends smoothly toward whichever is current. Sequences just step through them. */
+/** Arms folded across the middle, hands tucked into the opposite sleeves, villager-style (the entry stroll). */
+const CLASP: Pose = { ...STAND, torso: 0.03, lArm: 0.42, rArm: 0.42, lArmZ: 0.6, rArmZ: -0.6, lFore: 1.15, rFore: 1.15, head: 0.06 };
+
 export const POSES: Record<Anim, Pose> = {
   idle: STAND,
   walk: STAND,
@@ -85,10 +88,21 @@ export class Avatar {
   private phones: THREE.Group | null = null;
   private cloud: THREE.Mesh | null = null;
   anim: Anim = 'idle';
+  /** Walk/stand with hands tucked in the sleeves and no arm swing (local only — the entry stroll). */
+  clasp = false;
+
+  private robeMat: THREE.MeshStandardMaterial;
+  private underMat: THREE.MeshStandardMaterial;
+
+  /** Change the robe colour (the entry screen's robe picker). */
+  setColor(color: string) {
+    this.robeMat.color.set(color);
+    this.underMat.color.set(color).multiplyScalar(0.6);
+  }
 
   constructor(color: string, name?: string) {
-    const robe = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.85 });
-    const under = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.6), roughness: 0.9 });
+    const robe = (this.robeMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.85 }));
+    const under = (this.underMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.6), roughness: 0.9 }));
     const skin = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.7 });
     const mk = (geo: THREE.BufferGeometry, m: THREE.Material | THREE.Material[]) => {
       const mesh = new THREE.Mesh(geo, m);
@@ -220,7 +234,7 @@ export class Avatar {
   }
 
   update(dt: number, speed = 0) {
-    const target = POSES[this.anim];
+    const target = this.clasp && (this.anim === 'walk' || this.anim === 'idle') ? CLASP : POSES[this.anim];
     const p = this.pose;
     const rate = 8;
     for (const k in target) (p as unknown as Record<string, number>)[k] = damp((p as unknown as Record<string, number>)[k], (target as unknown as Record<string, number>)[k], rate, dt);
@@ -246,8 +260,10 @@ export class Avatar {
     j.rThigh.rotation.z = p.rThighZ;
     j.lShin.rotation.z = p.lShinZ;
     j.rShin.rotation.z = p.rShinZ;
-    j.lArm.rotation.x = p.lArm - swing * 0.6;
-    j.rArm.rotation.x = p.rArm + swing * 0.6;
+    const armSwing = this.clasp ? 0 : swing * 0.6;
+    j.lHand.visible = j.rHand.visible = !this.clasp; // hands up the sleeves
+    j.lArm.rotation.x = p.lArm - armSwing;
+    j.rArm.rotation.x = p.rArm + armSwing;
     j.lArm.rotation.z = p.lArmZ;
     j.rArm.rotation.z = p.rArmZ;
     j.lFore.rotation.x = p.lFore;

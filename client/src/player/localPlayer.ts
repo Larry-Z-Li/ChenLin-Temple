@@ -50,13 +50,37 @@ export class LocalPlayer {
     this.mode = 'free';
   }
 
+  /** Free flight for looking around the preview: WASD along the camera, Space up, Q down, Shift ×3. */
+  private fly(dt: number, input: Input, camYaw: number) {
+    let mx = 0, mz = 0, my = 0;
+    if (input.isDown('KeyW', 'ArrowUp')) mz -= 1;
+    if (input.isDown('KeyS', 'ArrowDown')) mz += 1;
+    if (input.isDown('KeyA', 'ArrowLeft')) mx -= 1;
+    if (input.isDown('KeyD', 'ArrowRight')) mx += 1;
+    if (input.isDown('Space')) my += 1;
+    if (input.isDown('KeyQ')) my -= 1;
+    const v = 16 * (input.isDown('ShiftLeft', 'ShiftRight') ? 3 : 1) * dt;
+    const s = Math.sin(camYaw), c = Math.cos(camYaw);
+    this.pos.x += (s * mz + c * mx) * v;
+    this.pos.z += (c * mz - s * mx) * v;
+    this.pos.y += my * v;
+    if (mx || mz) this.yaw = Math.atan2(-(s * mz + c * mx), -(c * mz - s * mx));
+    this.speed = 0;
+    this.avatar.anim = 'idle';
+    this.sync(dt);
+  }
+
   /** Play a gesture for `seconds`; walking cancels it. */
   gesture(anim: Anim, seconds: number) {
     this.gestureAnim = anim;
     this.gestureLeft = seconds;
   }
 
+  /** Dev preview only (F): fly freely, through walls and ground. */
+  flying = false;
+
   update(dt: number, input: Input, camYaw: number, collisions: CollisionWorld, ground: Ground) {
+    if (this.flying && this.mode === 'free') return this.fly(dt, input, camYaw);
     if (this.mode !== 'free') {
       this.avatar.anim = this.anchorAnim;
       this.sync(dt);
@@ -103,6 +127,15 @@ export class LocalPlayer {
     this.gestureLeft -= dt;
     if (this.gestureAnim && this.gestureLeft <= 0) this.gestureAnim = null;
     this.avatar.anim = this.speed > 0.3 ? (this.speed > (WALK + RUN) / 2 ? 'run' : 'walk') : (this.gestureAnim ?? 'idle');
+    this.sync(dt);
+  }
+
+  /** Steer the character directly (the entry screen's pacing monk). */
+  puppet(dt: number, x: number, y: number, z: number, yaw: number, walking: boolean) {
+    this.pos.set(x, y, z);
+    this.yaw = yaw;
+    this.speed = walking ? 1.2 : 0;
+    this.avatar.anim = walking ? 'walk' : 'idle';
     this.sync(dt);
   }
 

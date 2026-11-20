@@ -1,8 +1,9 @@
 /** English strings. Other locales mirror these keys (missing keys fall back to English). */
 const en = {
   'app.title': 'Chenlin Academy',
-  'app.subtitle': 'A quiet place to practice together',
+  'app.subtitle': 'Kindle the light, boundless merit',
 
+  'entry.kicker': 'Ten Thousand Buddha Stupa · 萬佛寶塔',
   'entry.name': 'Your name',
   'entry.namePlaceholder': 'Pilgrim',
   'entry.robe': 'Robe colour',

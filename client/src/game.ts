@@ -21,8 +21,8 @@ import { buildPagodas } from './buildings/pagodas';
 import { buildMapBoard } from './buildings/mapBoard';
 import { PrayerWheels } from './buildings/prayerWheels';
 import { buildStupas } from './buildings/stupas';
-import { BASIN, BODHI_TREE, CHERRY_GROVE, HALLS, hallHalf, PLAZA } from './config/layout';
-import { graphicsLevel, isTouchDevice } from './config/settings';
+import { BASIN, BODHI_TREE, CHERRY_GROVE, HALLS, hallHalf, PLAZA, SPAWN } from './config/layout';
+import { graphicsLevel, isTouchDevice, settings } from './config/settings';
 import { loadModelMap, loadThangkas } from './content/manifest';
 import { CollisionWorld } from './core/collisions';
 import type { WorldContext } from './core/context';
@@ -37,7 +37,8 @@ import { LocalPlayer } from './player/localPlayer';
 import { Hud } from './ui/hud';
 import { BigMap, Minimap } from './ui/minimap';
 import { mountJoystick } from './ui/touch';
-import { buildGardens } from './world/gardens';
+import { buildGardens, buildRidgePath } from './world/gardens';
+import { Intro } from './world/intro';
 import { buildKoi } from './world/koi';
 import { buildLanterns } from './world/lanterns';
 import { buildLeaves } from './world/leaves';
@@ -48,8 +49,16 @@ import { buildVegetation } from './world/vegetation';
 import { Wildlife } from './world/wildlife';
 import { buildPond, buildRiverColliders, buildStream, buildWaterfall } from './world/water';
 
-export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: string, color: string) {
-  unlockAudio();
+/**
+ * Build the world and start rendering. It opens on the entry screen's intro (your monk pacing on the
+ * mountain path); `enter()` connects you and flies him down to the plaza by cloud.
+ */
+export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
+  let phase: 'intro' | 'play' = 'intro';
+  let landing = false;
+  /** Name and robe to join with — held back until the cloud lands at the gate, so nobody sees the walk or the flight. */
+  let joinAs: { name: string; color: string } | null = null;
+  document.body.classList.add('intro');
 
   // ---------- Renderer / scene ----------
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -97,6 +106,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   buildDecorations(ctx, stupas);
   buildLanterns(ctx);
   buildGardens(ctx, models);
+  const ridge = buildRidgePath(ctx, stupas);
   buildPagodas(ctx);
   buildHuts(ctx);
   buildKoi(ctx);
@@ -120,7 +130,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   // ---------- Systems ----------
   const input = new Input();
   const net = new NetClient();
-  const player = new LocalPlayer(color, name);
+  const player = new LocalPlayer(settings.color, settings.name);
   player.pos.y = ctx.ground.heightAt(player.pos.x, player.pos.z);
   scene.add(player.avatar.root);
   const rig = new CameraRig(camera, renderer.domElement);
@@ -184,7 +194,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   };
   const wildlife = new Wildlife(ctx, net, offerings, player, () => remotes.positions()); // registers the cat before the instruments pick it up
   const instruments = new Instruments(ctx, net, player);
-  const wishes = new WishLanterns(ctx, net, hud, player, uiEl, name);
+  const wishes = new WishLanterns(ctx, net, hud, player, uiEl, settings.name);
   const bow = (): void => (seat.seated ? seat.bow() : player.gesture("bow", 2.4));
 
   // Networking
@@ -203,15 +213,22 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
     hud.setStatus(net.status, remotes.count + 1);
   });
   net.on('snap', (tr) => remotes.applySnapshot(tr));
-  net.connect(name, color);
 
   // Global keys (lowest priority — the seat handler, registered after, gets first pick while seated)
   input.onKey((e) => {
+    if (phase !== 'play' || landing) return false; // the entry screen and the flight down
     if (e.code === 'KeyE') {
       if (!e.repeat) ctx.interactions.trigger(); // each tap counts; holding doesn't auto-push
       return true;
     }
     if (e.code === 'KeyB') return !e.repeat && bow(), true;
+    // Dev preview only: F toggles flying (never in the live build).
+    if (import.meta.env.DEV && e.code === 'KeyF' && !e.repeat && !seat.seated && !cloud.riding) {
+      player.flying = !player.flying;
+      if (!player.flying) player.pos.y = ctx.ground.heightAt(player.pos.x, player.pos.z);
+      hud.toast(player.flying ? 'Flying (dev): WASD · Space up · Q down · Shift fast · F to land' : 'Landed');
+      return true;
+    }
     if (e.code === 'KeyM') return bigMap.toggle(), true;
     if (e.code === 'Escape' && bigMap.isOpen) return bigMap.show(false), true;
     if (e.code === 'Escape' && wishes.isOpen) return wishes.close(), true;
@@ -226,9 +243,25 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   // ---------- Loop ----------
   const clock = new THREE.Clock();
   let sendAcc = 0, mapAcc = 0, lastSent = '';
+  const intro = new Intro(ctx, camera, player, ridge);
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.1);
     const time = clock.elapsedTime;
+
+    if (phase === 'intro') {
+      intro.update(dt);
+      for (const u of ctx.updaters) u(dt, time);
+      remotes.update(dt, camera);
+      sky.update(dt);
+      sky.follow(player.pos);
+      renderer.render(scene, camera);
+      return;
+    }
+    if (landing && !cloud.riding) {
+      landing = false;
+      document.body.classList.remove('intro'); // landed: show the HUD
+      join();
+    }
 
     cloud.update(dt);
     player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground);
@@ -276,6 +309,38 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
     renderer.render(scene, camera);
   });
 
+  /** Go online (others start seeing you) — only once you're standing at the gate. */
+  function join() {
+    if (!joinAs) return;
+    net.connect(joinAs.name, joinAs.color);
+    joinAs = null;
+    lastSent = ''; // send where we are straight away
+  }
+
   // Debug handle for the console during development.
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, wishes, setDebugHours };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, wishes, setDebugHours, intro };
+
+  return {
+    /** The entry screen's robe picker: recolour the pacing monk. */
+    preview: (color: string) => player.avatar.setColor(color),
+    /** Enter: fly the monk down from the mountain to the gate by cloud, then go online. */
+    enter(name: string, color: string) {
+      unlockAudio();
+      ambient.setOn(settings.musicOn);
+      player.avatar.setColor(color);
+      player.avatar.clasp = false;
+      player.avatar.root.name = name;
+      wishes.myName = name;
+      joinAs = { name, color };
+      phase = 'play';
+      landing = true;
+      rig.yaw = intro.position ? Math.atan2(-(SPAWN.x - player.pos.x), -(SPAWN.z - player.pos.z)) : 0;
+      if (!cloud.flyTo({ x: SPAWN.x, z: SPAWN.z, yaw: SPAWN.yaw })) {
+        player.pos.set(SPAWN.x, ctx.ground.heightAt(SPAWN.x, SPAWN.z), SPAWN.z);
+        landing = false;
+        document.body.classList.remove('intro');
+        join();
+      }
+    },
+  };
 }

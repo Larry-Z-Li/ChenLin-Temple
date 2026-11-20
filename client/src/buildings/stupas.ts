@@ -17,7 +17,7 @@ const disc = (rt: number, rb: number, h: number, y: number, seg = 20) => new THR
 
 /** Tibetan-style chörten, ~10 m: stepped base, vase dome, harmika, 13-ring spire, parasol, finial. */
 function stupaGeometries() {
-  const stone = merge([slab(6.6, 3, -3)]); // foundation, buried into slopes
+  const stone = merge([slab(6.8, 8, -8)]); // stone terrace under the base, deep enough for steep slopes
   const white = merge([
     slab(6.2, 1.0, 0),
     slab(5.2, 0.8, 1.0),
@@ -80,10 +80,11 @@ export function buildStupas(ctx: WorldContext) {
       az += 14 / r;
       continue;
     }
-    // Sit on the lowest corner so the base never floats; the foundation hides the uphill side.
-    let y = Infinity;
-    for (const [dx, dz] of [[0, 0], [3, 3], [-3, 3], [3, -3], [-3, -3]]) y = Math.min(y, terrainHeight(p.x + dx, p.z + dz));
-    spots.push({ ...p, y: y - 0.2, yaw: Math.atan2(BASIN.x - p.x, BASIN.z - p.z) + range(rng, -0.25, 0.25), s: range(rng, 0.9, 1.1) });
+    // Sit on the highest point under the base so the whitewash is never buried in the slope;
+    // the stone terrace below fills in down to the ground on the downhill side.
+    let y = terrainHeight(p.x, p.z);
+    for (let k = 0; k < 12; k++) y = Math.max(y, terrainHeight(p.x + Math.cos(k * 0.5236) * 4.4, p.z + Math.sin(k * 0.5236) * 4.4));
+    spots.push({ ...p, y: y + 0.05, yaw: Math.atan2(BASIN.x - p.x, BASIN.z - p.z) + range(rng, -0.25, 0.25), s: range(rng, 0.9, 1.1) });
     // Irregular spacing: mostly 12–26 m, sometimes a close pair, sometimes a longer gap.
     const roll = rng();
     const gap = roll < 0.18 ? range(rng, 7, 10) : roll < 0.85 ? range(rng, 12, 26) : range(rng, 32, 48);

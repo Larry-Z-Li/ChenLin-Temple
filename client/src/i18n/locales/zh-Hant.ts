@@ -3,8 +3,9 @@ import type { I18nKey } from './en';
 /** 繁體中文 (default locale). Must cover every key in en.ts. */
 const zhHant: Record<I18nKey, string> = {
   'app.title': '辰霖學院',
-  'app.subtitle': '一同修行的寧靜之處',
+  'app.subtitle': '點然光明，功德無量',
 
+  'entry.kicker': 'Chenlin Academy · 萬佛寶塔',
   'entry.name': '您的名字',
   'entry.namePlaceholder': '行者',
   'entry.robe': '袍服顏色',

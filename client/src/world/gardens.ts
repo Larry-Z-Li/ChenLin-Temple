@@ -6,8 +6,9 @@ import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
 import { canvasTexture } from '../core/textures';
 import { inscription, onLocaleChange, t } from '../i18n';
-import { smallStupa } from '../buildings/stupas';
+import { smallStupa, type StupaSpot } from '../buildings/stupas';
 import { buildStatueSlot } from '../buildings/statue';
+import { addClearing } from './zones';
 
 const ROCK = new THREE.MeshStandardMaterial({ color: 0x77736c, roughness: 1, flatShading: true });
 
@@ -345,4 +346,23 @@ function buildPavilion(ctx: WorldContext) {
   st.position.set(P.x, FLOOR + 0.25, P.z);
   ctx.scene.add(st);
   ctx.collisions.addCircle(P.x, P.z, 0.85);
+}
+
+/**
+ * A walking path along the mountain ridge, just uphill of the line of stupas (the entry
+ * screen's monk paces on it). Returns its points.
+ */
+export function buildRidgePath(ctx: WorldContext, stupas: StupaSpot[]): [number, number][] {
+  const c = STUPA_COURT;
+  const pts = stupas.map((st): [number, number] => {
+    const dx = c.x - st.x, dz = c.z - st.z, l = Math.hypot(dx, dz) || 1;
+    return [st.x - (dx / l) * (6.5 + 2 * st.s), st.z - (dz / l) * (6.5 + 2 * st.s)];
+  });
+  if (pts.length > 1) gravelRibbon(ctx, pts, 0.6);
+  // Keep the forest off the walk so the entry shot has a clear line along it.
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, az] = pts[i - 1], [bx, bz] = pts[i], n = Math.ceil(Math.hypot(bx - ax, bz - az) / 3);
+    for (let k = 0; k <= n; k++) addClearing(ax + ((bx - ax) * k) / n, az + ((bz - az) * k) / n, 5);
+  }
+  return pts;
 }

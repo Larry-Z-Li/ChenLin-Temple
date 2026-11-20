@@ -45,7 +45,7 @@ export class WishLanterns {
   private pendingTitle: string | null = null;
   private hidden = new THREE.Matrix4().makeScale(0, 0, 0);
 
-  constructor(private ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, private myName: string) {
+  constructor(private ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string) {
     this.buildGarden();
 
     // Lanterns: one instance per hook, hidden until a wish hangs there.
