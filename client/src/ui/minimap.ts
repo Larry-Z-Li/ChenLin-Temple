@@ -16,6 +16,8 @@ export class Minimap {
     this.el.width = this.el.height = this.size * this.dpr;
     this.g = this.el.getContext('2d')!;
     parent.append(this.el);
+    // Phones get a round map button here instead (CSS shows one or the other).
+    parent.append(h('button', { class: 'minimap-btn', i18n: 'hud.map', onclick: onClick }));
   }
 
   draw(me: THREE.Vector3, myYaw: number, others: THREE.Vector3[]) {

@@ -12,8 +12,8 @@ import type { SutraReader } from './sutraReader';
 const SEAT_KINDS: Record<Seat['kind'], { focuses: Focus[]; anim: Record<Focus, Anim>; bow: Anim; camPitch: number; camDist: number }> = {
   cushion: {
     focuses: ['beads', 'sutra', 'prostrate'],
-    anim: { none: 'kneel', beads: 'beads', sutra: 'read', prostrate: 'kneel' },
-    bow: 'kneelBow', camPitch: 0.18, camDist: 3.4,
+    anim: { none: 'cross', beads: 'crossBeads', sutra: 'crossRead', prostrate: 'cross' }, // sitting cross-legged
+    bow: 'crossBow', camPitch: 0.18, camDist: 3.4,
   },
   bench: {
     focuses: ['beads', 'sutra'],
@@ -199,7 +199,7 @@ export class SeatSession {
         p.t = 0;
         if (++p.step >= PROSTRATION.length) {
           p.step = 0;
-          if (++p.rep >= PROSTRATION_REPS) return this.setFocus('none'); // remain kneeling
+          if (++p.rep >= PROSTRATION_REPS) return this.setFocus('none'); // back to sitting
         }
       }
       this.d.player.setAnchorAnim(PROSTRATION[p.step][0]);

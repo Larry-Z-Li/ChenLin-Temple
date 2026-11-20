@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { bell } from '../audio/sfx';
-import { saveSettings, settings } from '../config/settings';
+import { isTouchDevice, saveSettings, settings } from '../config/settings';
 import { damp } from '../core/math';
 import { glowTexture } from '../core/textures';
 
 export const BEAD_COUNT = 108;
 const SLOTS = BEAD_COUNT + 1; // +1 gap for the guru bead
 const A = 0.11, B = 0.5; // ellipse half-axes (m), camera space
+const DEPTH = 0.95, BEAD_R = 0.0098;
 
 /**
  * A 108-bead mala shown in front of the camera. ← / → slide it by exactly one bead with smooth easing;
@@ -24,7 +25,9 @@ export class Mala {
   private materials: THREE.Material[] = [];
   onCount?: (count: number, round: number) => void;
 
-  constructor(camera: THREE.Camera) {
+  private baseY = -0.62;
+
+  constructor(private camera: THREE.PerspectiveCamera) {
     const wood = new THREE.MeshStandardMaterial({ color: 0x6b2f1a, roughness: 0.4, emissive: 0x1a0a04, transparent: true });
     const beadMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, emissive: 0x1a0a04, transparent: true });
     this.materials.push(wood, beadMat);
@@ -96,6 +99,19 @@ export class Mala {
     this.guru.position.copy(p);
   }
 
+  /**
+   * Size and place the mala from the real screen: each bead about 22 px on phones (16 on desktop),
+   * the counting bead a little below the middle, and the string kept on screen in portrait.
+   */
+  private fit() {
+    const halfH = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * DEPTH, halfW = halfH * this.camera.aspect;
+    const px = isTouchDevice ? 22 : 16;
+    const s = THREE.MathUtils.clamp((px * halfH) / (BEAD_R * window.innerHeight), 0.8, 3.4);
+    this.group.scale.setScalar(s);
+    this.baseY = -0.22 * halfH - B * s; // the bead under the thumb sits just below centre
+    this.group.position.x = Math.min(halfW * 0.35, halfW - A * s * 1.6);
+  }
+
   update(dt: number) {
     this.fade = damp(this.fade, this.visible ? 1 : 0, 8, dt);
     if (!this.visible && this.fade < 0.01) {
@@ -103,7 +119,8 @@ export class Mala {
       return;
     }
     this.materials.forEach((m) => (m.opacity = this.fade * (m instanceof THREE.SpriteMaterial ? 0.35 : 1)));
-    this.group.position.y = -0.62 - (1 - this.fade) * 0.25;
+    this.fit();
+    this.group.position.y = this.baseY - (1 - this.fade) * 0.25 * this.group.scale.y;
     if (Math.abs(this.offset - this.target) > 1e-4) {
       this.offset = damp(this.offset, this.target, 14, dt);
       if (Math.abs(this.offset - this.target) < 0.002) this.offset = this.target;

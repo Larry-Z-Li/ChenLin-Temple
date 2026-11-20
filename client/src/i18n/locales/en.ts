@@ -129,6 +129,7 @@ const en = {
   'map.w': 'W',
   'map.title': 'Temple Map',
   'map.travelTitle': 'Fast travel — tap a place to fly there',
+  'travel.inside': 'Step outside the hall first, then fly by cloud.',
   'travel.standUp': 'Stand up first to fly somewhere.',
   'map.here': 'You are here',
   'map.pond': 'Release Pond',

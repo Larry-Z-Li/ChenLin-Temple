@@ -131,6 +131,7 @@ const zhHant: Record<I18nKey, string> = {
   'map.w': '西',
   'map.title': '辰霖學院全圖',
   'map.travelTitle': '快速傳送 — 點選目的地即可乘雲前往',
+  'travel.inside': '請先走出殿外，再乘雲前往。',
   'travel.standUp': '請先起身再乘雲前往。',
   'map.here': '您在此',
   'map.pond': '放生池',

@@ -21,7 +21,7 @@ import { buildPagodas } from './buildings/pagodas';
 import { buildMapBoard } from './buildings/mapBoard';
 import { PrayerWheels } from './buildings/prayerWheels';
 import { buildStupas } from './buildings/stupas';
-import { BASIN, BODHI_TREE, CHERRY_GROVE, HALLS, PLAZA } from './config/layout';
+import { BASIN, BODHI_TREE, CHERRY_GROVE, HALLS, hallHalf, PLAZA } from './config/layout';
 import { graphicsLevel, isTouchDevice } from './config/settings';
 import { loadModelMap, loadThangkas } from './content/manifest';
 import { CollisionWorld } from './core/collisions';
@@ -140,12 +140,17 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
 
   const bigMap = new BigMap(uiEl);
   const minimap = new Minimap(uiEl, () => bigMap.toggle());
+  /** No flying from inside a hall: step outside first. */
+  const insideHall = () => HALLS.some((h) => {
+    const [ex, ez] = hallHalf(h);
+    return Math.abs(player.pos.x - h.x) < ex && Math.abs(player.pos.z - h.z) < ez;
+  });
   buildMapBoard(ctx, () => bigMap.show(true));
   const hud: Hud = new Hud(uiEl, {
     onMusic: (on) => ambient.setOn(on),
     onSeatAction: (a) => seat.action(a),
     onChants: () => chantPanel.show(!chantPanel.isOpen),
-    onFastTravel: () => bigMap.toggle(true),
+    onFastTravel: () => (insideHall() ? hud.toast(t('travel.inside')) : bigMap.toggle(true)),
     onMap: () => bigMap.toggle(),
     onPrompt: () => !seat.seated && ctx.interactions.trigger(),
     onBow: () => bow(),
@@ -173,6 +178,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement, name: str
   const offerings = new Offerings(ctx, net, hud, orchard, player);
   const cloud = new CloudRide(ctx, player, rig, hud);
   bigMap.onTravel = (spot) => {
+    if (insideHall()) return hud.toast(t('travel.inside'));
     if (seat.seated || player.mode !== 'free') return hud.toast(t('travel.standUp'));
     cloud.flyTo(spot.arrive);
   };

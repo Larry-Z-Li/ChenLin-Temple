@@ -10,6 +10,9 @@ export interface Pose {
   torso: number;
   lThigh: number; rThigh: number;
   lShin: number; rShin: number;
+  /** Sideways bends (outward splay at the hip, inward turn at the knee), for sitting cross-legged. */
+  lThighZ: number; rThighZ: number;
+  lShinZ: number; rShinZ: number;
   lArm: number; rArm: number;
   lArmZ: number; rArmZ: number;
   lFore: number; rFore: number;
@@ -18,12 +21,20 @@ export interface Pose {
   head: number;
 }
 
-const STAND: Pose = { hipY: 0.92, torso: 0, lThigh: 0, rThigh: 0, lShin: 0, rShin: 0, lArm: 0.05, rArm: 0.05, lArmZ: -0.08, rArmZ: 0.08, lFore: 0.15, rFore: 0.15, lPalm: 0, rPalm: 0, head: 0 };
+const STAND: Pose = { hipY: 0.92, torso: 0, lThigh: 0, rThigh: 0, lShin: 0, rShin: 0, lThighZ: 0, rThighZ: 0, lShinZ: 0, rShinZ: 0, lArm: 0.05, rArm: 0.05, lArmZ: -0.08, rArmZ: 0.08, lFore: 0.15, rFore: 0.15, lPalm: 0, rPalm: 0, head: 0 };
 // Seiza: knees forward on the cushion, shins folded back underneath, hands resting in the lap.
 const KNEEL: Pose = { ...STAND, hipY: 0.42, torso: 0.04, lThigh: 1.2, rThigh: 1.2, lShin: -2.7, rShin: -2.7, lArm: 0.35, rArm: 0.35, lArmZ: -0.1, rArmZ: 0.1, lFore: 1.25, rFore: 1.25, head: 0.08 };
 
 // Sitting on a bench: thighs level, shins hanging, hands resting on the knees.
 const SIT: Pose = { ...STAND, hipY: 0.53, torso: 0.02, lThigh: 1.57, rThigh: 1.57, lShin: -1.57, rShin: -1.57, lArm: 0.3, rArm: 0.3, lArmZ: -0.1, rArmZ: 0.1, lFore: 0.9, rFore: 0.9, head: 0.05 };
+
+// Sitting cross-legged on a cushion: knees out to the sides, shins crossed in front, hands in the lap.
+const CROSS: Pose = {
+  ...STAND, hipY: 0.15, torso: 0.02, head: 0.06,
+  lThigh: 1.62, rThigh: 1.62, lThighZ: -0.78, rThighZ: 0.78,
+  lShin: -2.25, rShin: -2.25, lShinZ: 0.95, rShinZ: -0.95,
+  lArm: 0.42, rArm: 0.42, lArmZ: -0.06, rArmZ: 0.06, lFore: 1.15, rFore: 1.15,
+};
 
 // Palms pressed together at the heart (合掌).
 const HEART = { lArm: 0.6, rArm: 0.6, lArmZ: 0.45, rArmZ: -0.45, lFore: 1.5, rFore: 1.5 };
@@ -53,6 +64,10 @@ export const POSES: Record<Anim, Pose> = {
   pDown: P_DOWN,
   pUp: { ...P_DOWN, lPalm: H, rPalm: -H },
   reach: { ...STAND, torso: 0.15, head: 0.2, rArm: 1.0, rArmZ: 0.05, rFore: 0.35 },
+  cross: CROSS,
+  crossBeads: { ...CROSS, rArm: 0.5, rArmZ: 0.05, rFore: 1.7, head: 0.18 },
+  crossRead: { ...CROSS, lArm: 0.45, rArm: 0.45, lArmZ: -0.04, rArmZ: 0.04, lFore: 1.55, rFore: 1.55, head: 0.35 },
+  crossBow: { ...CROSS, ...HEART, torso: 0.6, head: 0.25 },
 };
 
 const SKIN = 0xd8a982;
@@ -227,6 +242,10 @@ export class Avatar {
     j.rThigh.rotation.x = p.rThigh - swing;
     j.lShin.rotation.x = p.lShin - Math.max(0, -swing) * 0.9;
     j.rShin.rotation.x = p.rShin - Math.max(0, swing) * 0.9;
+    j.lThigh.rotation.z = p.lThighZ;
+    j.rThigh.rotation.z = p.rThighZ;
+    j.lShin.rotation.z = p.lShinZ;
+    j.rShin.rotation.z = p.rShinZ;
     j.lArm.rotation.x = p.lArm - swing * 0.6;
     j.rArm.rotation.x = p.rArm + swing * 0.6;
     j.lArm.rotation.z = p.lArmZ;

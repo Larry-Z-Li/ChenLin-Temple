@@ -13,6 +13,10 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1510; color: var(--ink); font-family: var(--sans); }
+/* Phones: no double-tap or pinch zoom of the page (taps on bead/HUD buttons must count, not zoom). */
+* { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button, .hud { -webkit-user-select: none; user-select: none; }
+input, textarea { -webkit-user-select: text; user-select: text; }
 #app canvas { display: block; touch-action: none; cursor: grab; }
 #app canvas:active { cursor: grabbing; }
 button { font: inherit; color: inherit; }
@@ -125,6 +129,17 @@ body.touch .quick-actions { bottom: 160px; }
 body.touch .inventory { bottom: 212px; left: 24px; }
 body.touch .chant-panel { bottom: 252px; left: 24px; }
 body.touch .seatbar { bottom: 16px; }
+/* Phones on their side: the screen is short, so the bottom bar sits at the bottom edge (right of the joystick). */
+@media (orientation: landscape) and (max-height: 540px) {
+  body.touch .quick-actions { bottom: 12px; }
+  body.touch .inventory { bottom: 156px; }
+  body.touch .chant-panel { bottom: 68px; left: 160px; max-height: 62vh; }
+  body.touch .prompt { bottom: 70px; }
+}
+/* Phones: a map button instead of the corner minimap. */
+.minimap-btn { display: none; }
+body.touch .minimap { display: none; }
+body.touch .minimap-btn { display: grid; place-items: center; position: fixed; right: 16px; bottom: 24px; width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--panel-border); background: var(--panel); color: var(--ink); font: 600 14px var(--serif); backdrop-filter: blur(8px); }
 
 @media (max-width: 640px) {
   .minimap { width: 120px; height: 120px; }

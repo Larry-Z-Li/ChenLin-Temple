@@ -1,4 +1,7 @@
 import './styles.css';
+
+// iOS Safari ignores user-scalable=no: stop its page pinch/double-tap zoom so rapid taps (bead counting) don't zoom.
+for (const ev of ['gesturestart', 'gesturechange', 'dblclick'] as const) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
 import { settings } from './config/settings';
 import { setLocale } from './i18n';
 import { showEntry } from './ui/entry';

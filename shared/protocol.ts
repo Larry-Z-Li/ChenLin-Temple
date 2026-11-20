@@ -1,6 +1,6 @@
 // Wire protocol shared by client and server. Keep this file dependency-free.
 
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -13,6 +13,8 @@ export const ANIMS = [
   // Prostration keyframes: palms at crown / mouth / heart, kneel upright, forehead down (palms down), palms up
   'pCrown', 'pMouth', 'pHeart', 'pKneelUp', 'pDown', 'pUp',
   'reach', // reaching to the offering table (incense)
+  // sitting cross-legged on a cushion: plain, with beads, reading, bowing
+  'cross', 'crossBeads', 'crossRead', 'crossBow',
 ] as const;
 export type Anim = (typeof ANIMS)[number];
 
