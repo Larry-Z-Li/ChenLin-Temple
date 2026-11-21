@@ -1,6 +1,7 @@
-// Wire protocol shared by client and server. Keep this file dependency-free.
+// Wire protocol shared by client and server. No outside dependencies (only ./moderation, beside it).
+import { isBlocked } from './moderation';
 
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -100,6 +101,9 @@ export interface Wish {
   at: number;
 }
 
+/** slow: your cooldown · busy: many lanterns just went up · limit: you have enough up already · blocked: the word filter. */
+export type WishDenyReason = 'slow' | 'empty' | 'full' | 'blocked' | 'limit' | 'busy';
+
 export type ClientMsg =
   | { t: 'hello'; v: number; name: string; color: string }
   | { t: 'move'; tr: Transform }
@@ -110,6 +114,8 @@ export type ClientMsg =
   | { t: 'strike'; inst: string }
   /** `side`: the hall's left (0) or right (1) wall. */
   | { t: 'wish'; title: string; text: string; color: number; board?: WishBoard; side?: number }
+  /** Flag a lantern as unkind; enough different people and it comes down. */
+  | { t: 'report'; id: string }
   /** Give one fruit from your basket to a deer (they eat any kind). */
   | { t: 'feed'; deer: string; fruit: Fruit }
   | { t: 'offer'; hall: string; kind: 'incense' }
@@ -143,7 +149,7 @@ export type ServerMsg =
   | { t: 'strike'; inst: string; by: string }
   | { t: 'wishAdded'; wish: Wish }
   | { t: 'wishRemoved'; id: string }
-  | { t: 'wishDenied'; reason: 'slow' | 'empty' | 'full' }
+  | { t: 'wishDenied'; reason: WishDenyReason }
   | { t: 'fed'; deer: string; by: string; fruit: Fruit }
   | { t: 'pickDenied'; fruit: string; reason: 'gone' | 'full' }
   | { t: 'offered'; hall: string; offering: Offering; by: string }
@@ -161,16 +167,19 @@ export const COLOR_RE = /^#[0-9a-f]{6}$/i;
 export const isFruit = (v: unknown): v is Fruit => typeof v === 'string' && (FRUITS as readonly string[]).includes(v);
 
 /** Free text (wish titles and wishes): no control chars or angle brackets, trimmed, length-capped. */
+/** Zero-width and text-direction characters (used to fake names or hide words). */
+const INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g;
+
 export function sanitizeText(raw: unknown, max: number): string {
   if (typeof raw !== 'string') return '';
-  return [...raw.replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/[ \t]+/g, ' ').trim()].slice(0, max).join('');
+  return [...raw.replace(INVISIBLE, '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/[ \t]+/g, ' ').trim()].slice(0, max).join('');
 }
 
 export function sanitizeName(raw: unknown): string {
   if (typeof raw !== 'string') return 'Pilgrim';
   // Strip control chars and angle brackets; collapse whitespace.
-  const clean = raw.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
-  return clean.slice(0, MAX_NAME_LEN) || 'Pilgrim';
+  const clean = raw.replace(INVISIBLE, '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, MAX_NAME_LEN);
+  return clean && !isBlocked(clean) ? clean : 'Pilgrim';
 }
 
 export function isTransform(v: unknown): v is Transform {

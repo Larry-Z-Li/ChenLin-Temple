@@ -11,6 +11,9 @@ export function cullFar(obj: THREE.Object3D, dist: number) {
   items.push({ obj, dist });
 }
 
+/** Everything registered (they wander, so other culling leaves them alone). */
+export const farCulled = () => items.map((it) => it.obj);
+
 /** `scale` widens the distances (e.g. 2 on high graphics). */
 export function updateFarCull(dt: number, eye: THREE.Vector3, scale: number) {
   if ((acc += dt) < 0.3) return;

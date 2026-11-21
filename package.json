@@ -10,10 +10,12 @@
     "dev": "concurrently -k -n server,client -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client",
     "start": "npm run start -w server",
-    "typecheck": "npm run typecheck -w client && npm run typecheck -w server"
+    "typecheck": "npm run typecheck -w client && npm run typecheck -w server",
+    "tour": "node scripts/tour.mjs"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "puppeteer-core": "^23.10.4"
   },
   "engines": {
     "node": ">=20"

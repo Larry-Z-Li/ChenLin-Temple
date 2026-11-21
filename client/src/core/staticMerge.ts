@@ -14,7 +14,11 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
  * their colour is baked into vertex colours, so a white wall, a red column and a gold trim with the
  * same finish become one mesh.
  */
-export function mergeStatic(scene: THREE.Scene, roots: THREE.Object3D[], opts: { skip: Set<THREE.Object3D>; keepForRaycast: Set<THREE.Object3D> }) {
+export function mergeStatic(
+  scene: THREE.Scene,
+  roots: THREE.Object3D[],
+  opts: { skip: Set<THREE.Object3D>; keepForRaycast: Set<THREE.Object3D>; /** Never merge across these (e.g. a hall's inside and outside). */ zone?: (m: THREE.Mesh) => number },
+) {
   const CELL = 96;
   const found: { m: THREE.Mesh; root: THREE.Object3D }[] = [];
   const perRoot = new Map<THREE.Object3D, number>();
@@ -35,7 +39,7 @@ export function mergeStatic(scene: THREE.Scene, roots: THREE.Object3D[], opts: {
   for (const { m, root } of found) {
     const p = new THREE.Vector3().setFromMatrixPosition(m.matrixWorld);
     const where = (perRoot.get(root) ?? 0) >= 20 ? root.uuid : `${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`;
-    const key = `${matKey(m.material as THREE.Material)}|${m.castShadow ? 1 : 0}${m.receiveShadow ? 1 : 0}|${where}`;
+    const key = `${matKey(m.material as THREE.Material)}|${m.castShadow ? 1 : 0}${m.receiveShadow ? 1 : 0}|${where}|${opts.zone?.(m) ?? 0}`;
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(m);
   }
 

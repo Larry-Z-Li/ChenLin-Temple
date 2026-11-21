@@ -38,6 +38,8 @@ export class HallLanterns {
   private panel: HTMLElement;
   private pending: string | null = null;
   private page = 0;
+  /** Lanterns you've reported this visit. */
+  private reported = new Set<string>();
   private hidden = new THREE.Matrix4().makeScale(0, 0, 0);
   /** Your own lantern just went up (the great bell rings for you, and the camera visits it). */
   onHung: (shot: LanternShot) => void = () => {};
@@ -127,7 +129,7 @@ export class HallLanterns {
     net.on('wishDenied', (reason) => {
       if (this.pending === null) return; // the garden's desk
       this.pending = null;
-      this.hud.toast(t(reason === 'full' ? 'hallWish.full' : reason === 'slow' ? 'wish.slow' : 'wish.empty'));
+      this.hud.toast(t(reason === 'full' ? 'hallWish.full' : reason === 'empty' ? 'wish.empty' : (`wish.${reason}` as const)));
     });
 
     // Gentle sway.
@@ -232,7 +234,17 @@ export class HallLanterns {
     const pages = Math.max(1, Math.ceil(all.length / PAGE));
     this.page = Math.max(0, Math.min(pages - 1, page));
     const rows = all.slice(this.page * PAGE, this.page * PAGE + PAGE).map((w) => {
-      const more = h('div', { class: 'wishlist-more' }, w.text ? h('p', { class: 'wish-body' }, w.text) : null, h('div', { class: 'wish-meta' }, wishMeta(w)));
+      // Report: anyone's but your own; enough different people and the server takes it down.
+      const report = w.name === this.myName ? null : (h('button', { class: 'wish-report', disabled: this.reported.has(w.id), i18n: this.reported.has(w.id) ? 'wish.reported' : 'wish.report' }) as HTMLButtonElement);
+      report?.addEventListener('click', () => {
+        this.reported.add(w.id);
+        this.net.reportWish(w.id);
+        report.disabled = true;
+        report.dataset.i18n = 'wish.reported';
+        report.textContent = t('wish.reported');
+        this.hud.toast(t('wish.reportThanks'));
+      });
+      const more = h('div', { class: 'wishlist-more' }, w.text ? h('p', { class: 'wish-body' }, w.text) : null, h('div', { class: 'wish-meta' }, wishMeta(w)), report);
       const row = h('div', { class: 'wishlist-row' },
         h('button', { class: 'wishlist-head', onclick: () => row.classList.toggle('open') },
           h('span', { class: 'wishlist-dot', style: `background:#${lanternHex(w.color).toString(16).padStart(6, '0')}` }),

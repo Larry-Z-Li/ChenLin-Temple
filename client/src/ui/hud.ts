@@ -37,6 +37,8 @@ export class Hud {
   private help: HTMLElement;
   private settingsPanel: HTMLElement;
   private gfxBtns: Record<'high' | 'low', HTMLButtonElement>;
+  private fpsBtns: Record<'on' | 'off', HTMLElement>;
+  private fpsEl = h('div', { class: 'fps hidden' });
   private todBtns: Record<'temple' | 'day', HTMLButtonElement>;
   private inventory: HTMLElement;
   private beadBtns: HTMLElement;
@@ -86,6 +88,13 @@ export class Hud {
         refreshSky();
       } });
     this.todBtns = { temple: tod('temple', 'settings.templeTime'), day: tod('day', 'settings.alwaysDay') };
+    const fps = (on: boolean, key: I18nKey) =>
+      h('button', { class: 'seg-btn', i18n: key, onclick: () => {
+        settings.showFps = on;
+        saveSettings();
+        this.renderFps();
+      } });
+    this.fpsBtns = { on: fps(true, 'settings.show'), off: fps(false, 'settings.hide') };
     const row = (label: I18nKey, ...ctl: HTMLElement[]) => h('label', { class: 'setting-row' }, h('span', { i18n: label }), ...ctl);
     this.settingsPanel = h(
       'div',
@@ -96,6 +105,7 @@ export class Hud {
         { class: 'settings-body' },
         row('settings.graphics', h('div', { class: 'seg' }, this.gfxBtns.high, this.gfxBtns.low)),
         row('settings.timeOfDay', h('div', { class: 'seg' }, this.todBtns.temple, this.todBtns.day)),
+        row('settings.fps', h('div', { class: 'seg' }, this.fpsBtns.on, this.fpsBtns.off)),
         row('settings.ambientVolume', slider('musicVolume')),
         row('settings.effectsVolume', slider('sfxVolume')),
         row('hud.language', lang),
@@ -105,7 +115,7 @@ export class Hud {
     const top = h(
       'header',
       { class: 'topbar' },
-      h('div', { class: 'brand' }, h('div', { class: 'title', i18n: 'app.title' }), this.status),
+      h('div', { class: 'brand' }, h('div', { class: 'title', i18n: 'app.title' }), this.status, this.fpsEl),
       h(
         'div',
         { class: 'row' },
@@ -158,6 +168,7 @@ export class Hud {
     this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, quick, this.toasts, this.help, this.settingsPanel);
     parent.append(this.root);
     this.renderMusic();
+    this.renderFps();
     this.renderGraphics();
     this.renderTimeOfDay();
     this.setStatus('connecting', 0);
@@ -174,7 +185,18 @@ export class Hud {
     this.musicBtn.title = available ? t('hud.music') : t('hud.noAmbient');
   }
 
-  private renderGraphics() {
+  private renderFps() {
+    this.fpsBtns.on.classList.toggle('active', settings.showFps);
+    this.fpsBtns.off.classList.toggle('active', !settings.showFps);
+    this.fpsEl.classList.toggle('hidden', !settings.showFps);
+  }
+
+  /** The frame-rate line (only shown when turned on). */
+  setFps(fps: number, draws: number) {
+    if (settings.showFps) this.fpsEl.textContent = `${Math.round(fps)} fps · ${draws} draws`;
+  }
+
+  renderGraphics() {
     const level = graphicsLevel();
     this.gfxBtns.high.classList.toggle('active', level === 'high');
     this.gfxBtns.low.classList.toggle('active', level === 'low');
@@ -231,6 +253,7 @@ export class Hud {
   /** Seat bar: cushions offer beads, sutras and prostrations; benches offer beads and sutras. null hides it. */
   showSeatBar(kind: 'cushion' | 'bench' | null) {
     this.seatBar.classList.toggle('hidden', !kind);
+    document.body.classList.toggle('seated', !!kind); // phones: no joystick or map button over the bar
     this.seatBtns.prostrate.classList.toggle('hidden', kind === 'bench');
     if (!kind) this.showBeadButtons(false);
   }

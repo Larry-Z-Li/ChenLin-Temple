@@ -1,7 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
@@ -40,11 +40,24 @@ import {
   type ServerMsg,
   type Transform,
 } from '../../shared/protocol';
+import { isBlocked } from '../../shared/moderation';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS ?? 150);
 const MAX_MSG_BYTES = 2048;
 const MAX_MSGS_PER_SEC = 40;
+/** Sockets from one address (a family or a class on one network still fits) and in all. */
+const MAX_CONN_PER_IP = 20;
+const MAX_SOCKETS = MAX_PLAYERS + 50;
+/** A socket has this long to say hello. */
+const HELLO_TIMEOUT_MS = 15_000;
+/** Lanterns: live ones per person on the hall wall, new ones per hour across the wall, reports that take one down. */
+const WISHES_PER_PERSON = 4;
+const HALL_WISHES_PER_HOUR = 20;
+const REPORTS_TO_REMOVE = 3;
+const REPORTS_PER_HOUR = 10;
+/** Set ADMIN_KEY to take a lantern down by hand: POST /api/remove-wish?id=…&key=… */
+const ADMIN_KEY = process.env.ADMIN_KEY ?? '';
 /** Offerings last until midnight in this time zone. */
 const TEMPLE_TZ = process.env.TEMPLE_TZ ?? DEFAULT_TEMPLE_TZ;
 
@@ -73,6 +86,8 @@ const MIME: Record<string, string> = {
 // ---------- Static hosting of the built client (production) ----------
 const server = http.createServer((req, res) => {
   // Headcount only (no names), e.g. curl https://<host>/api/status
+  res.setHeader('x-content-type-options', 'nosniff');
+  if (req.method === 'POST' && req.url?.startsWith('/api/remove-wish')) return removeWishByHand(req, res);
   if (req.url === '/api/status') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ present: [...clients.values()].filter((c) => c.info).length }));
@@ -83,9 +98,15 @@ const server = http.createServer((req, res) => {
     res.end('Temple server running. Build the client (npm run build) to serve it from here.');
     return;
   }
-  const urlPath = decodeURIComponent((req.url ?? '/').split('?')[0]);
+  let urlPath: string;
+  try {
+    urlPath = decodeURIComponent((req.url ?? '/').split('?')[0]);
+  } catch {
+    res.writeHead(400).end(); // e.g. "/%" — malformed escapes used to throw and take the server down
+    return;
+  }
   let file = path.normalize(path.join(STATIC_DIR, urlPath));
-  if (!file.startsWith(STATIC_DIR)) {
+  if (file !== STATIC_DIR && !file.startsWith(STATIC_DIR + path.sep)) {
     res.writeHead(403).end();
     return;
   }
@@ -112,6 +133,9 @@ interface Client {
   alive: boolean;
   msgWindowStart: number;
   msgCount: number;
+  /** Who they are for limits and reports: a salted hash of their address, never the address itself. */
+  who: string;
+  ip: string;
 }
 
 const clients = new Map<string, Client>();
@@ -149,9 +173,12 @@ let currentDay = dayKey();
 // ---------- Wish lanterns (persisted to a JSON file; see README for hosting caveats) ----------
 const DATA_DIR = process.env.DATA_DIR ?? path.resolve(here, '../data');
 const WISH_FILE = path.join(DATA_DIR, 'wishes.json');
-const wishes = new Map<string, Wish>();
+/** Saved with who hung it and who reported it (hashes); `pub` strips those before anything is sent. */
+type StoredWish = Wish & { owner?: string; reports?: string[] };
+const wishes = new Map<string, StoredWish>();
+const pub = ({ owner: _o, reports: _r, ...w }: StoredWish): Wish => w;
 try {
-  const list = JSON.parse(fs.readFileSync(WISH_FILE, 'utf8')) as Wish[];
+  const list = JSON.parse(fs.readFileSync(WISH_FILE, 'utf8')) as StoredWish[];
   for (const w of list) if (w && typeof w.id === 'string' && Date.now() - w.at < WISH_TTL_MS) wishes.set(w.id, w);
   console.log(`Loaded ${wishes.size} wish lanterns`);
 } catch {
@@ -175,6 +202,47 @@ function pruneWishes(now = Date.now()) {
   }
 }
 setInterval(pruneWishes, 10 * 60 * 1000);
+
+/** The salt that keeps the address hashes from being reversed; kept beside the lanterns so limits survive restarts. */
+const SALT = (() => {
+  const f = path.join(DATA_DIR, 'salt');
+  try {
+    return fs.readFileSync(f, 'utf8');
+  } catch {
+    const s = randomBytes(16).toString('hex');
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(f, s);
+    } catch {
+      /* read-only disk: limits just reset on restart */
+    }
+    return s;
+  }
+})();
+const hashWho = (ip: string) => createHash('sha256').update(SALT + ip).digest('hex').slice(0, 16);
+/** The visitor's address: the first X-Forwarded-For entry behind Render's proxy, else the socket's. */
+const ipOf = (req: http.IncomingMessage) => String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || '?';
+const connsByIp = new Map<string, number>();
+const lastWishBy = new Map<string, number>();
+/** Recent times, per key, for "n per hour" limits. */
+const recent = new Map<string, number[]>();
+function underLimit(key: string, max: number, windowMs: number, now = Date.now()) {
+  const list = (recent.get(key) ?? []).filter((t) => now - t < windowMs);
+  recent.set(key, list);
+  return list.length < max;
+}
+const noteHit = (key: string, now = Date.now()) => recent.get(key)?.push(now) ?? recent.set(key, [now]);
+
+function removeWishByHand(req: http.IncomingMessage, res: http.ServerResponse) {
+  const q = new URL(req.url ?? '', 'http://x').searchParams, key = Buffer.from(q.get('key') ?? ''), want = Buffer.from(ADMIN_KEY);
+  if (!ADMIN_KEY || key.length !== want.length || !timingSafeEqual(key, want)) return res.writeHead(403).end();
+  const w = wishes.get(q.get('id') ?? '');
+  if (!w) return res.writeHead(404).end();
+  wishes.delete(w.id);
+  broadcast({ t: 'wishRemoved', id: w.id });
+  saveWishes();
+  res.writeHead(200).end('removed');
+}
 
 const inventoryCount = (c: Client) => Object.values(c.inventory).reduce((a, b) => a + (b ?? 0), 0);
 
@@ -234,7 +302,7 @@ function handle(c: Client, msg: ClientMsg) {
       wheels: turningWheels(now),
       picked: pickedAgo,
       offerings: liveOfferings(now),
-      wishes: [...wishes.values()],
+      wishes: [...wishes.values()].map(pub),
     });
     broadcast({ t: 'join', player: { ...c.info, tr: c.tr } }, c.id);
     return;
@@ -281,6 +349,7 @@ function handle(c: Client, msg: ClientMsg) {
       const now = Date.now();
       const title = sanitizeText(msg.title, WISH_TITLE_MAX), text = sanitizeText(msg.text, WISH_TEXT_MAX);
       if (!title) return send(c, { t: 'wishDenied', reason: 'empty' });
+      if (isBlocked(`${title} ${text}`)) return send(c, { t: 'wishDenied', reason: 'blocked' });
       const board = msg.board === 'hall' ? 'hall' : 'garden';
       const onBoard = () => [...wishes.values()].filter((w) => (w.board ?? 'garden') === board);
       pruneWishes(now);
@@ -291,8 +360,15 @@ function handle(c: Client, msg: ClientMsg) {
       let slot = [...Array(hi - lo).keys()].map((s) => s + lo).find((s) => !used.has(s));
       // The hall's wall turns you away when every hook is taken.
       if (slot === undefined && board === 'hall') return send(c, { t: 'wishDenied', reason: 'full' });
-      if (now - c.lastWish < WISH_COOLDOWN_MS) return send(c, { t: 'wishDenied', reason: 'slow' });
+      // The cooldown follows the person (their address), not the connection: reloading doesn't reset it.
+      if (now - Math.max(c.lastWish, lastWishBy.get(c.who) ?? 0) < WISH_COOLDOWN_MS) return send(c, { t: 'wishDenied', reason: 'slow' });
+      if (board === 'hall') {
+        if (onBoard().filter((w) => w.owner === c.who).length >= WISHES_PER_PERSON) return send(c, { t: 'wishDenied', reason: 'limit' });
+        if (!underLimit('hall-wishes', HALL_WISHES_PER_HOUR, 3600_000, now)) return send(c, { t: 'wishDenied', reason: 'busy' });
+        noteHit('hall-wishes', now);
+      }
       c.lastWish = now;
+      lastWishBy.set(c.who, now);
       // The garden, when full: take down the oldest lantern and reuse its hook.
       if (slot === undefined) {
         const oldest = onBoard().reduce((a, b) => (a.at <= b.at ? a : b));
@@ -301,10 +377,24 @@ function handle(c: Client, msg: ClientMsg) {
         slot = oldest.slot;
       }
       const color = Number.isInteger(msg.color) && msg.color >= 0 && msg.color < WISH_COLOURS ? msg.color : 0;
-      const wish: Wish = { id: randomUUID().slice(0, 12), board, slot, title, text, color, name: c.info.name, at: now };
+      const wish: StoredWish = { id: randomUUID().slice(0, 12), board, slot, title, text, color, name: c.info.name, at: now, owner: c.who };
       wishes.set(wish.id, wish);
       saveWishes();
-      broadcast({ t: 'wishAdded', wish });
+      broadcast({ t: 'wishAdded', wish: pub(wish) });
+      break;
+    }
+    case 'report': {
+      const w = typeof msg.id === 'string' ? wishes.get(msg.id) : undefined;
+      if (!w || w.owner === c.who || w.reports?.includes(c.who)) return;
+      if (!underLimit(`report:${c.who}`, REPORTS_PER_HOUR, 3600_000)) return;
+      noteHit(`report:${c.who}`);
+      w.reports = [...(w.reports ?? []), c.who];
+      if (w.reports.length >= REPORTS_TO_REMOVE) {
+        wishes.delete(w.id);
+        broadcast({ t: 'wishRemoved', id: w.id });
+        console.log(`[wishes] took down ${w.id} after ${w.reports.length} reports`);
+      }
+      saveWishes();
       break;
     }
     case 'feed': {
@@ -366,7 +456,10 @@ function handle(c: Client, msg: ClientMsg) {
 
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: MAX_MSG_BYTES });
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
+  const ip = ipOf(req);
+  if ((connsByIp.get(ip) ?? 0) >= MAX_CONN_PER_IP || clients.size >= MAX_SOCKETS) return ws.close(1013, 'busy');
+  connsByIp.set(ip, (connsByIp.get(ip) ?? 0) + 1);
   const c: Client = {
     id: randomUUID().slice(0, 8),
     ws,
@@ -383,8 +476,11 @@ wss.on('connection', (ws) => {
     alive: true,
     msgWindowStart: Date.now(),
     msgCount: 0,
+    who: hashWho(ip),
+    ip,
   };
   clients.set(c.id, c);
+  setTimeout(() => !c.info && ws.close(4002, 'no hello'), HELLO_TIMEOUT_MS);
 
   ws.on('pong', () => (c.alive = true));
   ws.on('message', (raw) => {
@@ -401,6 +497,9 @@ wss.on('connection', (ws) => {
     }
   });
   ws.on('close', () => {
+    const n = (connsByIp.get(c.ip) ?? 1) - 1;
+    if (n > 0) connsByIp.set(c.ip, n);
+    else connsByIp.delete(c.ip);
     releaseSeat(c);
     clients.delete(c.id);
     if (c.info) broadcast({ t: 'leave', id: c.id });
@@ -436,6 +535,8 @@ setInterval(() => {
   const now = Date.now();
   for (const id of wheels.keys()) if (wheelSpeedNow(id, now) === 0) wheels.delete(id);
   for (const [id, at] of picked) if (now - at >= FRUIT_REGROW_MS) picked.delete(id);
+  for (const [k, at] of lastWishBy) if (now - at >= WISH_COOLDOWN_MS) lastWishBy.delete(k);
+  for (const [k, list] of recent) if (!list.some((t) => now - t < 3600_000)) recent.delete(k);
   for (const c of clients.values()) {
     if (!c.alive) {
       c.ws.terminate();

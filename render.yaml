@@ -18,3 +18,6 @@ services:
       # Offerings (incense, fruit) clear at midnight in this time zone.
       - key: TEMPLE_TZ
         value: Asia/Taipei
+      # Optional: lets you take a lantern down by hand (see README). Render asks for the value.
+      - key: ADMIN_KEY
+        sync: false

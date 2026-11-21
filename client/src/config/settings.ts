@@ -9,6 +9,10 @@ export interface Settings {
   langChosen: boolean;
   /** 'auto' = low on phones/tablets, high elsewhere. */
   graphics: 'auto' | 'high' | 'low';
+  /** Set when 'auto' found this device too slow for high (kept, so the next visit starts low). */
+  autoLow: boolean;
+  /** Frame rate and draw calls under the headcount (also `?fps` in the address). */
+  showFps: boolean;
   /** 'temple' = sky follows the temple's clock (day and night); 'day' = always daytime. */
   timeOfDay: 'temple' | 'day';
   musicOn: boolean;
@@ -26,6 +30,8 @@ const DEFAULTS: Settings = {
   lang: DEFAULT_LOCALE,
   langChosen: false,
   graphics: 'auto',
+  autoLow: false,
+  showFps: false,
   timeOfDay: 'temple',
   musicOn: true,
   musicVolume: 0.5,
@@ -65,5 +71,5 @@ export function saveSettings() {
 export const isTouchDevice = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
 export function graphicsLevel(): 'high' | 'low' {
-  return settings.graphics === 'auto' ? (isTouchDevice ? 'low' : 'high') : settings.graphics;
+  return settings.graphics === 'auto' ? (isTouchDevice || settings.autoLow ? 'low' : 'high') : settings.graphics;
 }

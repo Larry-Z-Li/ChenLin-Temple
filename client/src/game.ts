@@ -23,8 +23,8 @@ import { buildPagodas } from './buildings/pagodas';
 import { buildMapBoard } from './buildings/mapBoard';
 import { PrayerWheels } from './buildings/prayerWheels';
 import { buildStupas } from './buildings/stupas';
-import { BASIN, BODHI_TREE, CHERRY_GROVE, HALLS, hallHalf, PLAZA, SPAWN } from './config/layout';
-import { graphicsLevel, isTouchDevice, settings } from './config/settings';
+import { BASIN, BODHI_TREE, CHERRY_GROVE, HALLS, hallHalf, PLAZA, SPAWN, TRAVEL_SPOTS } from './config/layout';
+import { graphicsLevel, isTouchDevice, saveSettings, settings } from './config/settings';
 import { loadModelMap, loadThangkas } from './content/manifest';
 import { CollisionWorld } from './core/collisions';
 import type { WorldContext } from './core/context';
@@ -47,8 +47,9 @@ import { buildLeaves } from './world/leaves';
 import { buildPrayerFlags } from './world/prayerFlags';
 import { buildSky, setDebugHours, setTempleTimeZone } from './world/sky';
 import { buildTerrain } from './world/terrain';
-import { updateFarCull } from './core/farCull';
+import { farCulled, updateFarCull } from './core/farCull';
 import { mergeRigid, mergeStatic } from './core/staticMerge';
+import { assignInteriors, interiorLayer, updateInteriors } from './core/interiorCull';
 import { buildSandGarden } from './world/sandGarden';
 import { buildVegetation } from './world/vegetation';
 import { Wildlife } from './world/wildlife';
@@ -174,6 +175,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     return Math.abs(player.pos.x - h.x) < ex && Math.abs(player.pos.z - h.z) < ez;
   });
   buildMapBoard(ctx, () => bigMap.show(true));
+  if (/[?&]fps\b/.test(location.search)) settings.showFps = true; // ?fps in the address: show the counter this visit
   const hud: Hud = new Hud(uiEl, {
     onMusic: (on) => ambient.setOn(on),
     onSeatAction: (a) => seat.action(a),
@@ -228,10 +230,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   buildNightLights(); // every lamp is registered by now
   buildFloodlights(ctx);
   // Thousands of small static meshes → a few hundred (draw calls are what phones struggle with).
-  const merged = mergeStatic(scene, staticRoots, { skip: new Set(ctx.detailMeshes), keepForRaycast: new Set(ctx.cameraBlockers) });
+  const merged = mergeStatic(scene, staticRoots, { skip: new Set(ctx.detailMeshes), keepForRaycast: new Set(ctx.cameraBlockers), zone: interiorLayer });
   let rigid = 0;
   scene.traverse((o) => o.userData.rigid && (rigid += mergeRigid(o)));
-  if (import.meta.env.DEV) console.info(`[static merge] ${merged.before} meshes → ${merged.after}; ${rigid} fewer in moving things`);
+  const inside = assignInteriors(scene, new Set(farCulled()));
+  if (import.meta.env.DEV) console.info(`[static merge] ${merged.before} meshes → ${merged.after}; ${rigid} fewer in moving things; ${inside} inside halls`);
   const bow = (): void => (seat.seated || seat.standingFocus ? seat.bow() : player.gesture("bow", 2.4));
 
   // Networking
@@ -283,6 +286,27 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const clock = new THREE.Clock();
   let sendAcc = 0, mapAcc = 0, lastSent = '';
   const intro = new Intro(ctx, camera, player, ridge);
+
+  // Frame rate: the optional counter, and 'auto' graphics stepping down to low (and remembering it)
+  // when this device can't keep up on high. Measured twice a second; a hidden tab doesn't count.
+  let fpsFrames = 0, fpsT = performance.now(), slowFor = 0, playedFor = 0;
+  const measure = () => {
+    fpsFrames++;
+    const now = performance.now(), span = (now - fpsT) / 1000;
+    if (span < 0.5) return;
+    const fps = fpsFrames / span;
+    fpsFrames = 0;
+    fpsT = now;
+    hud.setFps(fps, renderer.info.render.calls);
+    if (span > 2 || phase !== 'play' || playedFor < 8 || settings.graphics !== 'auto' || graphicsLevel() === 'low') return void (slowFor = 0);
+    slowFor = fps < 40 ? slowFor + span : Math.max(0, slowFor - span);
+    if (slowFor < 6) return;
+    settings.autoLow = true;
+    saveSettings();
+    applyGraphics();
+    hud.renderGraphics();
+    hud.toast(t('settings.autoLow'));
+  };
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.1);
     const time = clock.elapsedTime;
@@ -295,7 +319,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       sky.update(dt);
       sky.follow(player.pos);
       bigMap.draw(player.pos, player.yaw, remotes.positions()); // the start page's map button
+      updateInteriors(camera, graphicsLevel() === 'low' ? 1 : 2);
       renderer.render(scene, camera);
+      measure();
       return;
     }
     if (landing && !cloud.riding) {
@@ -308,10 +334,12 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     cloud.update(dt);
     lights.update(dt, player.pos);
     updateFarCull(dt, camera.position, graphicsLevel() === 'low' ? 1 : 2);
+    updateInteriors(camera, graphicsLevel() === 'low' ? 1 : 2);
     if (!bodhiBell.active) player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground); // stand still while the bell rings
 
     // Walking puts standing beads or a sutra away.
     if (seat.standingFocus && (input.isDown('KeyW', 'KeyA', 'KeyS', 'KeyD') || Math.hypot(input.stick.x, input.stick.y) > 0.3)) seat.endStanding();
+    document.body.classList.toggle('cinematic', bodhiBell.active); // the bell's camera: bottom buttons out of the way
     if (bodhiBell.active) hud.setPrompt(null);
     else if (!seat.seated && !cloud.riding && !offerings.busy) {
       const it = ctx.interactions.update(player.pos.x, player.pos.z);
@@ -355,6 +383,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       bigMap.draw(player.pos, player.yaw, remotes.positions());
     }
     renderer.render(scene, camera);
+    playedFor += dt;
+    measure();
   });
 
   /** Go online (others start seeing you) — only once you're standing at the gate. */
@@ -366,7 +396,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   }
 
   // Debug handle for the console during development.
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, hallWishes, lights, bodhiBell, renderer, setDebugHours, intro };
+  // For poking at from the console, and for `npm run tour` (scripts/tour.mjs).
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, hallWishes, lights, bodhiBell, renderer, setDebugHours, intro, hud, bigMap, travelSpots: TRAVEL_SPOTS };
 
   return {
     /** The entry screen's robe picker: recolour the pacing monk. */

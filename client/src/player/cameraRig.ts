@@ -10,7 +10,11 @@ export class CameraRig {
   private targetDist = 6;
   private curDist = 6;
   private focus = new THREE.Vector3();
-  private ray = new THREE.Raycaster();
+  private ray = (() => {
+    const r = new THREE.Raycaster();
+    r.layers.enableAll(); // hall interiors live on their own layers (see interiorCull)
+    return r;
+  })();
   private dragging = false;
   private last = { x: 0, y: 0 };
   /** Active touches, for pinch-to-zoom. */

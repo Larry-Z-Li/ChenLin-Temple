@@ -17,6 +17,8 @@ Open the URL in two browser windows to see multiplayer. If the server isn't runn
 
 Production: `npm run build && npm start` serves everything from http://localhost:8787 (set `PORT` to change it).
 
+**Check everything at once:** with `npm run dev` running, `npm run tour` plays through the temple in a headless Chrome at desktop and iPhone-portrait size (start page, landing, every fast-travel stop, inside a hall, kneeling, the lantern list, the bell, the map, night) and writes screenshots plus `tour-out/report.md` (draw calls per stop, any errors). `npm run tour phone` does one size. It needs Chrome installed (or `CHROME_PATH`).
+
 ## Controls
 
 | | |
@@ -83,9 +85,10 @@ Default is Traditional Chinese (`zh-Hant`), with English selectable. Every UI st
 - **Fast travel:** the 快速傳送 button opens the map; tap a hall, pagoda or landmark and a cloud flies you there.
 - **Lights:** a canopy of colourful lotus lanterns over the approach, more along the courtyard and in the Bodhi tree, palace lanterns inside the halls, paper path lanterns, glowing lotus flowers and drifting water lanterns on the pond.
 - **Hall instruments:** strike the bowl bell (磬), wooden fish (木魚), drum and bell in the hall; everyone nearby hears it.
-- **Gardens & life:** a bamboo grove path, a walled raked rock garden, a pavilion on the lotus pond (with a small stupa), a maple-and-moss tea corner, two little huts, a stupa at the heart of the courtyard; footpaths, wooden footbridges over the rivers (which you can't wade into), picnic tables; deer that wander lawns and paths (feed them any fruit), cats napping about, butterflies by day and fireflies at night; the ridge stupas glow after dark. A map board by the gate (E, M or ◫ for the big map).
-- **Wish lanterns (SE garden):** write a title and wish at the desk, pick a colour and hang it for everyone. Lanterns stay 30 days; when all 90 hooks are full the oldest comes down. Stored in `server/data/wishes.json` (set `DATA_DIR` to move it) — on hosts without a persistent disk (e.g. Render's free plan) they reset whenever the server restarts.
-- **Graphics:** ⚙ settings has High / Low (Low is the default on phones), plus ambient and effects volume.
+- **Gardens & life:** a bamboo grove path, a walled raked rock garden, a pavilion on the lotus pond (with a small stupa), a maple-and-moss tea corner, two little huts, a stupa at the heart of the courtyard; footpaths, wooden footbridges over the rivers (which you can't wade into), picnic tables; deer that wander lawns and paths (feed them any fruit), cats napping about, butterflies by day and fireflies at night; the ridge stupas glow after dark. A map board beside the walk up to 寶生苑 (E, M or ◫ for the big map).
+- **Lantern wall (光明燈, in 寶生苑):** write a title and wish at a table, pick a colour and hang it on the left or right wall (49 hooks each) for everyone; the great bell rings for you. Lanterns stay 30 days; a full wall turns you away. Stored in `server/data/wishes.json` (set `DATA_DIR` to move it) — on hosts without a persistent disk (e.g. Render's free plan) they reset whenever the server restarts.
+- **Keeping the wall kind:** a word filter (swearing, slurs, links; English and Chinese, in `shared/moderation.ts`), one lantern a minute per person and at most four live ones each (counted by address, so reloading doesn't reset it), at most 20 new lanterns an hour across the wall, and a Report button in the list — three different people reporting a lantern takes it down. To take one down yourself, set `ADMIN_KEY` on the server and `curl -X POST "https://<host>/api/remove-wish?id=<id>&key=<key>"` (ids are in `wishes.json`). Addresses are only ever stored as salted hashes.
+- **Graphics:** ⚙ settings has High / Low (Low is the default on phones; a computer that can't hold 40 fps on High is moved to Low once, and remembers), a frame-rate counter (also `?fps` in the address), plus ambient and effects volume. Hall interiors aren't drawn when you're well outside (see `client/src/core/interiorCull.ts`).
 
 ## Roadmap
 

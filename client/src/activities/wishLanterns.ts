@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { WISH_COOLDOWN_MS, WISH_TEXT_MAX, WISH_TITLE_MAX, WISH_TTL_MS, type Wish } from '../../../shared/protocol';
+import { isBlocked } from '../../../shared/moderation';
 import { THEME } from '../config/theme';
 import { t, type I18nKey } from '../i18n';
 import { h } from '../ui/dom';
@@ -50,6 +51,7 @@ export function showWishForm(panel: HTMLElement, hud: Hud, headingKey: I18nKey, 
   const submit = () => {
     const tt = title.value.trim();
     if (!tt) return hud.toast(t('wish.empty'));
+    if (isBlocked(`${tt} ${text.value}`)) return hud.toast(t('wish.blocked'));
     onHang(tt.slice(0, WISH_TITLE_MAX), text.value.trim(), color);
     close();
   };
