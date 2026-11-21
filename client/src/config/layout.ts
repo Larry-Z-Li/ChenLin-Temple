@@ -314,8 +314,8 @@ export const PATH_LIGHT_RUNS: { from: [number, number]; to: [number, number]; st
 /** And a ring of them around the release pond. */
 export const POND_LIGHT_RING = { radius: POND.radius + 2.2, count: 22 };
 
-/** Map board (告示牌) on the right as you arrive, angled toward the spawn point. */
-export const MAP_BOARD = { x: 6, z: 117 + DZ };
+/** Map board (告示牌) on the grass just right of the walk up to Baosheng Court, parallel to it (facing the walk). */
+export const MAP_BOARD = { x: 4.4, z: hall('baosheng').z + hall('baosheng').depth / 2 + STAIRS + 6, yaw: -Math.PI / 2 };
 
 /** Pavilion (亭) out on the release pond, reached by a covered walkway from the east. */
 export const POND_PAVILION = { x: POND.x + 6.6, z: POND.z, r: 2.6, walkX0: POND.x + 9, walkX1: POND.x + 15.6, walkZ0: POND.z - 1.4, walkZ1: POND.z + 1.4 };

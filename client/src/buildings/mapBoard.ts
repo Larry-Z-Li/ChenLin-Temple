@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MAP_BOARD, SPAWN } from '../config/layout';
+import { MAP_BOARD } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { canvasTexture } from '../core/textures';
@@ -11,8 +11,7 @@ const W = 2.6, H = 2.9; // panel size (title band + square map)
 
 /** Notice board with the temple map; walk up and press E for the big map. */
 export function buildMapBoard(ctx: WorldContext, openMap: () => void) {
-  const { x, z } = MAP_BOARD;
-  const yaw = Math.atan2(SPAWN.x - x, SPAWN.z - z); // face the arrivals
+  const { x, z, yaw } = MAP_BOARD;
   const g = new THREE.Group();
   g.position.set(x, ctx.ground.heightAt(x, z), z);
   g.rotation.y = yaw;

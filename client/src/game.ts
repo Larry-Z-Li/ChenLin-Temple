@@ -187,6 +187,15 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     onGraphics: () => applyGraphics(),
   });
   onLocaleChange(() => hud.refreshText());
+  // Start page: how many are in the temple right now (you only join once you land at the gate).
+  const inIntro = () => document.body.classList.contains('intro');
+  const pollHeadcount = () =>
+    fetch('/api/status')
+      .then((r) => r.json())
+      .then((s: { present: number }) => inIntro() && hud.setStatus('online', s.present))
+      .catch(() => {});
+  void pollHeadcount();
+  const headcountTimer = setInterval(() => (inIntro() ? void pollHeadcount() : clearInterval(headcountTimer)), 15000);
   void ambient.init().then(() => hud.renderMusic(ambient.available));
   void chants.init();
   void soundscape.init();
@@ -285,6 +294,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       remotes.update(dt, camera);
       sky.update(dt);
       sky.follow(player.pos);
+      bigMap.draw(player.pos, player.yaw, remotes.positions()); // the start page's map button
       renderer.render(scene, camera);
       return;
     }
