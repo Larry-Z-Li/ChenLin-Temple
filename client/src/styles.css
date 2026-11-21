@@ -117,6 +117,10 @@ body.intro .minimap, body.intro .minimap-btn, body.intro .joystick { display: no
 .entry-go:disabled { opacity: 0.55; cursor: progress; transform: none; }
 .entry-arrow { font-size: 20px; }
 .entry-hint { font: 12px var(--sans); letter-spacing: 0.18em; color: rgba(246, 239, 224, 0.7); }
+/* Portrait phones: the panel sits at the bottom so the monk shows above it. */
+@media (orientation: portrait) and (max-width: 640px) {
+  .entry { align-items: flex-end; padding-bottom: 28px; background: linear-gradient(0deg, rgba(16, 20, 26, 0.72) 0%, rgba(16, 20, 26, 0.5) 38%, rgba(16, 20, 26, 0.1) 58%, transparent 70%); }
+}
 @media (max-height: 520px) {
   .entry-panel { gap: 10px; }
   .entry-title { font-size: 40px; }

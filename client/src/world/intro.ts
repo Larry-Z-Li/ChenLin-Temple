@@ -92,8 +92,18 @@ export class Intro {
     // High enough to see over the knolls the stupas stand on.
     let knoll = -Infinity;
     for (const d of [4, 8, 12, 16]) knoll = Math.max(knoll, g.heightAt(p.x + vx * d, p.z + vz * d));
-    const wantCam = new THREE.Vector3(cx, Math.max(y + 6, g.heightAt(cx, cz) + 2.5, knoll + 4), cz);
-    const wantLook = new THREE.Vector3(p.x + vx * 50, y - 10, p.z + vz * 50);
+    let wantCam = new THREE.Vector3(cx, Math.max(y + 6, g.heightAt(cx, cz) + 2.5, knoll + 4), cz);
+    let wantLook = new THREE.Vector3(p.x + vx * 50, y - 10, p.z + vz * 50);
+    if (this.camera.aspect < 0.9) {
+      // Portrait phone: too narrow to keep him off to one side. Lower and right behind him, centred
+      // a little above the middle, above the entry panel (which sits at the bottom).
+      const px = p.x - vx * 10 - rx * 0.8, pz = p.z - vz * 10 - rz * 0.8;
+      wantCam = new THREE.Vector3(px, Math.max(y + 3, g.heightAt(px, pz) + 2.5, knoll + 2), pz);
+      const hx = p.x - px, hz = p.z - pz, hl = Math.hypot(hx, hz) || 1;
+      const lift = Math.atan(0.2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)));
+      const pitch = Math.atan2(y + 1 - wantCam.y, hl) - lift;
+      wantLook = wantCam.clone().add(new THREE.Vector3((hx / hl) * Math.cos(pitch), Math.sin(pitch), (hz / hl) * Math.cos(pitch)).multiplyScalar(50));
+    }
     if (!this.started) {
       this.camPos.copy(wantCam);
       this.look.copy(wantLook);
