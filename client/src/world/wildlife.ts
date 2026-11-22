@@ -11,6 +11,7 @@ import { t } from '../i18n';
 import type { NetClient } from '../net/netClient';
 import type { LocalPlayer } from '../player/localPlayer';
 import { lighting } from './sky';
+import { createCat } from './cat';
 import { isReserved } from './zones';
 
 // ---------------------------------------------------------------- hearts
@@ -151,52 +152,28 @@ function deerModel(stag: boolean) {
 
 // ---------------------------------------------------------------- cat
 
-function buildCat(ctx: WorldContext, spot: (typeof CAT_SPOTS)[number], index: number) {
+/** One of the temple cats (see cat.ts): asleep until someone comes close, then it watches them; pet it for hearts and a purr. */
+function buildCat(ctx: WorldContext, spot: (typeof CAT_SPOTS)[number], index: number, people: () => THREE.Vector3[]) {
   const { x, z, h } = spot;
-  const fur = new THREE.MeshStandardMaterial({ color: spot.color, roughness: 0.95, flatShading: true });
-  const white = new THREE.MeshStandardMaterial({ color: 0xf3ece0, roughness: 0.95, flatShading: true });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x3a2414 });
-  const root = new THREE.Group();
-  root.position.set(x, h, z);
-  root.rotation.y = 0.6 + index * 1.9;
-  ctx.scene.add(root);
-  cullFar(root, 55);
-  const body = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1).scale(0.2, 0.12, 0.25), fur);
-  body.position.y = 0.11;
-  body.castShadow = true;
-  root.add(body);
-  const head = new THREE.Group();
-  head.position.set(0.13, 0.12, 0.17);
-  root.add(head);
-  head.add(new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1).scale(0.095, 0.085, 0.09), fur));
-  const muzzle = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1).scale(0.045, 0.035, 0.03), white);
-  muzzle.position.set(0.02, -0.025, 0.075);
-  head.add(muzzle);
-  for (const s of [-1, 1]) {
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.07, 4), fur);
-    ear.position.set(s * 0.055, 0.08, -0.01);
-    ear.rotation.z = s * -0.3;
-    head.add(ear);
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.006, 0.006), dark);
-    eye.position.set(s * 0.04 + 0.01, 0.015, 0.085);
-    head.add(eye);
-  }
-  const tail = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.03, 6, 18, Math.PI * 1.1).rotateX(Math.PI / 2), fur);
-  tail.position.y = 0.04;
-  tail.rotation.y = 0.6;
-  root.add(tail);
+  const cat = createCat({ coat: spot.coat, pose: spot.pose, seed: index * 7 + 3, scale: 0.95 + (index % 3) * 0.05 });
+  cat.root.position.set(x, h, z);
+  cat.root.rotation.y = 0.6 + index * 1.9;
+  ctx.scene.add(cat.root);
+  cullFar(cat.root, 55);
   ctx.collisions.addCircle(x, z, 0.3);
-
-  let woke = 99;
+  const head = new THREE.Vector3();
   ctx.updaters.push((dt, time) => {
-    woke += dt;
-    body.scale.set(1 + Math.sin(time * 1.6) * 0.03, 1 + Math.sin(time * 1.6) * 0.05, 1);
-    head.rotation.x = -0.35 * Math.exp(-woke * 1.5) * Math.min(1, woke * 8);
-    head.rotation.z = Math.sin(woke * 20) * 0.08 * Math.exp(-woke * 3);
+    // the nearest person within 3 m: it looks up at their face
+    let near: THREE.Vector3 | null = null, best = 9;
+    for (const p of people()) {
+      const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+      if (d < best) [best, near] = [d, p];
+    }
+    cat.update(dt, time, near ? head.set(near.x, near.y + 1.45, near.z) : null);
   });
   ctx.instruments.push({ id: `cat-${index}`, kind: 'cat', x, z, onStrike: () => {
-    woke = 0;
-    heartBurst(x, h + 0.4, z, 4);
+    cat.pet();
+    heartBurst(x, h + 0.45, z, 4);
   } });
 }
 
@@ -298,7 +275,7 @@ export class Wildlife {
 
   constructor(private ctx: WorldContext, private net: NetClient, private offerings: Offerings, private player: LocalPlayer, private others: () => THREE.Vector3[]) {
     heartScene = ctx.scene;
-    CAT_SPOTS.forEach((c, i) => buildCat(ctx, c, i));
+    CAT_SPOTS.forEach((c, i) => buildCat(ctx, c, i, () => [this.player.pos, ...this.others()]));
     buildButterflies(ctx);
     buildFireflies(ctx);
 

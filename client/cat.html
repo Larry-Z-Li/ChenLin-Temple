@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cat Preview</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #cfd8cf; overflow: hidden; font: 13px system-ui, sans-serif; }
+      #bar { position: fixed; top: 10px; left: 10px; display: flex; gap: 6px; }
+      #bar button { padding: 6px 10px; border: 0; border-radius: 6px; background: #fff; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <div id="bar"><button data-s="asleep">Asleep</button><button data-s="awake">Awake</button><button data-s="petted">Petted</button><button data-s="spin">Spin</button></div>
+    <script type="module" src="/src/dev/catPreview.ts"></script>
+  </body>
+</html>

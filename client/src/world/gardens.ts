@@ -153,7 +153,7 @@ function buildFootBridges(ctx: WorldContext) {
       g.add(box(b.length, 0.08, 0.1, red, 0, y0 + H + 0.5, s * (WIDTH / 2 - 0.05)));
       g.add(box(b.length, 0.05, 0.06, red, 0, y0 + H + 0.22, s * (WIDTH / 2 - 0.05)));
     }
-    for (const s of [-1, 1]) g.add(box(0.5, 0.9, WIDTH - 0.2, mat(0x8d8a80, { roughness: 1 }), s * (b.length / 2 - 0.25), y0 - 0.5, 0)); // stone abutments
+    for (const s of [-1, 1]) g.add(box(0.5, 0.9, WIDTH - 0.2, mat(0x8d8a80, { roughness: 1 }), s * (b.length / 2 - 0.27), y0 - 0.5, 0)); // stone abutments (just inside the deck's ends)
     // walkable deck + ramps, and rails you can't step through
     const half = b.length / 2, hw = WIDTH / 2 - 0.15, top = y0 + H;
     if (b.axis === 'x') {
@@ -299,7 +299,7 @@ function buildPavilion(ctx: WorldContext) {
 
   // Walkway: deck on stone piers, posts both sides, low rails, gabled roof.
   const wx = (P.walkX0 + P.walkX1) / 2, wl = P.walkX1 - P.walkX0, wz = (P.walkZ0 + P.walkZ1) / 2, ww = P.walkZ1 - P.walkZ0;
-  ctx.scene.add(box(wl, 0.12, ww, deck, wx, FLOOR - 0.12, wz));
+  ctx.scene.add(box(wl, 0.12, ww, deck, wx, FLOOR - 0.11, wz)); // 1 cm above the pavilion's stone base where they meet
   for (let x = P.walkX0 + 0.4; x < P.walkX1; x += 2.2) ctx.scene.add(box(0.4, 0.8, ww - 0.4, stone, x, -0.7, wz));
   for (let x = P.walkX0 + 0.2; x <= P.walkX1; x += 1.6)
     for (const z of [P.walkZ0 + 0.1, P.walkZ1 - 0.1]) ctx.scene.add(cylinder(0.08, 0.09, 2.5, red, x, FLOOR, z, 8));

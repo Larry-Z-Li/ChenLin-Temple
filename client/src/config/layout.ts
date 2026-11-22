@@ -14,6 +14,7 @@
  * SPREAD× apart around the great stupa (sizes stay the same) so the grounds have room to breathe.
  */
 import type { DeityId } from './deities';
+import type { CatCoat, CatPose } from '../world/cat';
 
 /** How far apart everything is spaced, around the great stupa. */
 export const SPREAD = 1.5;
@@ -359,12 +360,12 @@ const onSteps = (id: string, dx: number) => {
 };
 
 /** Cats napping about the place (`h` = height they lie at). */
-export const CAT_SPOTS = [
-  { ...onSteps('guanyin', 2.9), color: 0xd98a3a }, // Guanyin Court's steps (ginger)
-  { ...onSteps('wenshu', 2.9), color: 0x8a8a8a }, // Mañjuśrī Court's steps (grey)
-  { ...onSteps('baosheng', 2.9), color: 0x2a2a2a }, // Baosheng Court's steps (black)
-  { x: DORM.minX + 8, z: (DORM.minZ + DORM.maxZ) / 2, h: 0, color: 0xe8d8b8 }, // the monks' courtyard (cream)
-  { x: BODHI_TREE.x + 2.4, z: BODHI_TREE.z + 3.2, h: 0, color: 0x7a5a3a }, // under the Bodhi tree (tabby)
+export const CAT_SPOTS: { x: number; z: number; h: number; coat: CatCoat; pose: CatPose }[] = [
+  { ...onSteps('guanyin', 2.9), coat: 'ginger', pose: 'loaf' }, // Guanyin Court's steps
+  { ...onSteps('wenshu', 2.9), coat: 'silver', pose: 'loaf' }, // Mañjuśrī Court's steps
+  { ...onSteps('baosheng', 2.9), coat: 'tuxedo', pose: 'loaf' }, // Baosheng Court's steps
+  { x: DORM.minX + 8, z: (DORM.minZ + DORM.maxZ) / 2, h: 0, coat: 'calico', pose: 'sit' }, // the monks' courtyard
+  { x: BODHI_TREE.x + 2.4, z: BODHI_TREE.z + 3.2, h: 0, coat: 'brown', pose: 'sit' }, // under the Bodhi tree
 ];
 
 /** Wooden footbridges over the rivers (flat decks, red rails). `axis` = the direction you walk across. */

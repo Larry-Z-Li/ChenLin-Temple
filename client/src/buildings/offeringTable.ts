@@ -60,7 +60,7 @@ export function buildOfferingTable(ctx: WorldContext, hallId: string, x: number,
     if (Math.abs(px - x) < 1.3) continue; // keep clear of the bowl, incense and lighting candle
     // Wide, shallow offering bowl for fruit
     g.add(cylinder(0.33, 0.2, 0.11, bronze, px, top, z + 0.08, 20));
-    g.add(cylinder(0.3, 0.3, 0.01, mat(0x6b4a24, { roughness: 0.6 }), px, top + 0.1, z + 0.08, 20));
+    g.add(cylinder(0.3, 0.3, 0.01, mat(0x6b4a24, { roughness: 0.6 }), px, top + 0.105, z + 0.08, 20)); // 5 mm proud of the rim, not level with it
     slots.push({ x: px, y: top + 0.1, z: z + 0.08 });
   }
   ctx.offeringTables.push({ hallId, x, y: top, z, length, slots, bowl: { x, y: top + 0.27, z, r: 0.36 } });

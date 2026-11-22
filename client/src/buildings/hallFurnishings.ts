@@ -54,7 +54,7 @@ export function furnishHall(ctx: WorldContext, g: THREE.Group, f: HallFrame, blo
     rug(items, hx + side * (x0 + x1) / 2, F, (block.z0 + block.z1) / 2, x1 - x0, block.z1 - block.z0 + 1.9);
   }
   const rz0 = tableZ + 0.6, rz1 = f.frontInner - 0.05;
-  items.add(box(1.7, 0.012, rz1 - rz0, mat(0xa8842c, { roughness: 0.8 }), hx, F + FLOOR_TOP, (rz0 + rz1) / 2, false));
+  items.add(box(1.7, 0.008, rz1 - rz0, mat(0xa8842c, { roughness: 0.8 }), hx, F + FLOOR_TOP, (rz0 + rz1) / 2, false));
   items.add(box(1.4, 0.016, rz1 - rz0, mat(0x8e1f1a, { roughness: 0.95 }), hx, F + FLOOR_TOP, (rz0 + rz1) / 2, false));
 
   // ---- Hanging banners: a pair flanking the altar, more along the side aisles between the thangkas ----
@@ -251,7 +251,7 @@ function rugTexture() {
 }
 
 function rug(parent: THREE.Group, x: number, F: number, z: number, w: number, d: number) {
-  parent.add(box(w, 0.012, d, mat(0xa8842c, { roughness: 0.85 }), x, F + FLOOR_TOP, z, false));
+  parent.add(box(w, 0.008, d, mat(0xa8842c, { roughness: 0.85 }), x, F + FLOOR_TOP, z, false));
   const tex = rugTexture().clone();
   tex.repeat.set((w - 0.3) / 1.1, (d - 0.3) / 1.1);
   tex.needsUpdate = true;

@@ -10,16 +10,22 @@ import { box, cylinder, hipRoofGeometry, mat } from './materials';
 /** Paved walkways + the mountain gate at the entrance. */
 export function buildDecor(ctx: WorldContext) {
   const base = stoneTexture();
-  PAVED.forEach((r, i) => {
+  // Where paved areas overlap (the ring walk's corners, walks running into the court), the earlier one
+  // keeps the ground and the later is cut around it: two slabs in one plane flicker into each other.
+  const pieces = PAVED.flatMap((r, i) => PAVED.slice(0, i).reduce((ps, cut) => ps.flatMap((p) => subtractRect(p, cut)), [r]));
+  for (const r of pieces) {
     const w = r.maxX - r.minX, d = r.maxZ - r.minZ;
     const tex = base.clone();
+    // 3 m stones laid on the world grid, so neighbouring pieces' patterns run on without a seam
+    // (a box's top face maps u along +x and v along −z).
     tex.repeat.set(w / 3, d / 3);
+    tex.offset.set(r.minX / 3, -r.maxZ / 3);
     tex.needsUpdate = true;
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), new THREE.MeshStandardMaterial({ map: tex, color: THEME.pavedStone, roughness: 0.95 }));
-    m.position.set((r.minX + r.maxX) / 2, 0.02 + i * 0.001, (r.minZ + r.maxZ) / 2); // tiny offsets avoid z-fighting at overlaps
+    m.position.set((r.minX + r.maxX) / 2, 0.02, (r.minZ + r.maxZ) / 2);
     m.receiveShadow = true;
     ctx.scene.add(m);
-  });
+  }
 
   // Mountain gate (simple paifang-style arch)
   const { x, z, width: W, height: H, couplet } = MOUNTAIN_GATE;
@@ -65,4 +71,17 @@ export function buildDecor(ctx: WorldContext) {
   });
   ctx.updaters.push((_dt, time) => lanterns.forEach((l, i) => (l.rotation.z = Math.sin(time * 1.1 + i * 2) * 0.05)));
   ctx.scene.add(g);
+}
+
+type Area = { minX: number; maxX: number; minZ: number; maxZ: number };
+/** `a` minus `b`: up to four rectangles covering what of `a` lies outside `b`. */
+function subtractRect(a: Area, b: Area): Area[] {
+  if (b.maxX <= a.minX || b.minX >= a.maxX || b.maxZ <= a.minZ || b.minZ >= a.maxZ) return [a];
+  const z0 = Math.max(a.minZ, b.minZ), z1 = Math.min(a.maxZ, b.maxZ);
+  return [
+    { ...a, maxZ: b.minZ },
+    { ...a, minZ: b.maxZ },
+    { minX: a.minX, maxX: b.minX, minZ: z0, maxZ: z1 },
+    { minX: b.maxX, maxX: a.maxX, minZ: z0, maxZ: z1 },
+  ].filter((r) => r.maxX - r.minX > 0.01 && r.maxZ - r.minZ > 0.01);
 }

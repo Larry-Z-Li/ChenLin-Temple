@@ -13,12 +13,13 @@ export function buildThangka(entry: ThangkaEntry | null, width = 1.5, height = 2
   const g = new THREE.Group();
   const border = 0.16;
   g.add(box(width + border * 2, height + border * 2.6, 0.03, mat(0x7a1f1f, { roughness: 0.7 }), 0, -(height + border * 2.6) / 2));
-  g.add(box(width + border, height + border, 0.035, mat(0x2b4c8c, { roughness: 0.7 }), 0, -(height + border) / 2 - border * 0.3));
+  // Layers ~8 mm apart (frame, mount, painting) so they don't flicker into each other from across a hall.
+  g.add(box(width + border, height + border, 0.035, mat(0x2b4c8c, { roughness: 0.7 }), 0, -(height + border) / 2 - border * 0.3, 0.006));
 
   const panelMat = new THREE.MeshStandardMaterial({ color: 0xe9dfc6, roughness: 0.85 });
   const panel = new THREE.Mesh(new THREE.PlaneGeometry(width, height), panelMat);
   panel.userData.dynamic = true; // its image (and size) arrive later: kept out of static merging
-  panel.position.set(0, -height / 2 - border * 0.8, 0.025);
+  panel.position.set(0, -height / 2 - border * 0.8, 0.032);
   g.add(panel);
 
   const rodMat = mat(0xc9a24a, { metalness: 0.6, roughness: 0.4 });

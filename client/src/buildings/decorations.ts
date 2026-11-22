@@ -203,7 +203,7 @@ function buildStele(ctx: WorldContext) {
     new THREE.PlaneGeometry(0.7, 1.85),
     new THREE.MeshStandardMaterial({ map: verticalTextTexture(zhHant['app.title'], { bg: '#8f8b82', color: '#2b2622', w: 160, h: 420 }), roughness: 0.9 }),
   );
-  face.position.set(0, 1.62, 0.135);
+  face.position.set(0, 1.62, 0.142);
   g.add(face);
   g.traverse((o) => (o.castShadow = true));
   ctx.scene.add(g);

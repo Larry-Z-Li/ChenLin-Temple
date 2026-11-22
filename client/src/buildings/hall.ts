@@ -113,13 +113,13 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
   const wallX = (x0: number, x1: number, z: number) => {
     const w = x1 - x0, cx = (x0 + x1) / 2;
     g.add(blocker(box(w, H, T, wallMat, cx, F, z)));
-    g.add(box(w, 1.0, T + 0.06, baseMat, cx, F, z));
+    g.add(box(w + 0.06, 1.0, T + 0.06, baseMat, cx, F, z)); // a little past the wall's ends: no flush faces at door jambs
     ctx.collisions.addBox(x0, x1, z - T / 2, z + T / 2);
   };
   const wallZ = (z0: number, z1: number, x: number) => {
     const d = z1 - z0, cz = (z0 + z1) / 2;
     g.add(blocker(box(T, H, d, wallMat, x, F, cz)));
-    g.add(box(T + 0.06, 1.0, d, baseMat, x, F, cz));
+    g.add(box(T + 0.06, 1.0, d + 0.06, baseMat, x, F, cz));
     ctx.collisions.addBox(x - T / 2, x + T / 2, z0, z1);
   };
   const lintel = (dw: number, z: number) => g.add(blocker(box(dw, H - DOOR_H, T, wallMat, hx, F + DOOR_H, z)));

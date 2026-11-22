@@ -75,7 +75,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   appEl.append(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 3000);
+  // Near plane at 0.15 m (the rig keeps 0.3 m from walls and 0.4 m from your head): three times the depth
+  // precision of 0.05, so thin layers (rugs, frames, plaques) don't flicker against what they lie on.
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.15, 3000);
   scene.add(camera); // camera children (prayer beads) need to be in the scene graph
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -230,9 +232,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   buildNightLights(); // every lamp is registered by now
   buildFloodlights(ctx);
   // Thousands of small static meshes → a few hundred (draw calls are what phones struggle with).
-  const merged = mergeStatic(scene, staticRoots, { skip: new Set(ctx.detailMeshes), keepForRaycast: new Set(ctx.cameraBlockers), zone: interiorLayer });
+  // `?nomerge` in the address skips it (to tell a merging problem from a modelling one).
+  const noMerge = /[?&]nomerge\b/.test(location.search);
+  const merged = noMerge ? { before: 0, after: 0 } : mergeStatic(scene, staticRoots, { skip: new Set(ctx.detailMeshes), keepForRaycast: new Set(ctx.cameraBlockers), zone: interiorLayer });
   let rigid = 0;
-  scene.traverse((o) => o.userData.rigid && (rigid += mergeRigid(o)));
+  if (!noMerge) scene.traverse((o) => o.userData.rigid && (rigid += mergeRigid(o)));
   const inside = assignInteriors(scene, new Set(farCulled()));
   if (import.meta.env.DEV) console.info(`[static merge] ${merged.before} meshes → ${merged.after}; ${rigid} fewer in moving things; ${inside} inside halls`);
   const bow = (): void => (seat.seated || seat.standingFocus ? seat.bow() : player.gesture("bow", 2.4));
