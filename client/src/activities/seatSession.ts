@@ -9,15 +9,17 @@ import { BEAD_COUNT, type Mala } from './beads';
 import type { SutraReader } from './sutraReader';
 
 /** What each kind of seat offers, and the pose for each activity. (Chants are global, not seat-bound.) */
-const SEAT_KINDS: Record<Seat['kind'], { focuses: Focus[]; anim: Record<Focus, Anim>; bow: Anim; camPitch: number; camDist: number }> = {
+const SEAT_KINDS: Record<Seat['kind'], { focuses: Focus[]; anim: Record<Focus, Anim>; readBeads: Anim; bow: Anim; camPitch: number; camDist: number }> = {
   cushion: {
     focuses: ['beads', 'sutra', 'prostrate'],
     anim: { none: 'cross', beads: 'crossBeads', sutra: 'crossRead', prostrate: 'cross' }, // sitting cross-legged
+    readBeads: 'crossReadBeads',
     bow: 'crossBow', camPitch: 0.18, camDist: 3.4,
   },
   bench: {
     focuses: ['beads', 'sutra'],
     anim: { none: 'sit', beads: 'sitBeads', sutra: 'sitRead', prostrate: 'sit' },
+    readBeads: 'sitReadBeads',
     bow: 'sitBow', camPitch: 0.25, camDist: 4,
   },
 };
@@ -37,6 +39,7 @@ const PROSTRATION_REPS = 3;
 const STANDING = {
   focuses: ['beads', 'sutra'] as Focus[],
   anim: { none: 'idle', beads: 'standBeads', sutra: 'standRead', prostrate: 'idle' } as Record<Focus, Anim>,
+  readBeads: 'standReadBeads' as Anim,
   bow: 'bow' as Anim,
 };
 
@@ -57,6 +60,9 @@ interface Deps {
 export class SeatSession {
   seat: Seat | null = null;
   focus: Focus = 'none';
+  /** Beads and the sutra can be in hand together. */
+  private beads = false;
+  private reading = false;
   private standing = false;
   private pending: string | null = null;
   private prost: { rep: number; step: number; t: number } | null = null;
@@ -166,26 +172,41 @@ export class SeatSession {
     rig.lookAlong(rig.yaw, 0.3, 6);
   }
 
+  /**
+   * Beads and a sutra each toggle, and can be held together (the beads move to the left hand);
+   * prostrations put both away; 'none' stops everything.
+   */
   setFocus(f: Focus) {
     const { mala, sutra, hud, player } = this.d;
     const kind = this.kind();
     if (f !== 'none' && !kind.focuses.includes(f)) return;
-    if (f !== 'none' && this.focus === f) f = 'none'; // toggle off
-    this.focus = f;
-    mala.show(f === 'beads');
-    void sutra.show(f === 'sutra');
-    hud.showBeadButtons(f === 'beads');
-    this.prost = f === 'prostrate' ? { rep: 0, step: 0, t: 0 } : null;
+    const prostrate = f === 'prostrate' && this.focus !== 'prostrate';
+    if (f === 'beads') this.beads = !this.beads;
+    else if (f === 'sutra') this.reading = !this.reading;
+    else this.beads = this.reading = false; // 'none', or prostrations
+    this.focus = prostrate ? 'prostrate' : this.reading ? 'sutra' : this.beads ? 'beads' : 'none';
+    mala.show(this.beads);
+    mala.setLeftHand(this.reading);
+    void sutra.show(this.reading);
+    hud.showBeadButtons(this.beads);
+    document.body.classList.toggle('beads-sutra', this.beads && this.reading); // make room on screen for both
+    this.prost = prostrate ? { rep: 0, step: 0, t: 0 } : null;
     this.bowLeft = 0;
-    if (f === 'beads') this.renderBeads(mala.count, mala.round);
-    if (f !== 'beads' && f !== 'prostrate') hud.setInfo(null);
-    hud.setSeatState(f);
-    if (this.standing && f === 'none') {
+    if (this.beads) this.renderBeads(mala.count, mala.round);
+    else if (!prostrate) hud.setInfo(null);
+    hud.setSeatState([this.beads && 'beads', this.reading && 'sutra', prostrate && 'prostrate'].filter(Boolean) as Focus[]);
+    if (this.standing && this.focus === 'none') {
       this.standing = false;
       player.release();
       return;
     }
-    player.setAnchorAnim(kind.anim[f]);
+    player.setAnchorAnim(this.pose());
+  }
+
+  /** The pose for what's in hand now. */
+  private pose(): Anim {
+    const kind = this.kind();
+    return this.beads && this.reading ? kind.readBeads : kind.anim[this.focus];
   }
 
   action(a: SeatAction) {
@@ -202,20 +223,20 @@ export class SeatSession {
   }
 
   private renderBeads(n: number, round: number) {
-    if (this.focus !== 'beads') return;
+    if (!this.beads) return;
     this.d.hud.setInfo(`${t('beads.count', { n, total: BEAD_COUNT })} · ${t('beads.rounds', { n: round + 1 })} · ${t('beads.hint')}`);
   }
 
   /** Keyboard while seated; returns true if consumed. */
   handleKey(e: KeyboardEvent) {
     if (this.standing) {
-      if (this.focus === 'sutra' && this.d.sutra.handleKey(e)) return true;
+      if (this.reading && this.d.sutra.handleKey(e)) return true;
       if (e.code === 'Escape') return this.endStanding(), true;
-      if ((e.code === 'ArrowRight' || e.code === 'ArrowLeft') && this.focus === 'beads') return this.d.mala.step(e.code === 'ArrowRight' ? 1 : -1), true;
+      if ((e.code === 'ArrowRight' || e.code === 'ArrowLeft') && this.beads) return this.d.mala.step(e.code === 'ArrowRight' ? 1 : -1), true;
       return false;
     }
     if (!this.seat) return false;
-    if (this.focus === 'sutra' && this.d.sutra.handleKey(e)) return true;
+    if (this.reading && this.d.sutra.handleKey(e)) return true;
     switch (e.code) {
       case 'Digit1': this.action('prostrate'); return true;
       case 'Digit2': this.action('beads'); return true;
@@ -229,14 +250,14 @@ export class SeatSession {
         return true;
       case 'ArrowRight':
       case 'ArrowLeft':
-        if (this.focus === 'beads') this.d.mala.step(e.code === 'ArrowRight' ? 1 : -1);
+        if (this.beads) this.d.mala.step(e.code === 'ArrowRight' ? 1 : -1);
         return true;
     }
     return false;
   }
 
   update(dt: number) {
-    if (this.bowLeft > 0 && (this.bowLeft -= dt) <= 0 && (this.seat || this.standing)) this.d.player.setAnchorAnim(this.kind().anim[this.focus]);
+    if (this.bowLeft > 0 && (this.bowLeft -= dt) <= 0 && (this.seat || this.standing)) this.d.player.setAnchorAnim(this.pose());
     const p = this.prost;
     if (p) {
       p.t += dt;

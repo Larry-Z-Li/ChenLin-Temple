@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { FRUIT_REGROW_MS, INCENSE_BURN_MS, INVENTORY_MAX, type Anim, type Fruit, type Offering } from '../../../shared/protocol';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { FRUIT_REGROW_MS, INCENSE_BURN_MS, INVENTORY_MAX, QUEUE_MAX, type Anim, type Fruit, type Offering } from '../../../shared/protocol';
 import { FRUIT_TYPES } from '../config/theme';
 import type { OfferingTable, WorldContext } from '../core/context';
 import { glowTexture } from '../core/textures';
@@ -47,6 +48,12 @@ export class Offerings {
   private tables = new Map<string, TableVisual>();
   private regrowAcc = 0;
   private ritual: { table: OfferingTable; step: number; t: number } | null = null;
+  /** Incense lines (hall → player ids, front first; the front is the one offering). Kept by the server. */
+  private queues = new Map<string, string[]>();
+  /** The hall whose line I'm standing in, my place (0 = my turn), and my walk to that place. */
+  private inLine: string | null = null;
+  private place = 0;
+  private walk: { x0: number; z0: number; x1: number; z1: number; t: number; dur: number; yaw: number; walkYaw: number } | null = null;
   private zero = new THREE.Matrix4().makeScale(0, 0, 0);
 
   /** Take one fruit of a kind out of the basket (e.g. fed to a deer). */
@@ -111,6 +118,18 @@ export class Offerings {
       for (const [id, ago] of Object.entries(msg.picked)) this.hide(id, now - ago);
       this.clearOfferings();
       for (const [hall, list] of Object.entries(msg.offerings)) for (const o of list) this.addOffering(hall, o);
+      this.queues = new Map(Object.entries(msg.queues ?? {}));
+      this.syncLine();
+    });
+    net.on('queue', (hall, ids) => {
+      if (ids.length) this.queues.set(hall, ids);
+      else this.queues.delete(hall);
+      this.syncLine();
+    });
+    net.on('status', (s) => {
+      if (s === 'online') return;
+      this.queues.clear(); // lost the server: no lines to wait in
+      this.syncLine();
     });
     net.on('picked', (id, by) => {
       this.hide(id, Date.now());
@@ -136,8 +155,112 @@ export class Offerings {
     net.on('newDay', () => this.clearOfferings());
   }
 
+  /** Offering, or waiting in line (the game hides the usual prompts then). */
   get busy() {
-    return !!this.ritual;
+    return !!this.ritual || this.inLine !== null;
+  }
+
+  /** Waiting in an incense line (not yet at the front). */
+  get queued() {
+    return this.inLine !== null && !this.ritual;
+  }
+
+  /** Step out of the line (Esc, or tapping the prompt). */
+  leaveLine() {
+    if (!this.inLine || this.ritual) return;
+    this.net.queue(this.inLine, false);
+    this.inLine = null;
+    this.walk = null;
+    this.releasePlayer();
+  }
+
+  private releasePlayer() {
+    this.player.release();
+    this.ctx.interactions.enabled = true;
+    this.hud.setPrompt(null);
+  }
+
+  /** Where people wait, one after another back from the incense stand (away from the table). */
+  private lineSpots(table: OfferingTable) {
+    const fx = Math.sin(table.facing ?? 0), fz = Math.cos(table.facing ?? 0);
+    const stand = table.stand ?? { x: table.x + fx, z: table.z + fz };
+    return Array.from({ length: QUEUE_MAX - 1 }, (_, k) => ({ x: stand.x + fx * (1 + 0.8 * k), z: stand.z + fz * (1 + 0.8 * k) }));
+  }
+
+  /** Into the back of the line (straight to the front if nobody's waiting). Offline there's no line. */
+  private joinLine(table: OfferingTable) {
+    if (this.ritual || this.inLine || this.player.mode !== 'free') return;
+    if ((this.queues.get(table.hallId)?.length ?? 0) >= QUEUE_MAX) return this.hud.toast(t('queue.full'));
+    if (!this.net.queue(table.hallId, true)) this.startRitual(table);
+  }
+
+  /** The server moved a line: find my place in it and walk there, or offer if it's my turn. */
+  private syncLine() {
+    let hall: string | null = null, place = -1;
+    for (const [h, ids] of this.queues) {
+      const i = ids.indexOf(this.net.id);
+      if (i >= 0) [hall, place] = [h, i];
+    }
+    const vis = hall && this.tables.get(hall);
+    if (!hall || !vis) {
+      if (this.inLine !== null && !this.ritual) {
+        this.inLine = null;
+        this.walk = null;
+        this.releasePlayer();
+      }
+      return;
+    }
+    const joined = this.inLine === null;
+    this.inLine = hall;
+    this.place = place;
+    if (place === 0) {
+      if (this.ritual) return;
+      this.walk = null;
+      if (!joined) this.hud.toast(t('queue.turn'));
+      return this.startRitual(vis.table, true);
+    }
+    const spot = this.lineSpots(vis.table)[place - 1], bowl = vis.table.bowl ?? vis.table, p = this.player.pos;
+    const d = Math.hypot(spot.x - p.x, spot.z - p.z), yaw = Math.atan2(-(bowl.x - spot.x), -(bowl.z - spot.z));
+    this.walk = { x0: p.x, z0: p.z, x1: spot.x, z1: spot.z, t: 0, dur: Math.max(0.35, d / 1.4), yaw, walkYaw: d > 0.05 ? Math.atan2(-(spot.x - p.x), -(spot.z - p.z)) : yaw };
+    this.ctx.interactions.enabled = false;
+  }
+
+  private updateLine(dt: number) {
+    const w = this.walk;
+    if (!w || this.ritual) return;
+    w.t = Math.min(1, w.t + dt / w.dur);
+    const k = w.t * w.t * (3 - 2 * w.t), x = w.x0 + (w.x1 - w.x0) * k, z = w.z0 + (w.z1 - w.z0) * k, moving = w.t < 1;
+    this.player.anchor(x, this.ctx.ground.heightAt(x, z), z, moving ? w.walkYaw : w.yaw, 'ritual', moving ? 'walk' : 'idle');
+    this.hud.setPrompt(t('queue.waiting', { n: this.place }));
+  }
+
+  /** Brass posts and a red rope along both sides of where the line stands. */
+  private buildStanchions(table: OfferingTable, spots: { x: number; z: number }[]) {
+    const fx = Math.sin(table.facing ?? 0), fz = Math.cos(table.facing ?? 0), sx = fz, sz = -fx; // sideways
+    const a = spots[0], brass: THREE.BufferGeometry[] = [], rope: THREE.BufferGeometry[] = [];
+    const posts = [-0.4, 0.95, 2.3, 3.65].map((t) => ({ x: a.x + fx * t, z: a.z + fz * t }));
+    for (const s of [-1, 1]) {
+      const ps = posts.map((p) => {
+        const x = p.x + sx * s * 0.55, z = p.z + sz * s * 0.55, y = this.ctx.ground.heightAt(x, z);
+        brass.push(new THREE.CylinderGeometry(0.09, 0.1, 0.1, 14).translate(x, y + 0.04, z));
+        brass.push(new THREE.CylinderGeometry(0.02, 0.02, 0.84, 8).translate(x, y + 0.5, z));
+        brass.push(new THREE.SphereGeometry(0.038, 10, 8).translate(x, y + 0.93, z));
+        return new THREE.Vector3(x, y + 0.82, z);
+      });
+      for (let i = 1; i < ps.length; i++) {
+        // a gentle sag: two straight pieces dipping to the middle
+        const mid = ps[i - 1].clone().lerp(ps[i], 0.5).add(new THREE.Vector3(0, -0.09, 0));
+        for (const [p, q] of [[ps[i - 1], mid], [mid, ps[i]]]) {
+          const len = p.distanceTo(q), g = new THREE.CylinderGeometry(0.014, 0.014, len, 6);
+          g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), q.clone().sub(p).normalize()));
+          rope.push(g.translate((p.x + q.x) / 2, (p.y + q.y) / 2, (p.z + q.z) / 2));
+        }
+      }
+    }
+    const brassMesh = new THREE.Mesh(mergeGeometries(brass)!, new THREE.MeshStandardMaterial({ color: 0xc9a24a, metalness: 0.7, roughness: 0.35 }));
+    const ropeMesh = new THREE.Mesh(mergeGeometries(rope)!, new THREE.MeshStandardMaterial({ color: 0x9b1c1c, roughness: 0.8 }));
+    brassMesh.castShadow = ropeMesh.castShadow = true;
+    this.ctx.scene.add(brassMesh, ropeMesh);
   }
 
   private addTable(table: OfferingTable) {
@@ -149,7 +272,12 @@ export class Offerings {
       this.ctx.interactions.add({ id: `${table.hallId}-${key}`, x, z, radius: 1.0, prompt, onInteract: act });
 
     const stand = table.stand ?? { x: table.x + fx, z: table.z + fz };
-    add('incense', stand.x, stand.z, () => (this.ritual ? null : { text: t('prompt.placeIncense') }), () => this.startRitual(table));
+    const waiting = () => this.queues.get(table.hallId)?.length ?? 0;
+    add('incense', stand.x, stand.z, () => (this.ritual || this.inLine ? null : { text: waiting() ? t('prompt.joinLine', { n: waiting() }) : t('prompt.placeIncense') }), () => this.joinLine(table));
+    // pressing E anywhere along the line queues you too (when there is one)
+    const spots = this.lineSpots(table);
+    spots.slice(0, 5).forEach((p, i) => add(`line${i}`, p.x, p.z, () => (this.ritual || this.inLine || !waiting() ? null : { text: t('prompt.joinLine', { n: waiting() }) }), () => this.joinLine(table)));
+    this.buildStanchions(table, spots);
     table.slots.forEach((slot, i) =>
       add(`plate${i}`, slot.x + fx * 0.92, slot.z + fz * 0.92, () => ({ text: this.inventory.length ? t('prompt.offerAllFruit', { n: this.inventory.length }) : t('prompt.offerFruit') }), () => {
         // Required: a clear message when there's nothing to offer.
@@ -159,8 +287,8 @@ export class Offerings {
     );
   }
 
-  private startRitual(table: OfferingTable) {
-    if (this.ritual || this.player.mode !== 'free') return;
+  private startRitual(table: OfferingTable, fromLine = false) {
+    if (this.ritual || (!fromLine && this.player.mode !== 'free')) return;
     const stand = table.stand ?? { x: table.x + Math.sin(table.facing ?? 0), z: table.z + Math.cos(table.facing ?? 0) };
     const bowl = table.bowl ?? { x: table.x, z: table.z };
     const yaw = Math.atan2(-(bowl.x - stand.x), -(bowl.z - stand.z));
@@ -179,8 +307,9 @@ export class Offerings {
       if (++r.step >= RITUAL.length) {
         this.ritual = null;
         this.incense = 0;
-        this.player.release();
-        this.ctx.interactions.enabled = true;
+        if (this.inLine) this.net.queue(this.inLine, false); // done: out of the line, the next steps up
+        this.inLine = null;
+        this.releasePlayer();
         return;
       }
     }
@@ -249,6 +378,7 @@ export class Offerings {
 
   update(dt: number) {
     const now = Date.now();
+    this.updateLine(dt);
     this.updateRitual(dt);
     // The big courtyard burner always smoulders a little.
     this.ambientAcc += dt * 5;

@@ -126,7 +126,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.8);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  const s = 60;
+  const s = 75; // the shadow box is 150 m across, slid ahead of the camera (see follow)
   Object.assign(sun.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 400 });
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.03;
@@ -182,9 +182,18 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     nightGlow.update(lighting.night);
   }
 
-  /** Shadow frustum follows the player. */
-  function follow(p: THREE.Vector3) {
-    sun.target.position.set(Math.round(p.x), 0, Math.round(p.z));
+  /**
+   * Shadow box follows the player, slid forward along `look` (the camera's direction) so it covers what's
+   * on screen — from ~20 m behind you to ~130 m ahead — instead of wasting half of it behind the camera.
+   */
+  function follow(p: THREE.Vector3, look?: THREE.Vector3) {
+    let fx = 0, fz = 0;
+    if (look) {
+      const l = Math.hypot(look.x, look.z) || 1;
+      [fx, fz] = [(look.x / l) * s * 0.75, (look.z / l) * s * 0.75];
+    }
+    // at your height, not sea level: up on the ridge the stupas beside you were above the box
+    sun.target.position.set(Math.round((p.x + fx) / 2) * 2, Math.round(p.y / 2) * 2, Math.round((p.z + fz) / 2) * 2);
     sun.position.copy(sun.target.position).addScaledVector(lightDir, 200);
   }
   return { sun, follow, update };

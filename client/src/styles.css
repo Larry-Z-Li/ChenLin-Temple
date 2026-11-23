@@ -205,6 +205,13 @@ body.touch .minimap-btn { display: grid; place-items: center; position: fixed; r
 .wish-meta { font-size: 13px; opacity: 0.75; text-align: right; }
 .pill-btn { height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--ink); font: 600 15px var(--sans); cursor: pointer; }
 .wish-actions .primary-btn { height: 40px; padding: 0 20px; }
+/* Beads and a sutra together: the bead count moves left of the sutra panel. On phones the sutra may
+   cover the beads themselves, but stops short of the count (top) and the ◀ ▶ arrows (bottom). */
+body.beads-sutra .info { left: 16px; transform: none; max-width: max(180px, calc(100vw - 620px)); }
+@media (max-width: 640px) {
+  body.beads-sutra .info { left: 50%; transform: translateX(-50%); max-width: calc(100vw - 32px); }
+  body.beads-sutra .sutra-panel { top: 108px; bottom: 156px; }
+}
 .wishlist-card { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); grid-template-rows: auto 1fr auto; }
 .wishlist { overflow-y: auto; display: grid; gap: 6px; align-content: start; min-height: 0; }
 .wishlist-row { border-radius: 10px; background: rgba(255, 248, 235, 0.06); }

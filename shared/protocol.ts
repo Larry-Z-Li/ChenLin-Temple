@@ -1,7 +1,9 @@
 // Wire protocol shared by client and server. No outside dependencies (only ./moderation, beside it).
 import { isBlocked } from './moderation';
 
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
+/** Longest incense line at one table (the one offering counts). */
+export const QUEUE_MAX = 8;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -18,6 +20,8 @@ export const ANIMS = [
   'cross', 'crossBeads', 'crossRead', 'crossBow',
   // standing with prayer beads / reading a sutra
   'standBeads', 'standRead',
+  // reading with the beads in the other hand: seated cross-legged, on a bench, standing
+  'crossReadBeads', 'sitReadBeads', 'standReadBeads',
 ] as const;
 export type Anim = (typeof ANIMS)[number];
 
@@ -77,7 +81,8 @@ export interface Offering {
  * Wish lanterns: anyone can hang one; they stay 30 days. Two walls: the garden racks on the plaza
  * (when full, the oldest comes down) and the lantern wall in the first hall (when full, it says so).
  */
-export type WishBoard = 'garden' | 'hall';
+/** 'garden' (the old racks), or the id of the hall whose lantern wall it's on ('hall' = baosheng, from before every hall had one). */
+export type WishBoard = string;
 export const WISH_SLOTS = 90;
 /** The hall's lantern wall: two 7×7 grids either side of the back door. */
 export const HALL_WISH_SLOTS = 98;
@@ -116,6 +121,8 @@ export type ClientMsg =
   | { t: 'wish'; title: string; text: string; color: number; board?: WishBoard; side?: number }
   /** Flag a lantern as unkind; enough different people and it comes down. */
   | { t: 'report'; id: string }
+  /** Join (or leave) the line to offer incense at a hall's table. The front of the line is the one offering. */
+  | { t: 'queue'; hall: string; join: boolean }
   /** Give one fruit from your basket to a deer (they eat any kind). */
   | { t: 'feed'; deer: string; fruit: Fruit }
   | { t: 'offer'; hall: string; kind: 'incense' }
@@ -137,6 +144,8 @@ export type ServerMsg =
       /** hallId -> today's offerings */
       offerings: Record<string, Offering[]>;
       wishes: Wish[];
+      /** Incense lines with anyone in them: hall → player ids, front first. */
+      queues: Record<string, string[]>;
     }
   | { t: 'join'; player: PlayerInfo & { tr: Transform } }
   | { t: 'leave'; id: string }
@@ -149,6 +158,8 @@ export type ServerMsg =
   | { t: 'strike'; inst: string; by: string }
   | { t: 'wishAdded'; wish: Wish }
   | { t: 'wishRemoved'; id: string }
+  /** A hall's incense line, front first. */
+  | { t: 'queue'; hall: string; ids: string[] }
   | { t: 'wishDenied'; reason: WishDenyReason }
   | { t: 'fed'; deer: string; by: string; fruit: Fruit }
   | { t: 'pickDenied'; fruit: string; reason: 'gone' | 'full' }

@@ -72,6 +72,10 @@ export const POSES: Record<Anim, Pose> = {
   standBeads: { ...STAND, rArm: 0.5, rArmZ: 0.05, rFore: 1.7, head: 0.18 },
   standRead: { ...STAND, lArm: 0.45, rArm: 0.45, lArmZ: -0.04, rArmZ: 0.04, lFore: 1.55, rFore: 1.55, head: 0.35 },
   crossRead: { ...CROSS, lArm: 0.45, rArm: 0.45, lArmZ: -0.04, rArmZ: 0.04, lFore: 1.55, rFore: 1.55, head: 0.35 },
+  // the sutra in the right hand, counting beads with the left
+  crossReadBeads: { ...CROSS, rArm: 0.45, rArmZ: 0.04, rFore: 1.55, lArm: 0.5, lArmZ: -0.05, lFore: 1.7, head: 0.35 },
+  sitReadBeads: { ...SIT, rArm: 0.45, rArmZ: 0.04, rFore: 1.55, lArm: 0.5, lArmZ: -0.05, lFore: 1.7, head: 0.35 },
+  standReadBeads: { ...STAND, rArm: 0.45, rArmZ: 0.04, rFore: 1.55, lArm: 0.5, lArmZ: -0.05, lFore: 1.7, head: 0.35 },
   crossBow: { ...CROSS, ...HEART, torso: 0.6, head: 0.25 },
 };
 

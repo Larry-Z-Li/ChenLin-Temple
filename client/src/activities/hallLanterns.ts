@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { HALL_WISH_SLOTS, type Wish } from '../../../shared/protocol';
 import { box, cylinder, mat } from '../buildings/materials';
-import { HALLS, PLATFORM_H, WISH_HALL } from '../config/layout';
+import { HALLS, hallYaw, PLATFORM_H } from '../config/layout';
+import { rug } from '../buildings/hallFurnishings';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { canvasTexture } from '../core/textures';
@@ -23,8 +24,8 @@ const PER_WALL = GRID * GRID; // slots 0–48 the left wall (west), 49–97 the 
 const wallOf = (slot: number) => (slot < PER_WALL ? 0 : 1);
 
 /**
- * The lantern wall (光明燈) in the first hall: two 7×7 grids of small glowing lanterns on the back
- * wall, either side of the back door behind the Buddha. A writing table in each back corner (paper
+ * A hall's lantern wall (光明燈) — every hall has one: two 7×7 grids of small glowing lanterns on the
+ * back wall, either side of the middle (the back door, where there is one) behind the altar. A writing table in each back corner (paper
  * lantern, string, scissors, pencil) lets you hang one — title, wish and colour — for 30 days; when
  * all 98 hooks are taken it turns you away. The wall itself opens the list of every wish.
  */
@@ -47,34 +48,49 @@ export class HallLanterns {
   private shakes = new Map<number, number>();
   private glow: Lamp[];
   private walls: { at: THREE.Vector3; view: THREE.Vector3 }[] = [];
+  /** Lantern size (smaller in lower halls, where the rows are closer). */
+  private scale = SCALE;
 
-  constructor(ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string) {
-    const hall = HALLS.find((x) => x.id === WISH_HALL)!;
-    const F = PLATFORM_H, hw = hall.width / 2, wall = hall.z - hall.depth / 2 + 0.2; // inner face of the back wall
-    const cx = (2 + hw) / 2; // middle of each wall stretch beside the 4 m back door
+  constructor(ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string, readonly hallId: string) {
+    const hall = HALLS.find((x) => x.id === hallId)!;
+    const F = PLATFORM_H, hw = hall.width / 2, wall = -hall.depth / 2 + 0.2; // inner face of the back wall
+    const cx = (2 + hw) / 2; // middle of each wall stretch beside the middle 4 m
+    // Built in the hall's own space (as if it faced south), then turned with the hall; W() gives world positions.
+    const root = new THREE.Group();
+    root.position.set(hall.x, 0, hall.z);
+    root.rotation.y = hallYaw(hall);
+    root.updateMatrixWorld();
+    ctx.scene.add(root);
+    const W = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(root.matrixWorld);
     // Each grid casts real light into the hall, brighter as it fills.
-    this.glow = [-1, 1].map((s) => addLamp({ x: hall.x + s * cx, y: F + 3.4, z: wall + 1.2, color: 0xffb27a, intensity: 0, range: 8, decay: 1.6, indoor: true }));
+    this.glow = [-1, 1].map((s) => {
+      const p = W(s * cx, F + 3.4, wall + 1.2);
+      return addLamp({ x: p.x, y: p.y, z: p.z, color: 0xffb27a, intensity: 0, range: 8, decay: 1.6, indoor: true });
+    });
 
     // ---- The hangers: lacquered rails on the wall with gold hooks, under a 光明燈 board ----
     const red = mat(THEME.column, { roughness: 0.55 });
     const gold = mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 });
-    const rail0 = F + 1.6, w = (GRID - 1) * COL + 0.7;
+    // Fit the grid under the ceiling: lower halls start the bottom row lower and space the rows closer.
+    const low = (hall.wallHeight - 2.575) / (GRID - 1) < ROW;
+    const rail0 = F + (low ? 1.2 : 1.6), row = Math.min(ROW, (hall.wallHeight - (low ? 2.175 : 2.575)) / (GRID - 1)), w = (GRID - 1) * COL + 0.7;
+    this.scale = SCALE * Math.min(1, row / ROW);
     for (const s of [-1, 1]) {
-      const gx = hall.x + s * cx;
-      for (let r = 0; r < GRID; r++) ctx.scene.add(box(w, 0.07, 0.08, red, gx, rail0 + r * ROW - 0.035, wall + 0.06));
-      for (const e of [-1, 1]) ctx.scene.add(box(0.12, GRID * ROW + 0.3, 0.12, red, gx + (e * w) / 2, rail0 - 0.9, wall + 0.06));
+      const gx = s * cx;
+      for (let r = 0; r < GRID; r++) root.add(box(w, 0.07, 0.08, red, gx, rail0 + r * row - 0.035, wall + 0.06));
+      for (const e of [-1, 1]) root.add(box(0.12, GRID * row + 0.3, 0.12, red, gx + (e * w) / 2, rail0 - 0.9, wall + 0.06));
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.55), new THREE.MeshStandardMaterial({ map: signTexture() }));
-      sign.position.set(gx, rail0 + (GRID - 1) * ROW + 0.55, wall + 0.04);
-      ctx.scene.add(sign);
+      sign.position.set(gx, rail0 + (GRID - 1) * row + 0.55, wall + 0.04);
+      root.add(sign);
       // The camera's framing of this whole wall, from the room.
-      const cy = rail0 + ((GRID - 1) * ROW) / 2 + 0.2;
-      this.walls.push({ at: new THREE.Vector3(gx, cy, wall), view: new THREE.Vector3(gx, cy - 0.3, wall + 7.4) });
+      const cy = rail0 + ((GRID - 1) * row) / 2 + 0.2;
+      this.walls.push({ at: W(gx, cy, wall), view: W(gx, cy - 0.3, wall + 7.4) });
       for (let r = 0; r < GRID; r++)
-        for (let c = 0; c < GRID; c++) this.hooks.push(new THREE.Vector3(gx + (c - (GRID - 1) / 2) * COL, rail0 + (GRID - 1 - r) * ROW, wall + 0.36));
+        for (let c = 0; c < GRID; c++) this.hooks.push(new THREE.Vector3(gx + (c - (GRID - 1) / 2) * COL, rail0 + (GRID - 1 - r) * row, wall + 0.36));
     }
     const hookMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.012, 0.012, 0.28, 5).rotateX(Math.PI / 2).translate(0, 0, -0.13), gold, HALL_WISH_SLOTS);
     this.hooks.forEach((p, i) => hookMesh.setMatrixAt(i, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z)));
-    ctx.scene.add(hookMesh);
+    root.add(hookMesh);
 
     // ---- Lanterns (one per hook, hidden until hung): always lit indoors ----
     const { body, trim } = lanternGeometries();
@@ -85,23 +101,25 @@ export class HallLanterns {
       this.bodies.setMatrixAt(i, this.hidden);
       this.trims.setMatrixAt(i, this.hidden);
       this.bodies.setColorAt(i, new THREE.Color(0xffffff));
-      halo.push(p.x, p.y - 0.55 * SCALE, p.z);
+      halo.push(p.x, p.y - 0.55 * this.scale, p.z);
     });
     this.halos = haloPoints(halo, new Array(halo.length).fill(0), 0.95, 0.85, 0.6);
-    ctx.scene.add(this.bodies, this.trims, this.halos);
+    root.add(this.bodies, this.trims, this.halos);
 
     // ---- Writing tables in the back corners ----
     // Each side is its own wall: its table hangs lanterns there, it fills up on its own, and lists its own wishes.
     [-1, 1].forEach((s, side) => {
-      const tx = hall.x + s * (hw - 1.4), tz = wall + 1.5;
-      writingTable(ctx, tx, F, tz);
+      const tx = s * (hw - 1.4), tz = wall + 1.5;
+      writingTable(ctx, root, tx, F, tz, W);
+      rug(root, tx, F, tz + 1.05, 1.6, 1.1); // to stand on while you write
+      const ti = W(tx, 0, tz + 0.9), wi = W(s * cx, 0, wall + 1.5);
       ctx.interactions.add({
-        id: `hallwish-table${s}`, x: tx, z: tz + 0.9, radius: 1.2,
+        id: `hallwish-${hallId}-table${s}`, x: ti.x, z: ti.z, radius: 1.2,
         prompt: () => ({ text: this.full(side) ? t('prompt.hallWishFull') : wishWait() ? t('prompt.wishWait', { s: wishWait() }) : t('prompt.hallWish') }),
         onInteract: () => (this.full(side) ? this.hud.toast(t('hallWish.full')) : wishWait() ? this.hud.toast(t('wish.wait', { s: wishWait() })) : this.openForm(side)),
       });
       ctx.interactions.add({
-        id: `hallwish-wall${s}`, x: hall.x + s * cx, z: wall + 1.5, radius: 2.1,
+        id: `hallwish-${hallId}-wall${s}`, x: wi.x, z: wi.z, radius: 2.1,
         prompt: () => ({ text: t('prompt.hallList', { n: this.onWall(side).length }) }),
         onInteract: () => this.openList(side, 0),
       });
@@ -110,7 +128,7 @@ export class HallLanterns {
     this.panel = h('div', { class: 'wish-overlay hidden', onclick: (e: MouseEvent) => e.target === this.panel && this.close() });
     ui.append(this.panel);
 
-    const mine = (w: Wish) => w.board === 'hall';
+    const mine = (w: Wish) => (w.board === 'hall' ? 'baosheng' : w.board) === hallId; // 'hall': saved before every hall had a wall
     net.on('welcome', (msg) => {
       for (const id of [...this.wishes.keys()]) this.remove(id);
       for (const w of msg.wishes) if (mine(w)) this.add(w);
@@ -134,7 +152,7 @@ export class HallLanterns {
 
     // Gentle sway.
     let acc = 0;
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(SCALE, SCALE, SCALE);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(this.scale, this.scale, this.scale);
     ctx.updaters.push((dt, time) => {
       if ((acc += dt) < 0.05 || !this.bySlot.size) return;
       acc = 0;
@@ -223,7 +241,7 @@ export class HallLanterns {
   private openForm(side: number) {
     showWishForm(this.panel, this.hud, 'hallWish.heading', (title, text, color) => {
       this.pending = title;
-      this.net.hangWish(title, text, color, this.myName, this.freeSlot(side), 'hall', side);
+      this.net.hangWish(title, text, color, this.myName, this.freeSlot(side), this.hallId, side);
       this.player.gesture('reach', 0.8);
     }, () => this.close());
   }
@@ -294,7 +312,7 @@ function signTexture() {
 }
 
 /** A small writing table: an unlit paper lantern, a coil of red string, scissors, a pencil and paper slips. */
-function writingTable(ctx: WorldContext, x: number, F: number, z: number) {
+function writingTable(ctx: WorldContext, parent: THREE.Object3D, x: number, F: number, z: number, W: (x: number, y: number, z: number) => THREE.Vector3) {
   const wood = mat(0x5a2b1a, { roughness: 0.55 });
   const top = F + 0.8;
   const g = new THREE.Group();
@@ -333,6 +351,7 @@ function writingTable(ctx: WorldContext, x: number, F: number, z: number) {
   sc.position.set(x + 0.36, top + 0.008, z + 0.14);
   sc.rotation.y = -0.6;
   g.add(sc);
-  ctx.scene.add(g);
-  ctx.collisions.addBoxCentered(x, z, 1.2, 0.72);
+  parent.add(g);
+  const p = W(x, 0, z), turned = Math.abs(Math.sin(parent.rotation.y)) > 0.5;
+  ctx.collisions.addBoxCentered(p.x, p.z, turned ? 0.72 : 1.2, turned ? 1.2 : 0.72);
 }

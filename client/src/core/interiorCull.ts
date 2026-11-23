@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HALLS, hallHalf } from '../config/layout';
+import { HALLS, hallHalf, PLATFORM_H } from '../config/layout';
 
 /**
  * Hall interiors (altars, statues, cushions, furnishings, lanterns) are much of what's left to draw,
@@ -9,7 +9,9 @@ import { HALLS, hallHalf } from '../config/layout';
  */
 const zones = HALLS.map((h, i) => {
   const [ex, ez] = hallHalf(h);
-  return { x: h.x, z: h.z, ex, ez, layer: i + 1 };
+  // up to the top of the walls: the roofs (and a two-tier hall's upper storey, which sits inside the
+  // walls' outline) are outside, and must never be hidden with the interior
+  return { x: h.x, z: h.z, ex, ez, top: PLATFORM_H + h.wallHeight + 0.05, layer: i + 1 };
 });
 /** Walls are 0.4 m thick and centred on the hall's edge; anything past their inner face is outside. */
 const INNER = 0.25;
@@ -34,7 +36,7 @@ export function interiorLayer(o: THREE.Object3D): number {
   } else return 0;
   for (const z of zones) {
     const ix = z.ex - INNER, iz = z.ez - INNER;
-    if (box.min.x >= z.x - ix && box.max.x <= z.x + ix && box.min.z >= z.z - iz && box.max.z <= z.z + iz) return z.layer;
+    if (box.max.y <= z.top && box.min.x >= z.x - ix && box.max.x <= z.x + ix && box.min.z >= z.z - iz && box.max.z <= z.z + iz) return z.layer;
   }
   return 0;
 }

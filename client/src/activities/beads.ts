@@ -63,6 +63,13 @@ export class Mala {
     return Math.floor(this.target / BEAD_COUNT);
   }
 
+  /** Left hand (bottom-left of the screen): when a sutra is open on the right. */
+  setLeftHand(v: boolean) {
+    this.left = v;
+  }
+  private left = false;
+  private side = 1;
+
   show(v: boolean) {
     this.visible = v;
     if (v) this.group.visible = true;
@@ -109,7 +116,8 @@ export class Mala {
     const s = THREE.MathUtils.clamp((px * halfH) / (BEAD_R * window.innerHeight), 0.8, 3.4);
     this.group.scale.setScalar(s);
     this.baseY = -0.22 * halfH - B * s; // the bead under the thumb sits just below centre
-    this.group.position.x = Math.min(halfW * 0.35, halfW - A * s * 1.6);
+    this.group.position.x = this.side * Math.min(halfW * 0.35, halfW - A * s * 1.6);
+    this.group.rotation.y = this.side * 0.55;
   }
 
   update(dt: number) {
@@ -119,6 +127,7 @@ export class Mala {
       return;
     }
     this.materials.forEach((m) => (m.opacity = this.fade * (m instanceof THREE.SpriteMaterial ? 0.35 : 1)));
+    this.side = damp(this.side, this.left ? -1 : 1, 7, dt);
     this.fit();
     this.group.position.y = this.baseY - (1 - this.fade) * 0.25 * this.group.scale.y;
     if (Math.abs(this.offset - this.target) > 1e-4) {

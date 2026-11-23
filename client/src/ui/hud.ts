@@ -262,9 +262,10 @@ export class Hud {
     this.beadBtns.classList.toggle('hidden', !v);
   }
 
-  setSeatState(focus: Focus) {
-    for (const [k, b] of Object.entries(this.seatBtns)) b.classList.toggle('active', k === focus);
-    for (const [k, b] of Object.entries(this.standBtns)) b.classList.toggle('active', k === focus);
+  /** Light up the buttons for what's in hand (beads and a sutra can be on together). */
+  setSeatState(active: Focus[]) {
+    for (const [k, b] of Object.entries(this.seatBtns)) b.classList.toggle('active', active.includes(k as Focus));
+    for (const [k, b] of Object.entries(this.standBtns)) b.classList.toggle('active', active.includes(k as Focus));
   }
 
   /** Fruit being carried, grouped by kind. */

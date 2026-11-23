@@ -250,7 +250,7 @@ function rugTexture() {
   })());
 }
 
-function rug(parent: THREE.Group, x: number, F: number, z: number, w: number, d: number) {
+export function rug(parent: THREE.Object3D, x: number, F: number, z: number, w: number, d: number) {
   parent.add(box(w, 0.008, d, mat(0xa8842c, { roughness: 0.85 }), x, F + FLOOR_TOP, z, false));
   const tex = rugTexture().clone();
   tex.repeat.set((w - 0.3) / 1.1, (d - 0.3) / 1.1);

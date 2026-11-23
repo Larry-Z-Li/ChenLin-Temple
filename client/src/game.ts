@@ -185,7 +185,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     onChants: () => chantPanel.show(!chantPanel.isOpen),
     onFastTravel: () => (insideHall() ? hud.toast(t('travel.inside')) : (seat.endStanding(), bigMap.toggle(true))),
     onMap: () => bigMap.toggle(),
-    onPrompt: () => !seat.seated && ctx.interactions.trigger(),
+    onPrompt: () => (offerings.queued ? offerings.leaveLine() : !seat.seated && ctx.interactions.trigger()),
     onBow: () => bow(),
     onBeadStep: (dir) => mala.step(dir),
     onGraphics: () => applyGraphics(),
@@ -226,9 +226,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   };
   const wildlife = new Wildlife(ctx, net, offerings, player, () => remotes.positions()); // registers the cat before the instruments pick it up
   const instruments = new Instruments(ctx, net, player);
-  const hallWishes = staticBuild(() => new HallLanterns(ctx, net, hud, player, uiEl, settings.name));
+  // A lantern wall (光明燈) in every hall (not the open shrines).
+  const lanternWalls = staticBuild(() => HALLS.filter((h) => h.kind === 'hall').map((h) => new HallLanterns(ctx, net, hud, player, uiEl, settings.name, h.id)));
+  const hallWishes = lanternWalls.find((w) => w.hallId === 'baosheng')!;
   const bodhiBell = staticBuild(() => new BodhiBell(ctx));
-  hallWishes.onHung = (shot) => bodhiBell.ring(shot);
+  for (const w of lanternWalls) w.onHung = (shot) => bodhiBell.ring(shot);
   buildNightLights(); // every lamp is registered by now
   buildFloodlights(ctx);
   // Thousands of small static meshes → a few hundred (draw calls are what phones struggle with).
@@ -277,7 +279,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     }
     if (e.code === 'KeyM') return bigMap.toggle(), true;
     if (e.code === 'Escape' && bigMap.isOpen) return bigMap.show(false), true;
-    if (e.code === 'Escape' && hallWishes.isOpen) return hallWishes.close(), true;
+    if (e.code === 'Escape' && offerings.queued) return offerings.leaveLine(), true;
+    const openWall = lanternWalls.find((w) => w.isOpen);
+    if (e.code === 'Escape' && openWall) return openWall.close(), true;
     if (e.code === 'KeyC') return chantPanel.show(!chantPanel.isOpen), true; // listening works anywhere
     if (e.code === 'Escape' && chantPanel.isOpen) return chantPanel.show(false), true;
     if (e.code === 'Escape' && hud.settingsOpen) return hud.toggleSettings(false), true;
@@ -290,6 +294,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const clock = new THREE.Clock();
   let sendAcc = 0, mapAcc = 0, lastSent = '';
   const intro = new Intro(ctx, camera, player, ridge);
+  const lookDir = new THREE.Vector3();
 
   // Frame rate: the optional counter, and 'auto' graphics stepping down to low (and remembering it)
   // when this device can't keep up on high. Measured twice a second; a hidden tab doesn't count.
@@ -321,7 +326,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       for (const u of ctx.updaters) u(dt, time);
       remotes.update(dt, camera);
       sky.update(dt);
-      sky.follow(player.pos);
+      sky.follow(player.pos, camera.getWorldDirection(lookDir));
       bigMap.draw(player.pos, player.yaw, remotes.positions()); // the start page's map button
       updateInteriors(camera, graphicsLevel() === 'low' ? 1 : 2);
       renderer.render(scene, camera);
@@ -368,7 +373,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     rig.update(dt, player.pos, seat.seated ? 1.0 : 1.55, ctx.cameraBlockers, ctx.ground);
     bodhiBell.applyCamera(camera);
     sky.update(dt);
-    sky.follow(player.pos);
+    sky.follow(player.pos, camera.getWorldDirection(lookDir));
 
     sendAcc += dt;
     if (sendAcc >= 1 / SNAPSHOT_HZ) {
@@ -413,7 +418,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       player.avatar.setColor(color);
       player.avatar.clasp = false;
       player.avatar.root.name = name;
-      hallWishes.myName = name;
+      for (const w of lanternWalls) w.myName = name;
       joinAs = { name, color };
       phase = 'play';
       landing = true;

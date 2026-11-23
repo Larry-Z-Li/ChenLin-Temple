@@ -117,7 +117,6 @@ export const HALLS: HallDef[] = [
 ];
 const hall = (id: string) => HALLS.find((h) => h.id === id)!;
 /** The hall with the lantern wall (光明燈): the first one in from the plaza. */
-export const WISH_HALL = 'baosheng';
 const STAIRS = 1.6 + 2.1; // porch + steps beyond the walls
 
 /** The walled court around the great stupa (gates in the middle of each side). */

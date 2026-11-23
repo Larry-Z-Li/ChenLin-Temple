@@ -11,6 +11,9 @@ const PROMPT: Record<Instrument['kind'], I18nKey> = {
   bell: 'prompt.strikeBell',
   cat: 'prompt.petCat',
 };
+/** Only you hear these (your own practice); the drum, the bell and a purring cat carry to everyone nearby. */
+const PRIVATE = new Set<Instrument['kind']>(['bowl', 'woodfish']);
+
 const RADIUS: Record<Instrument['kind'], number> = { bowl: 1.15, woodfish: 1.15, drum: 1.5, bell: 1.5, cat: 1.6 };
 /** How far each instrument carries (metres until silent). */
 const REACH: Record<Instrument['kind'], number> = { bowl: 45, woodfish: 30, drum: 80, bell: 90, cat: 15 };
@@ -31,7 +34,7 @@ export class Instruments {
     }
     net.on('strike', (id, by) => {
       const ins = this.byId.get(id);
-      if (ins && by !== net.id) this.sound(ins);
+      if (ins && by !== net.id && !PRIVATE.has(ins.kind)) this.sound(ins);
     });
   }
 
@@ -43,7 +46,7 @@ export class Instruments {
     p.yaw = Math.atan2(-(ins.x - p.pos.x), -(ins.z - p.pos.z)); // face it
     p.gesture('reach', 0.45);
     this.sound(ins);
-    this.net.strike(ins.id);
+    if (!PRIVATE.has(ins.kind)) this.net.strike(ins.id);
   }
 
   private sound(ins: Instrument) {

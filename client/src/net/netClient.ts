@@ -33,6 +33,7 @@ export interface NetEvents {
   offered: (hall: string, offering: Offering, by: string) => void;
   offerDenied: (reason: 'noFruit' | 'full') => void;
   newDay: () => void;
+  queue: (hall: string, ids: string[]) => void;
 }
 
 /**
@@ -120,6 +121,7 @@ export class NetClient {
       case 'strike': return this.emit('strike', msg.inst, msg.by);
       case 'wishAdded': return this.emit('wishAdded', msg.wish);
       case 'wishRemoved': return this.emit('wishRemoved', msg.id);
+      case 'queue': return this.emit('queue', msg.hall, msg.ids);
       case 'wishDenied': return this.emit('wishDenied', msg.reason);
       case 'fed': return this.emit('fed', msg.deer, msg.by, msg.fruit);
       case 'pickDenied': return this.emit('pickDenied', msg.fruit, msg.reason);
@@ -165,6 +167,11 @@ export class NetClient {
   }
 
   /** Flag a lantern as unkind (the server takes it down after enough different people do). */
+  /** Join or leave a hall's incense line. False when offline (then there's no line to wait in). */
+  queue(hall: string, join: boolean) {
+    return this.send({ t: 'queue', hall, join });
+  }
+
   reportWish(id: string) {
     this.send({ t: 'report', id });
   }
