@@ -160,6 +160,7 @@ export class HallLanterns {
       if (this.pending !== null && w.title === this.pending && w.name === this.myName) {
         this.pending = null;
         this.hud.toast(t('wish.hung'));
+        this.close(); // hung: back to the hall
         markHung();
         this.onHung(this.shotFor(w.slot));
       }
@@ -352,7 +353,7 @@ export class HallLanterns {
     bless.addEventListener('click', () => {
       this.close();
       const r = this.routes[side];
-      const route: BlessRoute = { hook: this.root.localToWorld(this.hooks[w.slot].clone().add(new THREE.Vector3(0, -0.5 * this.scale, 0))), start: r.start, to: (spot) => this.spotAt(spot, r.side) };
+      const route: BlessRoute = { hook: this.root.localToWorld(this.hooks[w.slot].clone().add(new THREE.Vector3(0, -0.5 * this.scale, 0))), scale: this.scale, start: r.start, to: (spot) => this.spotAt(spot, r.side) };
       this.blessing.start(w.id, lanternHex(w.color), route);
     });
     this.panel.replaceChildren(

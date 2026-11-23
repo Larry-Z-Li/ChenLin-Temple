@@ -11,18 +11,22 @@ import { lanternGeometries } from './wishLanterns';
 export interface BlessRoute {
   /** The lantern's hook on the wall, and where you stand facing it. */
   hook: THREE.Vector3;
+  /** The lantern's size on the wall (it keeps it all the way down, in your hands and back up). */
+  scale: number;
   start: { x: number; z: number; yaw: number };
   /** The way from `start` to the spot, ending at it, and which way the spot faces (the altar). */
   to: (spot: number) => { path: { x: number; z: number }[]; yaw: number };
 }
 
 type Phase = 'wait' | 'down' | 'walk' | 'bow' | 'dim' | 'back' | 'up';
-const DOWN = 1.3, BOW = 2.2, BOWS = 3, DIM = 1.0, UP = 1.1, SPEED = 1.5;
+const DOWN = 1.3, BOW = 2.2, BOWS = 3, DIM = 1.0, UP = 1.1, SPEED = 3.2;
+/** How brightly the lantern glows at the height of the prayer (× its usual glow). */
+export const BLESS_GLOW = 20;
 
 /**
  * 祝福願望: the lantern floats down from its hook into your hands; you walk to a place before the altar
  * (one the server picked, away from the incense stand and from anyone else blessing), bow three times as
- * it brightens to three times its glow, let it dim, walk back and hang it up again. Everyone sees it:
+ * it brightens to twenty times its glow, let it dim, walk back and hang it up again. Everyone sees it:
  * it's off the wall while you hold it, and how brightly it glows travels with your position.
  */
 export class LanternBlessing {
@@ -84,7 +88,7 @@ export class LanternBlessing {
   get flags() {
     const j = this.job;
     if (!j || j.phase === 'wait' || j.phase === 'down' || j.phase === 'up') return 0;
-    return FLAG_LANTERN | (Math.round(((this.glow - 1) / 2) * 3) << FLAG_GLOW_SHIFT);
+    return FLAG_LANTERN | (Math.round(((this.glow - 1) / (BLESS_GLOW - 1)) * 3) << FLAG_GLOW_SHIFT);
   }
 
   /** Ask for the lantern; the server answers with a spot (or someone else got there first). */
@@ -115,6 +119,7 @@ export class LanternBlessing {
     this.floaterMat.color.setHex(j.color);
     this.floaterMat.emissive.setHex(j.color);
     this.floaterMat.emissiveIntensity = 0.45;
+    this.floater.scale.setScalar(j.route.scale);
     this.floater.visible = true;
   }
 
@@ -167,7 +172,7 @@ export class LanternBlessing {
         this.floater.position.lerpVectors(j.route.hook, this.handAt(v), e);
         if (k < 1) break;
         this.floater.visible = false;
-        this.player.avatar.holdLantern(j.color, 1);
+        this.player.avatar.holdLantern(j.color, 1, j.route.scale);
         this.go('walk');
         break;
       }
@@ -178,15 +183,15 @@ export class LanternBlessing {
           this.go('bow');
         }
         break;
-      case 'bow': { // three bows, the lantern brightening to three times its glow
+      case 'bow': { // three bows, the lantern brightening to twenty times its glow
         const k = Math.min(1, j.t / (BOW * BOWS));
-        this.glow = 1 + 2 * k;
+        this.glow = 1 + (BLESS_GLOW - 1) * k;
         this.player.setAnchorAnim(j.t % BOW < BOW * 0.75 ? 'bow' : 'idle');
         if (k >= 1) this.go('dim');
         break;
       }
       case 'dim':
-        this.glow = 3 - 2 * Math.min(1, j.t / DIM);
+        this.glow = BLESS_GLOW - (BLESS_GLOW - 1) * Math.min(1, j.t / DIM);
         this.player.setAnchorAnim('idle');
         if (j.t >= DIM) this.go('back');
         break;
@@ -209,7 +214,7 @@ export class LanternBlessing {
         break;
       }
     }
-    if (this.job && (j.phase === 'walk' || j.phase === 'bow' || j.phase === 'dim' || j.phase === 'back')) this.player.avatar.holdLantern(j.color, this.glow);
+    if (this.job && (j.phase === 'walk' || j.phase === 'bow' || j.phase === 'dim' || j.phase === 'back')) this.player.avatar.holdLantern(j.color, this.glow, j.route.scale);
   }
 
   private finish() {

@@ -3,7 +3,9 @@ import { unlockAudio } from '../audio/sfx';
 import { saveSettings, settings } from '../config/settings';
 import { AVATAR_COLORS } from '../config/theme';
 import { t } from '../i18n';
+import { assetUrl } from '../content/manifest';
 import { h } from './dom';
+import { playQimenWarp } from './qimenWarp';
 
 /**
  * The entry panel (left, over a grey tint on the mountain intro): the temple's name and motto, then your name
@@ -30,7 +32,7 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) 
     }),
   );
   const enter = h('button', { class: 'entry-go', disabled: true }, h('span', { i18n: 'entry.enter' }), h('span', { class: 'entry-arrow' }, '→')) as HTMLButtonElement;
-  // 佛家奇門: straight to qimen.one (no flight; it doesn't wait for the temple to load either).
+  // 佛家奇門: the 九字 tunnel, then on to qimen.one (no flight; it doesn't wait for the temple to load either).
   const foQimen = h('button', { class: 'entry-go' }, h('span', { i18n: 'entry.foQimen' }), h('span', { class: 'entry-arrow' }, '→')) as HTMLButtonElement;
   // Or fly straight to one of the gate halls instead of the front gate.
   const hallBtns = ([['caishen', '生門院'], ['yangsheng', '休門院'], ['guanyin', '開門院'], ['guoxue', '景門院']] as const).map(([id, label]) => {
@@ -44,7 +46,8 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) 
     'div',
     { class: 'entry-panel' },
     h('div', { class: 'entry-kicker', i18n: 'entry.kicker' }),
-    h('h1', { class: 'entry-title', i18n: 'app.title' }),
+    // the title, with the Buddha seal stamped beside it (as on the loading screen)
+    h('div', { class: 'entry-titlerow' }, h('h1', { class: 'entry-title', i18n: 'app.title' }), h('img', { class: 'entry-seal', src: assetUrl('brand', 'seal.svg'), alt: '' })),
     h('div', { class: 'entry-sub', i18n: 'app.subtitle' }),
     h('label', { class: 'entry-field' }, h('span', { i18n: 'entry.name' }), name),
     h('div', { class: 'entry-field' }, h('span', { i18n: 'entry.robe' }), swatches),
@@ -70,7 +73,10 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) 
     }, 1000);
   };
   enter.addEventListener('click', () => go());
-  foQimen.addEventListener('click', () => location.assign('https://qimen.one/'));
+  foQimen.addEventListener('click', () => {
+    foQimen.disabled = true;
+    void playQimenWarp().then(() => location.assign('https://qimen.one/'));
+  });
   name.addEventListener('keydown', (e) => e.key === 'Enter' && go());
   return {
     done,

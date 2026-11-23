@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ANIMS, FLAG_CLOUD, FLAG_GLOW_SHIFT, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LANTERN, FLAG_LISTENING, type PlayerInfo, type Transform } from '../../../shared/protocol';
+import { BLESS_GLOW } from '../activities/lanternBlessing';
 import { damp, dampAngle } from '../core/math';
 import { Avatar } from '../player/avatar';
 
@@ -69,7 +70,7 @@ export class RemotePlayers {
       r.avatar.setListening((flags & FLAG_LISTENING) !== 0);
       r.avatar.setIncense(flags & FLAG_INCENSE ? (flags & FLAG_INCENSE_LIT ? 2 : 1) : 0);
       r.avatar.setCloud((flags & FLAG_CLOUD) !== 0);
-      r.avatar.holdLantern(flags & FLAG_LANTERN ? (this.lanternOf(id) ?? 0xffc46a) : null, 1 + ((flags >> FLAG_GLOW_SHIFT) & 3) * (2 / 3));
+      r.avatar.holdLantern(flags & FLAG_LANTERN ? (this.lanternOf(id) ?? 0xffc46a) : null, 1 + ((flags >> FLAG_GLOW_SHIFT) & 3) * ((BLESS_GLOW - 1) / 3));
       r.avatar.setTagVisible(camera.position.distanceTo(p) < 28);
       r.avatar.update(dt, r.speed);
     }

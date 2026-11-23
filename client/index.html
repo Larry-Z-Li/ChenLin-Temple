@@ -20,9 +20,7 @@
       .loader-circle svg { width: 150px; height: 150px; overflow: visible; }
       .loader .enso { fill: none; stroke: #1c1a18; stroke-width: 9; stroke-linecap: round; stroke-dasharray: 520; stroke-dashoffset: calc(520 - 470 * var(--p)); transition: stroke-dashoffset 0.8s ease; filter: url(#brush); }
       .loader-name { writing-mode: vertical-rl; font: 600 30px "Noto Serif TC", "Songti TC", serif; letter-spacing: 0.3em; color: #1c1a18; }
-      .loader-seal { position: absolute; transform: translate(62px, 52px) rotate(-6deg); width: 28px; height: 28px; border-radius: 3px; background: #b3281e; color: #fff6e6; display: grid; place-items: center; overflow: hidden; font: 700 15px "Noto Serif TC", serif; }
-      .loader-seal img { width: 100%; height: 100%; object-fit: cover; }
-      .loader-seal img + span { display: none; } /* a seal image, when there is one, replaces the character */
+      .loader-seal { position: absolute; transform: translate(64px, 54px) rotate(-6deg); width: 34px; height: 34px; }
       .loader-caps { font: 500 11px Cinzel, serif; letter-spacing: 0.5em; padding-left: 0.5em; color: #8b857c; }
       .loader-line { width: 180px; height: 1px; background: #e6e1d8; position: relative; overflow: hidden; }
       .loader-line span { position: absolute; inset: 0; background: #1c1a18; transform-origin: left; transform: scaleX(var(--p)); transition: transform 0.8s ease; }
@@ -35,8 +33,8 @@
         <div class="loader-mark">
           <div class="loader-circle">
             <svg viewBox="0 0 200 200"><path class="enso" d="M118,28 C160,38 182,78 172,118 C162,160 120,182 82,172 C42,160 20,120 30,82 C38,52 62,32 92,27" /></svg>
-            <!-- the seal: assets/brand/seal.png if it's there (e.g. a carved Buddha seal), else 辰 -->
-            <div class="loader-seal"><img src="assets/brand/seal.png" alt="" onerror="this.remove()" /><span>辰</span></div>
+            <!-- the seal: a seated Buddha carved in the style of a seal stamp (assets/brand/seal.svg) -->
+            <img class="loader-seal" src="assets/brand/seal.svg" alt="" />
           </div>
           <div class="loader-name">辰霖學院</div>
         </div>

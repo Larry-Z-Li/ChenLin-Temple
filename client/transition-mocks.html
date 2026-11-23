@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Transition Mocks</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500&family=Noto+Serif+TC:wght@600;700&display=swap" />
+    <style>
+      /* Dev page: three mocks of the 佛家奇門 transition (start page → qimen.one), each looping.
+         Click a panel to replay it; ?t=2.5 freezes all three at 2.5 s into the loop. */
+      html, body { margin: 0; height: 100%; background: #0d0f14; font-family: system-ui, sans-serif; }
+      .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 12px; height: 100%; box-sizing: border-box; }
+      .panel { position: relative; border-radius: 10px; overflow: hidden; background: #000; cursor: pointer; }
+      .panel canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .tag { position: absolute; top: 10px; left: 12px; z-index: 1; font: 600 12px system-ui; letter-spacing: 0.08em; color: rgba(255, 255, 255, 0.8); text-shadow: 0 1px 3px #000; }
+      @media (max-width: 800px) { .row { grid-template-columns: 1fr; height: auto; } .panel { height: 70vh; } }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="panel" data-fx="warp"><div class="tag">A · 星躍 Star warp</div><canvas></canvas></div>
+      <div class="panel" data-fx="gates"><div class="tag">B · 八門 Gate tunnel</div><canvas></canvas></div>
+      <div class="panel" data-fx="wheel"><div class="tag">C · 法輪 Wheel of light</div><canvas></canvas></div>
+    </div>
+    <script>
+      // Timeline: the start page and the button pressed (IDLE), the effect (FX), white and qimen.one (OUT).
+      const IDLE = 0.9, FX = 3.0, OUT = 1.6, LOOP = IDLE + FX + OUT;
+      const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+      const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+      let seed = 7;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const GOLD = '#f0c870', SERIF = '"Noto Serif TC", "Songti TC", serif';
+
+      function roundRect(g, x, y, w, h, r) {
+        g.beginPath(); g.moveTo(x + r, y);
+        g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+        g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+      }
+
+      /** Stand-in for the start page: dusk over hills, the name, and the 佛家奇門 button (pressed just before IDLE). */
+      function startPage(g, w, h, t) {
+        const sky = g.createLinearGradient(0, 0, 0, h);
+        sky.addColorStop(0, '#1b2a44'); sky.addColorStop(0.6, '#4a5d72'); sky.addColorStop(1, '#2c3a2e');
+        g.fillStyle = sky; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#22302a'; g.beginPath(); g.moveTo(0, h);
+        for (let i = 0; i <= 16; i++) g.lineTo((i / 16) * w, h * (0.74 + 0.05 * Math.sin(i * 1.3) + 0.02 * Math.sin(i * 3.1)));
+        g.lineTo(w, h); g.fill();
+        g.fillStyle = '#fbf6ea'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.font = `600 ${Math.round(Math.min(w, h) * 0.09)}px ${SERIF}`; g.fillText('辰霖學院', w / 2, h * 0.36);
+        const press = t > IDLE - 0.3 && t < IDLE ? 0.93 : 1, bw = Math.min(190, w * 0.45), bh = 46;
+        g.save(); g.translate(w / 2, h * 0.6); g.scale(press, press);
+        const b = g.createLinearGradient(-bw / 2, 0, bw / 2, 0); b.addColorStop(0, '#f3dcaa'); b.addColorStop(1, '#d6a95e');
+        g.fillStyle = b; roundRect(g, -bw / 2, -bh / 2, bw, bh, 6); g.fill();
+        g.fillStyle = '#2b1d0c'; g.font = `700 17px ${SERIF}`; g.fillText('佛家奇門  →', 0, 1);
+        g.restore();
+      }
+
+      /** The far side: white, then qimen.one coming up. */
+      function landing(g, w, h, k) {
+        g.fillStyle = '#fffdf6'; g.fillRect(0, 0, w, h);
+        g.fillStyle = `rgba(60,50,40,${smooth(0.25, 0.7, k) * 0.7})`; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.font = `500 ${Math.round(Math.min(w, h) * 0.05)}px Cinzel, serif`; g.fillText('qimen.one', w / 2, h / 2);
+      }
+
+      /** A white bloom from the centre over the last part of an effect. */
+      function bloom(g, w, h, k, from = 0.72) {
+        const e = smooth(from, 1, k); if (!e) return;
+        const R = Math.hypot(w, h) * (0.1 + 0.9 * e), gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, R);
+        gr.addColorStop(0, `rgba(255,253,246,${Math.min(1, e * 1.6)})`); gr.addColorStop(0.6, `rgba(255,246,220,${e})`); gr.addColorStop(1, `rgba(255,240,200,${e * e})`);
+        g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      }
+
+      // A · 星躍: stars stretch into streaks as you accelerate.
+      const STARS = Array.from({ length: 520 }, () => ({ a: rnd() * Math.PI * 2, r: 0.08 + rnd() * 0.95, z: rnd(), gold: rnd() < 0.35 }));
+      function warp(g, w, h, k) {
+        g.fillStyle = `rgba(5,7,16,${smooth(0, 0.18, k)})`; g.fillRect(0, 0, w, h);
+        const cx = w / 2, cy = h / 2, F = Math.hypot(w, h) * 0.09;
+        const D = k * 0.35 + k ** 4 * 3.2, vel = 0.35 + 13 * k ** 3; // depth travelled; speed
+        g.lineCap = 'round';
+        for (const s of STARS) {
+          const z = (((s.z - D) % 1) + 1) % 1 + 0.03, z2 = z + Math.min(0.6, vel * 0.025);
+          const r1 = (F * s.r) / z, r2 = (F * s.r) / z2, c = Math.cos(s.a), sn = Math.sin(s.a);
+          const a = clamp(1.15 - z) * smooth(0, 0.15, k);
+          g.strokeStyle = s.gold ? `rgba(255,214,130,${a})` : `rgba(220,232,255,${a})`;
+          g.lineWidth = 0.6 + 2.2 * (1 - z);
+          g.beginPath(); g.moveTo(cx + c * r2, cy + sn * r2); g.lineTo(cx + c * r1, cy + sn * r1); g.stroke();
+        }
+        // a faint gold tunnel glow that tightens as you speed up
+        const gl = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * (0.5 - 0.3 * k));
+        gl.addColorStop(0, `rgba(255,210,120,${0.25 * k})`); gl.addColorStop(1, 'rgba(255,210,120,0)');
+        g.fillStyle = gl; g.fillRect(0, 0, w, h);
+        bloom(g, w, h, k);
+      }
+
+      // B · 八門: rings of the eight gates rush past; through the last, into light.
+      const GATES = '休生傷杜景死驚開';
+      function gates(g, w, h, k) {
+        g.fillStyle = `rgba(10,10,28,${smooth(0, 0.18, k)})`; g.fillRect(0, 0, w, h);
+        const cx = w / 2, cy = h / 2, S = Math.min(w, h), D = k * 1.4 + k ** 3 * 7;
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        for (let i = 16; i >= 0; i--) {
+          const n = Math.floor(D) + i, z = n + 1 - D; // this ring's depth, in ring spacings
+          if (z < 0.12) continue;
+          const R = (S * 0.3) / z, a = clamp(1.3 - z / 11) * smooth(0, 0.15, k) * clamp(z * 3);
+          const rot = n * 0.3927 + k * k * 2.5;
+          g.strokeStyle = `rgba(240,200,112,${a})`; g.lineWidth = Math.max(0.8, 3.2 / z);
+          g.beginPath();
+          for (let j = 0; j <= 8; j++) { const t = rot + (j * Math.PI) / 4; g[j ? 'lineTo' : 'moveTo'](cx + Math.cos(t) * R, cy + Math.sin(t) * R); }
+          g.stroke();
+          g.fillStyle = `rgba(255,226,160,${a})`; g.font = `700 ${Math.max(6, R * 0.17)}px ${SERIF}`;
+          for (let j = 0; j < 8; j++) { // a gate name at the middle of each side
+            const t = rot + ((j + 0.5) * Math.PI) / 4, rr = R * 0.8;
+            g.save(); g.translate(cx + Math.cos(t) * rr, cy + Math.sin(t) * rr); g.rotate(t + Math.PI / 2);
+            g.fillText(GATES[(j + n) % 8], 0, 0); g.restore();
+          }
+        }
+        // 開門 waiting at the end of the tunnel
+        const open = smooth(0.45, 0.8, k);
+        if (open) {
+          g.fillStyle = `rgba(255,240,200,${open})`; g.font = `700 ${S * (0.08 + 0.25 * open ** 2)}px ${SERIF}`;
+          g.shadowColor = 'rgba(255,220,140,0.9)'; g.shadowBlur = 30 * open; g.fillText('開', cx, cy); g.shadowBlur = 0;
+        }
+        bloom(g, w, h, k, 0.75);
+      }
+
+      // C · 法輪: the wheel spins up until its spokes become beams of light.
+      const MOTES = Array.from({ length: 160 }, () => ({ a: rnd() * Math.PI * 2, o: rnd(), s: 0.5 + rnd() }));
+      function drawWheel(g, R, rot, alpha) {
+        g.save(); g.rotate(rot); g.strokeStyle = g.fillStyle = `rgba(240,200,112,${alpha})`;
+        g.lineWidth = R * 0.07; g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.stroke(); // rim
+        g.lineWidth = R * 0.05; g.beginPath(); g.arc(0, 0, R * 0.2, 0, Math.PI * 2); g.stroke(); // hub
+        g.beginPath(); g.arc(0, 0, R * 0.07, 0, Math.PI * 2); g.fill();
+        for (let j = 0; j < 8; j++) { // eight spokes, each ending in a knob beyond the rim
+          const t = (j * Math.PI) / 4, c = Math.cos(t), s = Math.sin(t);
+          g.lineWidth = R * 0.045; g.beginPath(); g.moveTo(c * R * 0.2, s * R * 0.2); g.lineTo(c * R * 1.16, s * R * 1.16); g.stroke();
+          g.beginPath(); g.arc(c * R * 1.2, s * R * 1.2, R * 0.07, 0, Math.PI * 2); g.fill();
+        }
+        g.restore();
+      }
+      function wheel(g, w, h, k) {
+        g.fillStyle = `rgba(22,8,6,${smooth(0, 0.18, k)})`; g.fillRect(0, 0, w, h);
+        const cx = w / 2, cy = h / 2, S = Math.min(w, h), R = S * 0.2 * (1 + 0.25 * smooth(0.5, 1, k));
+        const spin = k * 2.2 + k ** 3 * 38, beam = k ** 2.2;
+        g.save(); g.translate(cx, cy);
+        // beams along the spokes, lengthening and fanning into a blur as it spins faster
+        g.globalCompositeOperation = 'lighter';
+        const copies = 1 + Math.floor(beam * 10);
+        for (let b = 0; b < copies; b++)
+          for (let j = 0; j < 8; j++) {
+            const t = spin + (j * Math.PI) / 4 - b * 0.05, L = R * (1.2 + 9 * beam);
+            const gr = g.createLinearGradient(0, 0, Math.cos(t) * L, Math.sin(t) * L);
+            gr.addColorStop(0, `rgba(255,220,150,${(0.5 * beam) / copies + 0.05 * beam})`); gr.addColorStop(1, 'rgba(255,220,150,0)');
+            g.strokeStyle = gr; g.lineWidth = R * (0.06 + 0.25 * beam);
+            g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(t) * L, Math.sin(t) * L); g.stroke();
+          }
+        // motes streaming outward
+        for (const m of MOTES) {
+          const d = (m.o + k * k * 3 * m.s) % 1, r = R * 0.4 + d * Math.hypot(w, h) * 0.6;
+          g.fillStyle = `rgba(255,230,170,${(1 - d) * smooth(0.1, 0.4, k) * 0.8})`;
+          g.beginPath(); g.arc(Math.cos(m.a + spin * 0.05) * r, Math.sin(m.a + spin * 0.05) * r, 1 + 2 * (1 - d), 0, Math.PI * 2); g.fill();
+        }
+        g.globalCompositeOperation = 'source-over';
+        // the wheel, smeared round as it speeds up
+        const smear = 1 + Math.floor(clamp(k * 1.4) * 7);
+        for (let b = 0; b < smear; b++) drawWheel(g, R, spin - b * 0.06 * k, (smooth(0, 0.2, k) * 1.2) / smear + (b ? 0 : 0.15));
+        g.restore();
+        bloom(g, w, h, k, 0.74);
+      }
+
+      const FX_FN = { warp, gates, wheel };
+      const frozen = new URLSearchParams(location.search).get('t');
+      const panels = [...document.querySelectorAll('.panel')].map((el, i) => {
+        const p = { el, c: el.querySelector('canvas'), fx: FX_FN[el.dataset.fx], start: performance.now() - i * 250 };
+        el.addEventListener('click', () => (p.start = performance.now()));
+        return p;
+      });
+      function frame(now) {
+        for (const p of panels) {
+          const dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(p.c.clientWidth * dpr), H = Math.round(p.c.clientHeight * dpr);
+          if (p.c.width !== W || p.c.height !== H) { p.c.width = W; p.c.height = H; }
+          const g = p.c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+          const w = W / dpr, h = H / dpr, t = frozen !== null ? Number(frozen) : (((now - p.start) / 1000) % LOOP);
+          if (t < IDLE + FX * 0.2) startPage(g, w, h, t); // the start page shows until the effect has darkened over it
+          if (t >= IDLE && t < IDLE + FX) p.fx(g, w, h, (t - IDLE) / FX);
+          if (t >= IDLE + FX) landing(g, w, h, (t - IDLE - FX) / OUT);
+        }
+        if (frozen === null) requestAnimationFrame(frame);
+      }
+      document.fonts.ready.then(() => requestAnimationFrame(frame));
+    </script>
+  </body>
+</html>

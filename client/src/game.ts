@@ -135,10 +135,14 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const lights = new LightPool(scene, 8);
 
   // High / low graphics: pixel ratio, shadows, grass & flowers, how many lamps really light.
+  // On high the resolution adapts (see measure): sharpness gives way first, before shadows or lights.
+  const SCALES = [2, 1.75, 1.5, 1.25, 1];
+  let scaleStep = 0;
+  const pixelRatio = () => Math.min(window.devicePixelRatio, graphicsLevel() === 'low' ? 1 : SCALES[scaleStep]);
   const applyGraphics = () => {
     const low = graphicsLevel() === 'low';
     lights.setActive(low ? 4 : 8);
-    renderer.setPixelRatio(low ? Math.min(window.devicePixelRatio, 1) : Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(pixelRatio());
     renderer.shadowMap.enabled = !low;
     sky.sun.castShadow = !low;
     for (const m of ctx.detailMeshes) m.visible = !low;
@@ -305,7 +309,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
 
   // Frame rate: the optional counter, and 'auto' graphics stepping down to low (and remembering it)
   // when this device can't keep up on high. Measured twice a second; a hidden tab doesn't count.
-  let fpsFrames = 0, fpsT = performance.now(), slowFor = 0, playedFor = 0;
+  let fpsFrames = 0, fpsT = performance.now(), slowFor = 0, playedFor = 0, sagFor = 0, easyFor = 0, easyNeed = 10;
   const measure = () => {
     fpsFrames++;
     const now = performance.now(), span = (now - fpsT) / 1000;
@@ -314,6 +318,21 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     fpsFrames = 0;
     fpsT = now;
     hud.setFps(fps, renderer.info.render.calls);
+    // High graphics: drop the render resolution a step when the frame rate sags, raise it again when
+    // there's room. Only once it's at 1× does 'auto' fall back to low graphics.
+    if (span <= 2 && graphicsLevel() === 'high') {
+      sagFor = fps < 42 ? sagFor + span : 0;
+      easyFor = fps > 57 ? easyFor + span : 0;
+      const step = sagFor >= 1.5 && pixelRatio() > 1 ? 1 : easyFor >= easyNeed && scaleStep > 0 ? -1 : 0;
+      if (step) {
+        scaleStep += step;
+        renderer.setPixelRatio(pixelRatio());
+        sagFor = easyFor = 0;
+        if (step > 0) easyNeed = Math.min(120, easyNeed * 2); // stepped up too soon: wait longer next time
+        if (step > 0) return void (slowFor = 0);
+      }
+      if (pixelRatio() > 1) return void (slowFor = 0);
+    }
     if (span > 2 || phase !== 'play' || playedFor < 8 || settings.graphics !== 'auto' || graphicsLevel() === 'low') return void (slowFor = 0);
     slowFor = fps < 40 ? slowFor + span : Math.max(0, slowFor - span);
     if (slowFor < 6) return;

@@ -82,6 +82,10 @@ export const POSES: Record<Anim, Pose> = {
 
 const SKIN = 0xd8a982;
 
+/** How big a carried lantern is by default (world scale): a wall lantern's size, so it doesn't change in your hands. */
+export const LANTERN_HELD = 0.9;
+const heldScale = new THREE.Vector3();
+
 export class Avatar {
   readonly root = new THREE.Group();
   private hips = new THREE.Group();
@@ -237,9 +241,9 @@ export class Avatar {
 
   /**
    * A lantern carried from the right hand (blessing a wish), glowing `glow` times its usual brightness
-   * (1–3); null puts it away.
+   * (1–20), `size` its world scale (the wall lantern's); null puts it away.
    */
-  holdLantern(color: number | null, glow = 1) {
+  holdLantern(color: number | null, glow = 1, size = LANTERN_HELD) {
     if (color === null) {
       if (this.lantern) this.lantern.g.visible = false;
       return;
@@ -252,18 +256,19 @@ export class Avatar {
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
       halo.position.y = -0.55;
       g.add(halo);
-      g.scale.setScalar(0.5);
       this.joints.rHand.add(g);
       this.lantern = { g, mat, halo };
     }
     const { g, mat, halo } = this.lantern;
     g.visible = true;
+    g.scale.setScalar(size / (this.joints.rHand.getWorldScale(heldScale).x || 1));
     mat.color.setHex(color);
     mat.emissive.setHex(color);
     mat.emissiveIntensity = 0.45 * glow;
-    halo.material.color.setHex(color);
+    // the halo widens and brightens together: about 0.7 m across as carried, ~4.5 m at a blessing's 20×
+    halo.material.color.setHex(color).multiplyScalar(Math.max(1, glow / 5));
     halo.material.opacity = Math.min(1, 0.22 * glow);
-    halo.scale.setScalar(0.9 + 0.45 * glow);
+    halo.scale.setScalar(((0.9 + 0.4 * glow) * 0.5) / size); // in metres, whatever the lantern's size
   }
   private lantern: { g: THREE.Group; mat: THREE.MeshStandardMaterial; halo: THREE.Sprite } | null = null;
 
