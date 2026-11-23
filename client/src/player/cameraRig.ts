@@ -3,6 +3,9 @@ import type { Ground } from '../core/ground';
 import { clamp, damp, dampAngle } from '../core/math';
 
 /** Third-person orbit camera with wall avoidance. Drag to look, scroll to zoom. */
+/** How far up you can tilt (radians below the horizontal for the camera, i.e. looking up). */
+const MIN_PITCH = -1.25;
+
 export class CameraRig {
   yaw = 0; // 0 = camera south of the player, looking north
   pitch = 0.3;
@@ -45,7 +48,7 @@ export class CameraRig {
       if (!this.dragging) return;
       this.lastUserLook = performance.now();
       this.yaw -= (e.clientX - this.last.x) * 0.005;
-      this.pitch = clamp(this.pitch + (e.clientY - this.last.y) * 0.004, -0.25, 1.25);
+      this.pitch = clamp(this.pitch + (e.clientY - this.last.y) * 0.004, MIN_PITCH, 1.25);
       this.last = { x: e.clientX, y: e.clientY };
     });
     const end = (e: PointerEvent) => {
@@ -114,6 +117,16 @@ export class CameraRig {
 
     const pos = this.focus.clone().addScaledVector(dir, this.curDist);
     pos.y = Math.max(pos.y, ground.heightAt(pos.x, pos.z) + 0.3);
+    // Tilting up past the horizon: glide in to just above the head and look up the same way (at the sky,
+    // not the back of your own head); tilting back down returns to the usual view from behind.
+    const up = clamp((-0.1 - this.pitch) / 0.75, 0, 1), k = up * up * (3 - 2 * up);
+    if (k > 0) {
+      const over = this.focus.clone().add(new THREE.Vector3(0, 0.38, 0)).addScaledVector(dir, 0.15);
+      pos.lerp(over, k);
+      this.camera.position.copy(pos);
+      this.camera.lookAt(pos.clone().sub(dir)); // along the view direction, from wherever the camera now is
+      return;
+    }
     this.camera.position.copy(pos);
     this.camera.lookAt(this.focus);
   }
