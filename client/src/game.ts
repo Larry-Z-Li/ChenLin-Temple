@@ -63,6 +63,8 @@ import { buildPond, buildRiverColliders, buildStream, buildWaterfall } from './w
 export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   let phase: 'intro' | 'play' = 'intro';
   let landing = false;
+  /** After the opening cloud ride, leave the temple for this URL (佛家奇門 button). */
+  let afterLandRedirect: string | null = null;
   /** Name and robe to join with — held back until the cloud lands at the gate, so nobody sees the walk or the flight. */
   let joinAs: { name: string; color: string } | null = null;
   document.body.classList.add('intro');
@@ -343,6 +345,10 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     if (landing && !cloud.riding) {
       landing = false;
       document.body.classList.remove('intro'); // landed: show the HUD
+      if (afterLandRedirect) {
+        location.assign(afterLandRedirect);
+        return;
+      }
       rig.lookAlong(landYaw, 0.3, 6); // one slow pan round to face the temple (or the hall) — only after the start trip
       join();
     }
@@ -419,15 +425,16 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   return {
     /** The entry screen's robe picker: recolour the pacing monk. */
     preview: (color: string) => player.avatar.setColor(color),
-    /** Enter: fly the monk down from the mountain to the gate by cloud, then go online. */
-    enter(name: string, color: string, hallId?: string) {
+    /** Enter: fly the monk down from the mountain to the gate by cloud, then go online (or `redirect` after landing). */
+    enter(name: string, color: string, hallId?: string, redirect?: string) {
       unlockAudio();
       ambient.setOn(settings.musicOn);
       player.avatar.setColor(color);
       player.avatar.clasp = false;
       player.avatar.root.name = name;
       for (const w of lanternWalls) w.myName = name;
-      joinAs = { name, color };
+      joinAs = redirect ? null : { name, color }; // leave without joining if we are only passing through
+      afterLandRedirect = redirect ?? null;
       phase = 'play';
       landing = true;
       // Keep facing the way the start screen looked (out over the valley); the flight doesn't turn the view.
@@ -440,7 +447,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
         player.pos.set(dest.x, ctx.ground.heightAt(dest.x, dest.z), dest.z);
         landing = false;
         document.body.classList.remove('intro');
-        join();
+        if (afterLandRedirect) location.assign(afterLandRedirect);
+        else join();
       }
     },
   };

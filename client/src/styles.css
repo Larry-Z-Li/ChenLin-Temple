@@ -113,12 +113,13 @@ body.intro .minimap, body.intro .minimap-btn, body.intro .joystick { display: no
 .entry-panel .text-input:focus { outline: none; border-bottom-color: #e3be7a; }
 .entry-panel .swatches { gap: 9px; }
 .entry-panel .swatch { width: 26px; height: 26px; }
-.entry-go { justify-self: start; margin-top: 6px; height: 54px; padding: 0 26px; display: inline-flex; align-items: center; gap: 26px; border: 0; border-radius: 6px; cursor: pointer; background: linear-gradient(135deg, #f3dcaa, #d6a95e); color: #2b1d0c; font: 700 17px var(--sans); letter-spacing: 0.14em; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); transition: filter 0.2s, transform 0.2s; }
+.entry-cta { display: grid; grid-template-columns: repeat(4, minmax(0, auto)); gap: 8px; margin-top: 6px; width: max-content; max-width: 100%; }
+.entry-cta .entry-go { grid-column: span 2; width: 100%; box-sizing: border-box; }
+.entry-go { height: 54px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 6px; cursor: pointer; background: linear-gradient(135deg, #f3dcaa, #d6a95e); color: #2b1d0c; font: 700 17px var(--sans); letter-spacing: 0.14em; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); transition: filter 0.2s, transform 0.2s; }
 .entry-go:hover { filter: brightness(1.06); transform: translateY(-1px); }
 .entry-go:disabled { opacity: 0.55; cursor: progress; transform: none; }
 .entry-arrow { font-size: 20px; }
-.entry-halls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; }
-.entry-hall { padding: 7px 14px; border-radius: 6px; border: 1px solid rgba(243, 220, 170, 0.55); background: rgba(16, 20, 26, 0.35); color: #f3dcaa; font: 600 15px var(--display); letter-spacing: 0.12em; cursor: pointer; }
+.entry-hall { width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 6px; border: 1px solid rgba(243, 220, 170, 0.55); background: rgba(16, 20, 26, 0.35); color: #f3dcaa; font: 600 15px var(--display); letter-spacing: 0.12em; cursor: pointer; text-align: center; }
 .entry-hall:hover { background: rgba(243, 220, 170, 0.16); }
 .entry-hall:disabled { opacity: 0.45; cursor: progress; }
 .entry-hint { font: 12px var(--sans); letter-spacing: 0.18em; color: rgba(246, 239, 224, 0.7); }
