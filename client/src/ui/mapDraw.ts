@@ -1,4 +1,4 @@
-import { hallHalf, ABBOT, CHERRY_GROVE, PLAZA, type TravelSpot, DORM, HALLS, MOUNTAIN_GATE, ORCHARD, PAGODAS, POND } from '../config/layout';
+import { hallHalf, ABBOT, CHERRY_GROVE, GREAT_STUPA, PLAZA, type TravelSpot, DORM, HALLS, MOUNTAIN_GATE, ORCHARD, PAGODAS, POND } from '../config/layout';
 import { getLocale, onLocaleChange, t, type I18nKey } from '../i18n';
 import { drawLabel, drawStyledMap, labelSpots } from './mapStyles';
 
@@ -13,7 +13,7 @@ export interface MapMarks {
   travel?: { spots: TravelSpot[]; hovered: TravelSpot | null };
 }
 
-/** The grounds' middle and reach: everything that's on the map, plus a margin (the map is centred on this). */
+/** The map's middle (the great stupa) and reach: everything that's on the map, plus a margin. */
 const GROUNDS = (() => {
   const pts: [number, number, number][] = [
     ...HALLS.map((h) => [h.x, h.z, Math.max(...hallHalf(h))] as [number, number, number]),
@@ -22,10 +22,9 @@ const GROUNDS = (() => {
     [(ORCHARD.minX + ORCHARD.maxX) / 2, (ORCHARD.minZ + ORCHARD.maxZ) / 2, (ORCHARD.maxX - ORCHARD.minX) / 2 + 4],
     [(DORM.minX + DORM.maxX) / 2, (DORM.minZ + DORM.maxZ) / 2, 16], [ABBOT.x, ABBOT.z, 8], [CHERRY_GROVE.x, CHERRY_GROVE.z, CHERRY_GROVE.r],
   ];
-  const minX = Math.min(...pts.map(([x, , r]) => x - r)), maxX = Math.max(...pts.map(([x, , r]) => x + r));
-  const minZ = Math.min(...pts.map(([, z, r]) => z - r)), maxZ = Math.max(...pts.map(([, z, r]) => z + r));
-  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-  const R = Math.max(...pts.map(([x, z, r]) => Math.hypot(x - cx, z - cz) + r)) + 10;
+  // centred on the great stupa, the temple's heart; wide enough to take in everything round it
+  const cx = GREAT_STUPA.x, cz = GREAT_STUPA.z;
+  const R = Math.max(...pts.map(([x, z, r]) => Math.hypot(x - cx, z - cz) + r)) + 8;
   return { cx, cz, R };
 })();
 
@@ -87,14 +86,7 @@ export function drawTempleMap(g: CanvasRenderingContext2D, S: number, marks: Map
   }
 
   if (marks.travel) {
-    for (const spot of marks.travel.spots) {
-      const on = spot === marks.travel.hovered;
-      g.strokeStyle = on ? '#fff3c4' : 'rgba(217,164,65,0.95)';
-      g.lineWidth = (on ? 2.6 : 1.6) * k;
-      g.beginPath();
-      g.arc(X(spot.at.x), Y(spot.at.z), (on ? 6.5 : 4.5) * k, 0, Math.PI * 2);
-      g.stroke();
-    }
+    // the hovered destination's plaque lights up (no rings: the plaques are the targets)
     const h = marks.travel.hovered, at = h && labelSpots.get(h.nameKey);
     if (h && at) drawLabel(g, S, 'garden', h.nameKey as I18nKey, at.x, at.z, at.big, true);
   }

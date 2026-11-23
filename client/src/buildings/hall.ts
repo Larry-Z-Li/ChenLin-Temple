@@ -257,7 +257,13 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
     const RH = D * 0.38;
     lift = addRoof(W, D, RH * 0.5, F + H, { gable: 0.999, curve: 1.25, upturn: 0.35 });
     const cy = F + H + RH * 0.3;
-    g.add(box(width * 0.74, 2.4, depth * 0.62, wallMat, hx, cy - 0.6, hz));
+    // the upper storey's walls run right down to the wall-tops, so no gap opens under the curved lower roof
+    // (walls, not a solid block: the raised ceiling bay inside stays open)
+    const uw = width * 0.74, ud = depth * 0.62, uy = F + H, uh = cy + 1.8 - uy;
+    for (const s of [-1, 1]) {
+      g.add(box(uw, uh, 0.3, wallMat, hx, uy, hz + s * (ud / 2 - 0.15)));
+      g.add(box(0.3, uh, ud, wallMat, hx + s * (uw / 2 - 0.15), uy, hz));
+    }
     g.add(box(width * 0.74 + 0.3, 0.6, depth * 0.62 + 0.3, beamMat, hx, cy + 1.2, hz));
     addRoof(width * 0.74 + eave * 2, depth * 0.62 + eave * 2, RH * 0.7, cy + 1.8, { gable: 0.55, curve: 1.7, upturn: 0.5 });
   } else {

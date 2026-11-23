@@ -14,7 +14,7 @@ export interface Settings {
   /** Frame rate and draw calls under the headcount (also `?fps` in the address). */
   showFps: boolean;
   /** 'temple' = sky follows the temple's clock (day and night); 'day' = always daytime. */
-  timeOfDay: 'temple' | 'day';
+  timeOfDay: 'temple' | 'day' | 'night';
   musicOn: boolean;
   musicVolume: number;
   chantVolume: number;

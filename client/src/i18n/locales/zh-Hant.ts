@@ -133,6 +133,7 @@ const zhHant: Record<I18nKey, string> = {
   'settings.timeOfDay': '時間',
   'settings.templeTime': '寺院時間',
   'settings.alwaysDay': '永遠白天',
+  'settings.alwaysNight': '永遠黑夜',
   'settings.ambientVolume': '環境音量',
   'settings.effectsVolume': '音效音量',
 

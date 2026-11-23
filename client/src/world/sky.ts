@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildSkyChart } from './skyChart';
 import { DEFAULT_TEMPLE_TZ } from '../../../shared/protocol';
 import { settings } from '../config/settings';
 import { lerp, mulberry32, smoothstep } from '../core/math';
@@ -36,7 +37,9 @@ export function templeHours(date = new Date()) {
   return get('hour') + get('minute') / 60;
 }
 
-const ALWAYS_DAY_HOURS = 14.5; // a gentle afternoon
+const ALWAYS_DAY_HOURS = 14.5;
+/** "Always night": late evening, the stars and the 28 mansions out, the lamps lit. */
+const ALWAYS_NIGHT_HOURS = 22; // a gentle afternoon
 
 /** Sun path: rises in the east (+X), crosses the southern sky (+Z), sets in the west. */
 function sunDirection(h: number, out: THREE.Vector3) {
@@ -116,6 +119,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
   const stars = new THREE.Points(starGeo, starMat);
   stars.frustumCulled = false;
   scene.add(stars);
+  const chart = buildSkyChart(scene); // the 28 mansions and the Four Symbols, by night
   const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xeef2ff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
   moon.scale.setScalar(90);
   scene.add(moon);
@@ -141,7 +145,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     if (clockAcc > 1 || refresh) {
       clockAcc = 0;
       refresh = false;
-      hours = debugHours ?? (settings.timeOfDay === 'day' ? ALWAYS_DAY_HOURS : templeHours());
+      hours = debugHours ?? (settings.timeOfDay === 'day' ? ALWAYS_DAY_HOURS : settings.timeOfDay === 'night' ? ALWAYS_NIGHT_HOURS : templeHours());
     }
     sunDirection(hours, sunDir);
     moonDir.set(-sunDir.x, -sunDir.y, 0.4).normalize();
@@ -177,6 +181,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     }
     scene.environmentIntensity = lerp(0.15, 0.55, daylight);
     starMat.opacity = smoothstep(0.35, 1, lighting.night);
+    chart.update(smoothstep(0.45, 1, lighting.night));
     (moon.material as THREE.SpriteMaterial).opacity = smoothstep(0.3, 1, lighting.night);
     moon.position.copy(moonDir).multiplyScalar(1300);
     nightGlow.update(lighting.night);

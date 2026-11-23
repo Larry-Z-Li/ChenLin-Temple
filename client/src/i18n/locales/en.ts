@@ -131,6 +131,7 @@ const en = {
   'settings.timeOfDay': 'Time of day',
   'settings.templeTime': 'Temple clock',
   'settings.alwaysDay': 'Always day',
+  'settings.alwaysNight': 'Always night',
   'settings.ambientVolume': 'Ambient volume',
   'settings.effectsVolume': 'Effects volume',
 

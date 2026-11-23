@@ -39,7 +39,7 @@ export class Hud {
   private gfxBtns: Record<'high' | 'low', HTMLButtonElement>;
   private fpsBtns: Record<'on' | 'off', HTMLElement>;
   private fpsEl = h('div', { class: 'fps hidden' });
-  private todBtns: Record<'temple' | 'day', HTMLButtonElement>;
+  private todBtns: Record<'temple' | 'day' | 'night', HTMLButtonElement>;
   private inventory: HTMLElement;
   private beadBtns: HTMLElement;
   private lastStatus: { s: NetStatus; n: number } = { s: 'connecting', n: 0 };
@@ -80,14 +80,14 @@ export class Hud {
         cb.onGraphics();
       } });
     this.gfxBtns = { high: gfx('high', 'settings.high'), low: gfx('low', 'settings.low') };
-    const tod = (v: 'temple' | 'day', key: I18nKey) =>
+    const tod = (v: 'temple' | 'day' | 'night', key: I18nKey) =>
       h('button', { class: 'seg-btn', i18n: key, onclick: () => {
         settings.timeOfDay = v;
         saveSettings();
         this.renderTimeOfDay();
         refreshSky();
       } });
-    this.todBtns = { temple: tod('temple', 'settings.templeTime'), day: tod('day', 'settings.alwaysDay') };
+    this.todBtns = { temple: tod('temple', 'settings.templeTime'), day: tod('day', 'settings.alwaysDay'), night: tod('night', 'settings.alwaysNight') };
     const fps = (on: boolean, key: I18nKey) =>
       h('button', { class: 'seg-btn', i18n: key, onclick: () => {
         settings.showFps = on;
@@ -104,7 +104,7 @@ export class Hud {
         'div',
         { class: 'settings-body' },
         row('settings.graphics', h('div', { class: 'seg' }, this.gfxBtns.high, this.gfxBtns.low)),
-        row('settings.timeOfDay', h('div', { class: 'seg' }, this.todBtns.temple, this.todBtns.day)),
+        row('settings.timeOfDay', h('div', { class: 'seg' }, this.todBtns.temple, this.todBtns.day, this.todBtns.night)),
         row('settings.fps', h('div', { class: 'seg' }, this.fpsBtns.on, this.fpsBtns.off)),
         row('settings.ambientVolume', slider('musicVolume')),
         row('settings.effectsVolume', slider('sfxVolume')),
@@ -205,6 +205,7 @@ export class Hud {
   private renderTimeOfDay() {
     this.todBtns.temple.classList.toggle('active', settings.timeOfDay === 'temple');
     this.todBtns.day.classList.toggle('active', settings.timeOfDay === 'day');
+    this.todBtns.night.classList.toggle('active', settings.timeOfDay === 'night');
   }
 
   toggleHelp(v?: boolean) {
