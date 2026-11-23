@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { assetUrl } from '../content/manifest';
 
 /**
  * The night sky's chart: the twenty-eight lunar mansions (二十八宿) joined by lines and shining brightest,
- * the pole stars (北極, 四輔) overhead, and the Four Symbols in their quarters — 青龍 east, 白虎 west,
- * 玄武 north, 朱雀 south — as faint figures of light near the horizon.
+ * the pole stars (北極, 四輔) overhead, and the Four Symbols in their quarters — 蒼龍 east, 白虎 west,
+ * 玄武 north, 朱雀 south — as faint figures of light near the horizon (from a traditional print).
  *
  * Laid out like a sky map, centred on the zenith with north up (so, looking up, east is on the left).
  * One texture on a dome cap: a single draw call, faded in with the night.
@@ -58,159 +59,110 @@ const S = 2048, C = S / 2;
 /** Chart pixel → canvas, the mansions' ring at about 0.76 of the way out (the figures beyond it). */
 const toCanvas = ([x, y]: [number, number]): [number, number] => [C + ((x - CHART_CENTRE[0]) / CHART_R) * 0.76 * C, C + ((y - CHART_CENTRE[1]) / CHART_R) * 0.76 * C];
 
-function drawChart() {
-  const c = document.createElement('canvas');
-  c.width = c.height = S;
+function drawChart(c: HTMLCanvasElement, images: HTMLImageElement[]) {
   const g = c.getContext('2d')!;
   g.fillStyle = '#000';
   g.fillRect(0, 0, S, S);
-  drawSymbols(g);
-  // lines, then the stars over them
+  drawSymbols(g, images);
+  // the lines joining each mansion's stars (the stars themselves are points: see twinkleStars)
   g.lineCap = 'round';
   for (const m of Object.values(MANSIONS)) {
     const p = m.pts.map(toCanvas);
     const lines = m.lines ?? p.slice(1).map((_, i) => [i, i + 1] as [number, number]).concat(m.loop ? [[p.length - 1, 0]] : []);
-    g.strokeStyle = 'rgba(255,214,120,0.55)';
-    g.lineWidth = 3;
-    g.shadowColor = 'rgba(255,200,90,0.8)';
-    g.shadowBlur = 6;
+    g.strokeStyle = 'rgba(255,220,150,0.26)';
+    g.lineWidth = 2.2;
+    g.shadowColor = 'rgba(255,200,110,0.5)';
+    g.shadowBlur = 4;
     g.beginPath();
     for (const [i, j] of lines) {
       g.moveTo(...p[i]);
       g.lineTo(...p[j]);
     }
     g.stroke();
-    g.shadowBlur = 0;
-    for (const [x, y] of p) {
-      const r = 13, grad = g.createRadialGradient(x, y, 0, x, y, r);
-      grad.addColorStop(0, 'rgba(255,255,240,1)');
-      grad.addColorStop(0.25, 'rgba(255,236,170,0.95)');
-      grad.addColorStop(1, 'rgba(255,200,90,0)');
-      g.fillStyle = grad;
-      g.beginPath();
-      g.arc(x, y, r, 0, Math.PI * 2);
-      g.fill();
-    }
   }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
 }
 
 /**
- * The Four Symbols, as faint glowing line drawings in their quarters near the chart's rim. Each is drawn
- * in a frame laid along the rim: x along it, y pointing out toward the horizon (so feet face the horizon).
+ * The Four Symbols, from a traditional star-chart print (cleaned to line art, assets/sky/*.png), tinted
+ * and glowing in their quarters near the chart's rim. The print has south at the top; the chart has north
+ * at the top, so 玄武 and the two long beasts are turned round (each stands toward its own horizon, the
+ * dragon's and tiger's heads to the south); 朱雀 already faces its horizon as printed.
  */
-function drawSymbols(g: CanvasRenderingContext2D) {
-  const rim = (angle: number, r: number, colour: string, draw: () => void, alpha = 0.42, flip = false) => {
+const SYMBOLS = [
+  { file: 'qinglong.png', colour: '#5fd0ff', x: 0.09, y: 0.5, h: 0.25, turn: true }, // 蒼龍 · east (left)
+  { file: 'baihu.png', colour: '#eef4ff', x: 0.91, y: 0.5, h: 0.25, turn: true }, // 白虎 · west (right)
+  { file: 'xuanwu.png', colour: '#a596ff', x: 0.5, y: 0.13, w: 0.21, turn: true }, // 玄武 · north (top)
+  { file: 'zhuque.png', colour: '#ff6a3a', x: 0.5, y: 0.88, w: 0.28, turn: false }, // 朱雀 · south (bottom)
+] as const;
+
+function drawSymbols(g: CanvasRenderingContext2D, images: HTMLImageElement[]) {
+  SYMBOLS.forEach((sym, i) => {
+    const img = images[i];
+    if (!img?.naturalWidth) return;
+    const aspect = img.naturalWidth / img.naturalHeight;
+    const h = 'h' in sym ? sym.h * S : (sym.w * S) / aspect, w = h * aspect;
+    // tint the white line art
+    const tint = document.createElement('canvas');
+    tint.width = Math.ceil(w);
+    tint.height = Math.ceil(h);
+    const t = tint.getContext('2d')!;
+    t.drawImage(img, 0, 0, w, h);
+    t.globalCompositeOperation = 'source-in';
+    t.fillStyle = sym.colour;
+    t.fillRect(0, 0, w, h);
     g.save();
-    g.translate(C + Math.cos(angle) * r * C, C + Math.sin(angle) * r * C);
-    g.rotate(angle + Math.PI / 2);
-    g.scale(flip ? -1 : 1, -1);
-    g.strokeStyle = colour;
-    g.fillStyle = colour;
-    g.shadowColor = colour;
-    g.shadowBlur = 22;
-    g.lineWidth = 5;
-    g.lineCap = g.lineJoin = 'round';
-    g.globalAlpha = alpha;
-    draw();
+    g.translate(sym.x * S, sym.y * S);
+    if (sym.turn) g.rotate(Math.PI);
+    g.shadowColor = sym.colour;
+    g.shadowBlur = 10;
+    g.globalAlpha = 0.3;
+    g.drawImage(tint, -w / 2, -h / 2, w, h);
     g.restore();
-  };
-  const curve = (pts: [number, number][]) => {
-    g.beginPath();
-    g.moveTo(...pts[0]);
-    for (let i = 1; i < pts.length - 1; i++) g.quadraticCurveTo(pts[i][0], pts[i][1], (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2);
-    g.lineTo(...pts[pts.length - 1]);
-    g.stroke();
-  };
-
-  // 青龍 · east (left): a long winding body along the rim, head to the south (角, its horn), tail to the north
-  rim(Math.PI, 0.89, '#5fd0ff', () => {
-    const body = (x: number) => Math.sin(x / 70) * 34;
-    for (let x = -330; x < 330; x += 6) {
-      const w = 22 * (1 - (x + 330) / 760) + 5; // tapering to the tail
-      g.lineWidth = w;
-      g.beginPath();
-      g.moveTo(x, body(x));
-      g.lineTo(x + 7, body(x + 7));
-      g.stroke();
-      if ((x + 330) % 36 < 6) (g.lineWidth = 3), curve([[x, body(x) - w / 2], [x + 6, body(x) - w / 2 - 14], [x + 12, body(x) - w / 2]]); // spines along its back
-    }
-    g.lineWidth = 4;
-    for (const lx of [-230, -110, 40, 170]) curve([[lx, body(lx)], [lx - 8, body(lx) + 40], [lx - 22, body(lx) + 62], [lx - 34, body(lx) + 58]]); // legs and claws
-    // head: snout, jaw, horns swept back, whiskers trailing
-    const hx = -350, hy = body(-330);
-    curve([[hx + 20, hy - 14], [hx - 30, hy - 16], [hx - 58, hy - 4], [hx - 40, hy + 8], [hx + 10, hy + 12]]);
-    curve([[hx + 6, hy - 14], [hx + 30, hy - 48], [hx + 62, hy - 58]]);
-    curve([[hx - 6, hy - 14], [hx + 12, hy - 52], [hx + 34, hy - 70]]);
-    g.lineWidth = 2.5;
-    curve([[hx - 52, hy - 4], [hx - 86, hy - 30], [hx - 120, hy - 20]]);
-    curve([[hx - 50, hy + 4], [hx - 90, hy + 26], [hx - 124, hy + 16]]);
-  }, 0.24);
-
-  // 白虎 · west (right): a striding tiger, head to the south (觜, 參), tail curling to the north (奎)
-  rim(0, 0.89, '#e9f1ff', () => {
-    g.lineWidth = 5;
-    g.beginPath();
-    g.ellipse(0, -10, 190, 58, 0, 0, Math.PI * 2);
-    g.stroke();
-    for (const sx of [-120, -70, -20, 30, 80]) curve([[sx, -66], [sx + 14, -30], [sx + 4, 4]]); // stripes
-    for (const [lx, d] of [[-140, -1], [-95, 1], [105, -1], [150, 1]]) curve([[lx, 30], [lx + d * 10, 80], [lx + d * 4, 110], [lx + d * 22, 114]]); // legs mid-stride
-    g.beginPath();
-    g.arc(-245, -40, 48, 0, Math.PI * 2); // head
-    g.stroke();
-    curve([[-270, -82], [-262, -104], [-248, -86]]); // ears
-    curve([[-232, -84], [-222, -104], [-212, -84]]);
-    curve([[-292, -30], [-300, -18], [-284, -6]]); // muzzle
-    g.lineWidth = 6;
-    curve([[188, -20], [250, -60], [262, -130], [228, -170], [200, -150]]); // tail
-  }, 0.42, true);
-
-  // 玄武 · north (top): a tortoise with a snake coiled round it
-  rim(-Math.PI / 2, 0.9, '#9a8cff', () => {
-    g.lineWidth = 5;
-    g.beginPath();
-    g.ellipse(0, 0, 140, 80, 0, Math.PI, Math.PI * 2); // the shell's dome
-    g.lineTo(-140, 0);
-    g.stroke();
-    for (const [hx, hy] of [[-60, -40], [0, -52], [60, -40], [-30, -12], [30, -12]]) {
-      g.beginPath();
-      for (let i = 0; i <= 6; i++) g.lineTo(hx + Math.cos((i / 6) * Math.PI * 2) * 22, hy + Math.sin((i / 6) * Math.PI * 2) * 15);
-      g.stroke(); // plates
-    }
-    for (const lx of [-90, -40, 50, 100]) curve([[lx, 0], [lx - 6, 30], [lx + 10, 40]]); // legs
-    curve([[140, -6], [175, -18], [196, -10], [190, 8], [150, 6]]); // head
-    g.lineWidth = 7;
-    curve([[-220, 30], [-160, 60], [-60, 52], [40, 70], [150, 60], [190, -10], [120, -110], [0, -120], [-120, -100], [-150, -150], [-80, -190], [20, -170]]); // the snake
-    g.beginPath();
-    g.arc(30, -165, 14, 0, Math.PI * 2);
-    g.fill(); // its head, facing the tortoise
   });
+}
 
-  // 朱雀 · south (bottom): a bird with wings spread wide and long tail plumes
-  rim(Math.PI / 2, 0.88, '#ff6a3a', () => {
-    g.lineWidth = 5;
-    g.beginPath();
-    g.ellipse(0, 0, 70, 30, 0, 0, Math.PI * 2);
-    g.stroke();
-    curve([[-60, -10], [-110, -40], [-130, -72], [-108, -78], [-92, -54]]); // neck and head
-    curve([[-118, -78], [-132, -110], [-112, -128]]); // crest
-    curve([[-130, -70], [-160, -66]]); // beak
-    for (const s of [-1, 1]) {
-      // wings swept up and out, feathers fanning from them
-      const tip: [number, number] = [s * 60 - 20, -230];
-      curve([[s * 20 - 10, -20], [s * 100 - 10, -110], tip]);
-      for (let k = 0; k < 6; k++) curve([[s * (30 + k * 12) - 10, -40 - k * 30], [s * (70 + k * 18) - 10, -50 - k * 30], [s * (110 + k * 20) - 10, -30 - k * 32]]);
-    }
-    for (const [dx, dy] of [[150, 40], [190, 10], [170, 80]]) curve([[60, 4], [110, dy - 10], [dx, dy], [dx + 40, dy + 30]]); // tail plumes
+/**
+ * Stars as small soft round points that twinkle (each at its own pace), instead of square dots or painted
+ * blobs. `size` in CSS pixels; `amp` how deep the twinkle dips (0 none … 1 out).
+ */
+export function twinkleStars(pos: number[], tint: number[], size: number[], amp: number) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('tint', new THREE.Float32BufferAttribute(tint, 3));
+  geo.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
+  geo.setAttribute('phase', new THREE.Float32BufferAttribute(size.map(() => Math.random()), 1));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uPx: { value: Math.min(2, window.devicePixelRatio || 1) }, uAmp: { value: amp } },
+    vertexShader: /* glsl */ `
+      attribute vec3 tint; attribute float size, phase;
+      uniform float uTime, uOpacity, uPx, uAmp;
+      varying vec3 vTint; varying float vA;
+      void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        float sp = 1.2 + fract(phase * 7.13) * 2.4;
+        float tw = (0.5 + 0.5 * sin(uTime * sp + phase * 6.283)) * (0.55 + 0.45 * sin(uTime * 0.63 + phase * 17.0));
+        vA = uOpacity * (1.0 - uAmp * tw);
+        vTint = tint;
+        gl_PointSize = size * uPx;
+      }`,
+    fragmentShader: /* glsl */ `
+      varying vec3 vTint; varying float vA;
+      void main() {
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = pow(max(0.0, 1.0 - d), 2.2); // a bright core, a quick soft edge
+        gl_FragColor = vec4(vTint, a * vA);
+        #include <colorspace_fragment>
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
   });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  return { pts, update: (opacity: number, time: number) => ((mat.uniforms.uOpacity.value = opacity), (mat.uniforms.uTime.value = time), (pts.visible = opacity > 0.01)) };
 }
 
 /** The dome cap carrying the chart; `night` 0 (day) … 1 (night). */
 export function buildSkyChart(scene: THREE.Scene) {
-  const radius = 1350, phiMax = THREE.MathUtils.degToRad(72); // from the zenith down to 18° above the horizon
+  const radius = 1350, phiMax = THREE.MathUtils.degToRad(54); // from the zenith down to 36° above the horizon: the chart sits high overhead
   const geo = new THREE.SphereGeometry(radius, 96, 48, 0, Math.PI * 2, 0, phiMax);
   const pos = geo.attributes.position, uv = geo.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
@@ -221,10 +173,40 @@ export function buildSkyChart(scene: THREE.Scene) {
   }
   // canvas y runs down, texture v runs up: flip so the chart's top (north) lands north
   for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
-  const mat = new THREE.MeshBasicMaterial({ map: drawChart(), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.BackSide });
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = S;
+  drawChart(canvas, []);
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  // the Four Symbols arrive as images: redraw the chart with them once they're in
+  const images = SYMBOLS.map((sym) => Object.assign(new Image(), { src: assetUrl('sky', sym.file) }));
+  void Promise.allSettled(images.map((im) => im.decode())).then(() => {
+    drawChart(canvas, images);
+    map.needsUpdate = true;
+  });
+  // the mansions' stars, on the dome just inside the chart: canvas → the direction it maps to
+  const sPos: number[] = [], tint: number[] = [], size: number[] = [], R = radius - 5;
+  for (const m of Object.values(MANSIONS))
+    for (const pt of m.pts) {
+      const [px, py] = toCanvas(pt), dx = (px / S - 0.5) * 2, dy = (py / S - 0.5) * 2, r = Math.hypot(dx, dy) || 1e-6, th = r * phiMax;
+      sPos.push(R * Math.sin(th) * (-dx / r), R * Math.cos(th), R * Math.sin(th) * (dy / r));
+      const b = 0.62 + Math.random() * 0.2;
+      tint.push(b, b * 0.9, b * 0.7);
+      size.push(5.5 + Math.random() * 2);
+    }
+  const mansionStars = twinkleStars(sPos, tint, size, 0.3);
+  scene.add(mansionStars.pts);
+  const mat = new THREE.MeshBasicMaterial({ map, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.BackSide });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = -0.5;
   scene.add(mesh);
-  return { update: (night: number) => ((mat.opacity = night), (mesh.visible = night > 0.01)) };
+  return {
+    update: (night: number, time: number) => {
+      mat.opacity = night;
+      mesh.visible = night > 0.01;
+      mansionStars.update(night, time);
+    },
+  };
 }

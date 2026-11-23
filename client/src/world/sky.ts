@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildSkyChart } from './skyChart';
+import { buildSkyChart, twinkleStars } from './skyChart';
 import { DEFAULT_TEMPLE_TZ } from '../../../shared/protocol';
 import { settings } from '../config/settings';
 import { lerp, mulberry32, smoothstep } from '../core/math';
@@ -103,22 +103,20 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
 
   // Stars (upper sky) and the moon.
   const rng = mulberry32(7);
-  const starPos: number[] = [], starCol: number[] = [];
+  const starPos: number[] = [], starCol: number[] = [], starSize: number[] = [];
   while (starPos.length < 1800 * 3) {
     const v = new THREE.Vector3(rng() * 2 - 1, rng(), rng() * 2 - 1);
     if (v.lengthSq() > 1 || v.y < 0.06) continue;
     v.normalize().multiplyScalar(1400);
     starPos.push(v.x, v.y, v.z);
-    const b = 0.5 + rng() * 0.5;
-    starCol.push(b, b, b * (0.9 + rng() * 0.1));
+    // mostly faint and small, a few brighter; a little blue or warm
+    const k = rng() ** 2.5, b = 0.18 + k * 0.5, warm = rng() - 0.5;
+    starCol.push(b * (1 + warm * 0.12), b, b * (1 - warm * 0.15));
+    starSize.push(1.6 + k * 2.2);
   }
-  const starGeo = new THREE.BufferGeometry();
-  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-  starGeo.setAttribute('color', new THREE.Float32BufferAttribute(starCol, 3));
-  const starMat = new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false });
-  const stars = new THREE.Points(starGeo, starMat);
-  stars.frustumCulled = false;
-  scene.add(stars);
+  const stars = twinkleStars(starPos, starCol, starSize, 0.45);
+  scene.add(stars.pts);
+  let starTime = 0;
   const chart = buildSkyChart(scene); // the 28 mansions and the Four Symbols, by night
   const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xeef2ff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
   moon.scale.setScalar(90);
@@ -180,8 +178,9 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
       sun.intensity = 0.65 * lighting.night;
     }
     scene.environmentIntensity = lerp(0.15, 0.55, daylight);
-    starMat.opacity = smoothstep(0.35, 1, lighting.night);
-    chart.update(smoothstep(0.45, 1, lighting.night));
+    starTime += dt;
+    stars.update(smoothstep(0.35, 1, lighting.night), starTime);
+    chart.update(smoothstep(0.45, 1, lighting.night), starTime);
     (moon.material as THREE.SpriteMaterial).opacity = smoothstep(0.3, 1, lighting.night);
     moon.position.copy(moonDir).multiplyScalar(1300);
     nightGlow.update(lighting.night);
