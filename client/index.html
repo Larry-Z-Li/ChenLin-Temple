@@ -8,8 +8,42 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500&family=Noto+Serif+TC:wght@500;600&display=swap" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%238e2b1f'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23d9a441'/%3E%3C/svg%3E" />
+    <style>
+      /* Loading screen (in the page itself, so it shows before any script has loaded): an ensō drawn as the
+         temple loads, the name beside it, a seal; it fades to the start page (see main.ts). */
+      .loader { position: fixed; inset: 0; z-index: 60; background: #fff; display: grid; place-items: center; transition: opacity 1.4s ease 0.5s; --p: 0.06; }
+      .loader.done { opacity: 0; pointer-events: none; }
+      .loader-in { display: grid; place-items: center; gap: 18px; transition: opacity 0.6s ease; }
+      .loader.done .loader-in { opacity: 0; }
+      .loader-mark { display: flex; align-items: center; gap: 22px; }
+      .loader-circle { position: relative; display: grid; place-items: center; }
+      .loader-circle svg { width: 150px; height: 150px; overflow: visible; }
+      .loader .enso { fill: none; stroke: #1c1a18; stroke-width: 9; stroke-linecap: round; stroke-dasharray: 520; stroke-dashoffset: calc(520 - 470 * var(--p)); transition: stroke-dashoffset 0.8s ease; filter: url(#brush); }
+      .loader-name { writing-mode: vertical-rl; font: 600 30px "Noto Serif TC", "Songti TC", serif; letter-spacing: 0.3em; color: #1c1a18; }
+      .loader-seal { position: absolute; transform: translate(62px, 52px) rotate(-6deg); width: 28px; height: 28px; border-radius: 3px; background: #b3281e; color: #fff6e6; display: grid; place-items: center; overflow: hidden; font: 700 15px "Noto Serif TC", serif; }
+      .loader-seal img { width: 100%; height: 100%; object-fit: cover; }
+      .loader-seal img + span { display: none; } /* a seal image, when there is one, replaces the character */
+      .loader-caps { font: 500 11px Cinzel, serif; letter-spacing: 0.5em; padding-left: 0.5em; color: #8b857c; }
+      .loader-line { width: 180px; height: 1px; background: #e6e1d8; position: relative; overflow: hidden; }
+      .loader-line span { position: absolute; inset: 0; background: #1c1a18; transform-origin: left; transform: scaleX(var(--p)); transition: transform 0.8s ease; }
+    </style>
   </head>
   <body>
+    <div id="loader" class="loader" role="progressbar" aria-label="Loading">
+      <svg width="0" height="0" style="position: absolute"><filter id="brush"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="n" /><feDisplacementMap in="SourceGraphic" in2="n" scale="5" /></filter></svg>
+      <div class="loader-in">
+        <div class="loader-mark">
+          <div class="loader-circle">
+            <svg viewBox="0 0 200 200"><path class="enso" d="M118,28 C160,38 182,78 172,118 C162,160 120,182 82,172 C42,160 20,120 30,82 C38,52 62,32 92,27" /></svg>
+            <!-- the seal: assets/brand/seal.png if it's there (e.g. a carved Buddha seal), else 辰 -->
+            <div class="loader-seal"><img src="assets/brand/seal.png" alt="" onerror="this.remove()" /><span>辰</span></div>
+          </div>
+          <div class="loader-name">辰霖學院</div>
+        </div>
+        <div class="loader-caps">CHENLIN ACADEMY</div>
+        <div class="loader-line"><span></span></div>
+      </div>
+    </div>
     <div id="app"></div>
     <div id="ui"></div>
     <script type="module" src="/src/main.ts"></script>

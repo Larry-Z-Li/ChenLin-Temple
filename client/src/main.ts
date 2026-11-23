@@ -5,23 +5,25 @@ for (const ev of ['gesturestart', 'gesturechange', 'dblclick'] as const) documen
 import { settings } from './config/settings';
 import { setLocale } from './i18n';
 import { showEntry } from './ui/entry';
-import { h } from './ui/dom';
 
 const app = document.getElementById('app')!;
 const ui = document.getElementById('ui')!;
 
+// The loading screen (in index.html): the ensō draws on as the temple loads, then fades to the start page.
+const loader = document.getElementById('loader');
+const progress = (p: number) => loader?.style.setProperty('--p', String(p));
 await setLocale(settings.lang);
-// Start in white; the mountain intro fades in once the world is built.
-const white = h('div', { class: 'whiteout' });
-document.body.append(white);
+progress(0.2);
 let game: Awaited<ReturnType<typeof import('./game').startGame>> | null = null;
 const entry = showEntry(ui, (color) => game?.preview(color));
 const { startGame } = await import('./game');
+progress(0.55);
 game = await startGame(app, ui);
-requestAnimationFrame(() => setTimeout(() => {
-  white.classList.add('out');
-  setTimeout(() => white.remove(), 3200);
-}, 300));
+progress(1);
+setTimeout(() => {
+  loader?.classList.add('done'); // the name fades, then the white
+  setTimeout(() => loader?.remove(), 2200);
+}, 900); // let the circle close first
 entry.ready();
-const { name, color, hall, redirect } = await entry.done;
-game.enter(name, color, hall, redirect);
+const { name, color, hall } = await entry.done;
+game.enter(name, color, hall);

@@ -92,8 +92,6 @@ body.reading .minimap { display: none; }
 
 /* ---------- Entry ---------- */
 /* Entry: the title column sits left over a grey tint on the mountain intro, which fades in from white. */
-.whiteout { position: fixed; inset: 0; background: #fff; z-index: 50; pointer-events: none; transition: opacity 3s ease; }
-.whiteout.out { opacity: 0; }
 /* Start page: only the top bar (headcount and the buttons), above the entry tint. */
 body.intro .hud { z-index: 11; }
 body.intro .hud > :not(.topbar):not(.panel), body.intro .brand .title { display: none !important; }

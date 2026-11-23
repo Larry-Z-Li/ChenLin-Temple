@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Loading Mocks</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500&family=Noto+Serif+TC:wght@500;600;700&display=swap" />
+    <style>
+      /* Dev page: three loading-screen mocks side by side, each looping (?p=0.6 freezes them at that progress). */
+      :root { --ink: #1c1a18; --muted: #8b857c; --seal: #b3281e; --gold: #c9a24a; }
+      html, body { margin: 0; height: 100%; background: #e9e6e0; font-family: system-ui, sans-serif; }
+      .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 14px; height: calc(100% - 28px); box-sizing: border-box; }
+      .screen { position: relative; background: #fff; border-radius: 10px; overflow: hidden; display: grid; place-items: center; --p: 0; }
+      .screen .tag { position: absolute; top: 10px; left: 12px; font: 600 12px system-ui; color: var(--muted); letter-spacing: 0.08em; }
+      .screen .content { transition: opacity 0.6s ease; display: grid; place-items: center; gap: 18px; }
+      .screen .fade { transition: opacity 0.6s ease; }
+      .screen.done .content, .screen.done .fade { opacity: 0; }
+      .screen .veil { position: absolute; inset: 0; background: linear-gradient(160deg, #6f8a6a, #2f4a5a); opacity: 0; transition: opacity 1.4s ease 0.4s; }
+      .screen.done .veil { opacity: 1; } /* stands in for the start page coming through */
+      .seal { width: 34px; height: 34px; background: var(--seal); color: #fff6e6; display: grid; place-items: center; font: 700 18px "Noto Serif TC", serif; border-radius: 3px; transform: rotate(-4deg); }
+      .caps { font: 500 11px Cinzel, serif; letter-spacing: 0.5em; color: var(--muted); padding-left: 0.5em; }
+      .hair { width: 180px; height: 1px; background: #e6e1d8; position: relative; overflow: hidden; }
+      .hair span { position: absolute; inset: 0; background: var(--ink); transform-origin: left; transform: scaleX(var(--p)); transition: transform 0.4s ease; }
+
+      /* A · 円相 */
+      .a .mark { display: flex; align-items: center; gap: 22px; }
+      .a svg { width: 150px; height: 150px; overflow: visible; }
+      .a .enso { fill: none; stroke: var(--ink); stroke-width: 9; stroke-linecap: round; stroke-dasharray: 520; stroke-dashoffset: calc(520 - 470 * var(--p)); transition: stroke-dashoffset 0.5s ease; filter: url(#brush); }
+      .a .vert { writing-mode: vertical-rl; font: 600 30px "Noto Serif TC", serif; letter-spacing: 0.3em; color: var(--ink); }
+      .a .seal { position: absolute; transform: translate(62px, 52px) rotate(-6deg); width: 26px; height: 26px; font-size: 14px; }
+      .a .mark-wrap { position: relative; display: grid; place-items: center; }
+
+      /* B · 山水 */
+      .b { place-items: stretch; }
+      .b .content { position: absolute; inset: 0; place-items: center; align-content: start; padding-top: 22%; }
+      .b .sun { width: 74px; height: 74px; border-radius: 50%; background: var(--seal); opacity: calc(0.25 + 0.75 * var(--p)); transition: opacity 0.5s; }
+      .b .title { font: 600 34px "Noto Serif TC", serif; letter-spacing: 0.6em; padding-left: 0.6em; color: var(--ink); }
+      .b .hills { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; }
+      .b .hills path { transition: opacity 0.8s ease, transform 0.8s ease; }
+      .b .h1 { opacity: calc(min(1, var(--p) * 3)); }
+      .b .h2 { opacity: calc(min(1, max(0, var(--p) * 3 - 1))); }
+      .b .h3 { opacity: calc(min(1, max(0, var(--p) * 3 - 2))); }
+      .b .horizon { position: absolute; left: 12%; right: 12%; bottom: 18%; height: 1px; background: rgba(28, 26, 24, 0.12); }
+      .b .horizon span { position: absolute; inset: 0; background: var(--ink); transform-origin: left; transform: scaleX(var(--p)); transition: transform 0.4s ease; }
+
+      /* C · 光明 lattice */
+      .c .grid { display: grid; grid-template-columns: repeat(7, 14px); gap: 5px; padding: 12px; border: 1px solid #e6e1d8; }
+      .c .grid i { width: 14px; height: 14px; border: 1px solid #ddd6ca; box-sizing: border-box; transition: background 0.4s, border-color 0.4s, box-shadow 0.4s; }
+      .c .grid i.on { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 8px rgba(201, 162, 74, 0.55); }
+      .c .grid i.on.red { background: var(--seal); border-color: var(--seal); box-shadow: 0 0 8px rgba(179, 40, 30, 0.45); }
+      .c .title { display: flex; align-items: center; gap: 14px; }
+      .c .title b { font: 700 38px "Noto Serif TC", serif; letter-spacing: 0.25em; color: var(--ink); }
+      .c .pct { font: 500 12px Cinzel, serif; letter-spacing: 0.3em; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute">
+      <filter id="brush"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="n" /><feDisplacementMap in="SourceGraphic" in2="n" scale="5" /></filter>
+    </svg>
+    <div class="row">
+      <div class="screen a">
+        <div class="tag">A · 円相 Ensō</div>
+        <div class="content">
+          <div class="mark">
+            <div class="mark-wrap">
+              <svg viewBox="0 0 200 200"><path class="enso" d="M118,28 C160,38 182,78 172,118 C162,160 120,182 82,172 C42,160 20,120 30,82 C38,52 62,32 92,27" /></svg>
+              <div class="seal">辰</div>
+            </div>
+            <div class="vert">辰霖學院</div>
+          </div>
+          <div class="caps">CHENLIN ACADEMY</div>
+          <div class="hair"><span></span></div>
+        </div>
+        <div class="veil"></div>
+      </div>
+
+      <div class="screen b">
+        <div class="tag">B · 山水 Ink hills</div>
+        <div class="content">
+          <div class="sun"></div>
+          <div class="title">辰霖學院</div>
+          <div class="caps">CHENLIN ACADEMY</div>
+        </div>
+        <svg class="hills fade" viewBox="0 0 400 200" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1a18" stop-opacity="0.18" /><stop offset="1" stop-color="#1c1a18" stop-opacity="0" /></linearGradient>
+            <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1a18" stop-opacity="0.35" /><stop offset="1" stop-color="#1c1a18" stop-opacity="0.02" /></linearGradient>
+            <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1a18" stop-opacity="0.7" /><stop offset="1" stop-color="#1c1a18" stop-opacity="0.05" /></linearGradient>
+          </defs>
+          <path class="h1" fill="url(#g1)" d="M0,120 C40,90 70,100 100,70 C130,40 160,80 190,60 C230,30 260,80 300,55 C340,30 370,70 400,60 L400,200 L0,200 Z" />
+          <path class="h2" fill="url(#g2)" d="M0,150 C50,120 80,135 120,105 C150,85 180,120 220,100 C260,80 300,125 340,100 C370,85 390,110 400,105 L400,200 L0,200 Z" />
+          <path class="h3" fill="url(#g3)" d="M0,175 C60,150 90,165 140,140 C180,122 210,160 250,145 C300,128 330,160 400,140 L400,200 L0,200 Z" />
+        </svg>
+        <div class="horizon fade"><span></span></div>
+        <div class="veil"></div>
+      </div>
+
+      <div class="screen c">
+        <div class="tag">C · 光明 Lattice</div>
+        <div class="content">
+          <div class="grid"></div>
+          <div class="title"><b>辰霖學院</b><div class="seal">燈</div></div>
+          <div class="caps">CHENLIN ACADEMY</div>
+          <div class="pct">0%</div>
+        </div>
+        <div class="veil"></div>
+      </div>
+    </div>
+    <script>
+      const screens = [...document.querySelectorAll('.screen')];
+      const grid = document.querySelector('.c .grid'), pct = document.querySelector('.c .pct');
+      const cells = Array.from({ length: 49 }, (_, i) => grid.appendChild(Object.assign(document.createElement('i'), { className: i % 11 === 3 ? 'red' : '' })));
+      const order = cells.map((_, i) => i).sort((a, b) => ((a * 37) % 49) - ((b * 37) % 49)); // light in a scattered order
+      const set = (p) => {
+        for (const s of screens) s.style.setProperty('--p', p.toFixed(3));
+        order.forEach((ci, k) => cells[ci].classList.toggle('on', k < Math.round(p * 49)));
+        pct.textContent = `${Math.round(p * 100)}%`;
+      };
+      const frozen = new URLSearchParams(location.search).get('p');
+      if (frozen !== null) set(Number(frozen));
+      else {
+        let t = 0;
+        setInterval(() => {
+          t = (t + 0.05) % 7; // 4 s loading, a beat, then the fade
+          set(Math.min(1, t / 4));
+          screens.forEach((s) => s.classList.toggle('done', t > 4.6 && t < 6.8));
+        }, 50);
+      }
+    </script>
+  </body>
+</html>
