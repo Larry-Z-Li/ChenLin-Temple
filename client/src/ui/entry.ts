@@ -11,8 +11,8 @@ import { h } from './dom';
  * click that also unlocks audio). Enter stays disabled until `ready()` — the world is still loading.
  */
 export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) {
-  let resolve!: (v: { name: string; color: string; hall?: string }) => void;
-  const done = new Promise<{ name: string; color: string; hall?: string }>((r) => (resolve = r));
+  let resolve!: (v: { name: string; color: string; hall?: string; redirect?: string }) => void;
+  const done = new Promise<{ name: string; color: string; hall?: string; redirect?: string }>((r) => (resolve = r));
   const name = h('input', { class: 'text-input', maxlength: '20', value: settings.name, 'data-i18n-placeholder': 'entry.namePlaceholder', autocomplete: 'nickname' }) as HTMLInputElement;
   name.placeholder = t('entry.namePlaceholder');
   let color = settings.color;
@@ -30,13 +30,16 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) 
     }),
   );
   const enter = h('button', { class: 'entry-go', disabled: true }, h('span', { i18n: 'entry.enter' }), h('span', { class: 'entry-arrow' }, '→')) as HTMLButtonElement;
+  // 佛家奇門院: land at 生門院 (caishen) instead of the front gate.
+  const foQimen = h('button', { class: 'entry-go', disabled: true }, h('span', { i18n: 'entry.foQimen' }), h('span', { class: 'entry-arrow' }, '→')) as HTMLButtonElement;
   // Or fly straight to one of the gate halls instead of the front gate.
   const hallBtns = ([['caishen', '生門院'], ['yangsheng', '休門院'], ['guanyin', '開門院'], ['guoxue', '景門院']] as const).map(([id, label]) => {
     const b = h('button', { class: 'entry-hall', disabled: true }, label) as HTMLButtonElement;
     b.addEventListener('click', () => go(id));
     return b;
   });
-  const halls = h('div', { class: 'entry-halls' }, ...hallBtns);
+  // One 4-column grid: the two gold buttons each span 2 cols so their edges match the halls.
+  const cta = h('div', { class: 'entry-cta' }, enter, foQimen, ...hallBtns);
   const panel = h(
     'div',
     { class: 'entry-panel' },
@@ -45,15 +48,14 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) 
     h('div', { class: 'entry-sub', i18n: 'app.subtitle' }),
     h('label', { class: 'entry-field' }, h('span', { i18n: 'entry.name' }), name),
     h('div', { class: 'entry-field' }, h('span', { i18n: 'entry.robe' }), swatches),
-    enter,
-    halls,
+    cta,
     h('div', { class: 'entry-hint', i18n: 'entry.hint' }),
   );
   const overlay = h('div', { class: 'entry' }, panel);
   parent.append(overlay);
 
   let ready = false;
-  const go = (hall?: string) => {
+  const go = (hall?: string, redirect?: string) => {
     if (!ready) return;
     unlockAudio();
     settings.name = sanitizeName(name.value || name.placeholder);
@@ -64,16 +66,19 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) 
     overlay.classList.add('out');
     setTimeout(() => {
       overlay.remove();
-      resolve({ name: settings.name, color, hall });
+      resolve({ name: settings.name, color, hall, redirect });
     }, 1000);
   };
   enter.addEventListener('click', () => go());
+  // Fly to 生門院, then open 奇門 after landing.
+  foQimen.addEventListener('click', () => go('caishen', 'https://qimen.one/'));
   name.addEventListener('keydown', (e) => e.key === 'Enter' && go());
   return {
     done,
     ready() {
       ready = true;
       enter.disabled = false;
+      foQimen.disabled = false;
       hallBtns.forEach((b) => (b.disabled = false));
     },
   };

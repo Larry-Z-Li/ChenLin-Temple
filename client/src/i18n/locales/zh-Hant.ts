@@ -10,6 +10,7 @@ const zhHant: Record<I18nKey, string> = {
   'entry.namePlaceholder': '行者',
   'entry.robe': '袍服顏色',
   'entry.enter': '進入寺院',
+  'entry.foQimen': '佛家奇門',
   'entry.hint': '建議配戴耳機。',
 
   'hud.online': '{n} 人在此',

@@ -8,6 +8,7 @@ const en = {
   'entry.namePlaceholder': 'Pilgrim',
   'entry.robe': 'Robe colour',
   'entry.enter': 'Enter the temple',
+  'entry.foQimen': '佛家奇門',
   'entry.hint': 'Headphones recommended.',
 
   'hud.online': '{n} present',
