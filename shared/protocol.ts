@@ -1,9 +1,7 @@
 // Wire protocol shared by client and server. No outside dependencies (only ./moderation, beside it).
 import { isBlocked } from './moderation';
 
-export const PROTOCOL_VERSION = 12;
-/** Longest incense line at one table (the one offering counts). */
-export const QUEUE_MAX = 8;
+export const PROTOCOL_VERSION = 13;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -33,6 +31,10 @@ export const FLAG_LISTENING = 1; // playing chants → headphones
 export const FLAG_INCENSE = 2; // holding a stick of incense
 export const FLAG_INCENSE_LIT = 4; // …and it is lit
 export const FLAG_CLOUD = 8; // riding a cloud
+export const FLAG_LANTERN = 16; // carrying a lantern to bless it…
+export const FLAG_GLOW_SHIFT = 5; // …and how brightly it glows: 2 bits (0–3) from here
+/** Places before a hall's altar where people bless lanterns (more than this share). */
+export const BLESS_SPOTS = 6;
 
 export interface PlayerInfo {
   id: string;
@@ -86,7 +88,7 @@ export type WishBoard = string;
 export const WISH_SLOTS = 90;
 /** The hall's lantern wall: two 7×7 grids either side of the back door. */
 export const HALL_WISH_SLOTS = 98;
-export const WISH_TTL_MS = 30 * 24 * 3600 * 1000;
+export const WISH_TTL_MS = 182 * 24 * 3600 * 1000; // six months
 export const WISH_TITLE_MAX = 24;
 export const WISH_TEXT_MAX = 140;
 export const WISH_COLOURS = 8;
@@ -104,10 +106,12 @@ export interface Wish {
   name: string;
   /** When it was hung (epoch ms). */
   at: number;
+  /** How many times people have blessed it (祝福願望). */
+  prayers?: number;
 }
 
-/** slow: your cooldown · busy: many lanterns just went up · limit: you have enough up already · blocked: the word filter. */
-export type WishDenyReason = 'slow' | 'empty' | 'full' | 'blocked' | 'limit' | 'busy';
+/** slow: your cooldown · busy: many lanterns just went up · limit: you have enough up already · blocked: the word filter · taken: someone just claimed that hook. */
+export type WishDenyReason = 'slow' | 'empty' | 'full' | 'blocked' | 'limit' | 'busy' | 'taken';
 
 export type ClientMsg =
   | { t: 'hello'; v: number; name: string; color: string }
@@ -118,11 +122,11 @@ export type ClientMsg =
   /** Strike a hall instrument (bell, drum, singing bowl, wooden fish). */
   | { t: 'strike'; inst: string }
   /** `side`: the hall's left (0) or right (1) wall. */
-  | { t: 'wish'; title: string; text: string; color: number; board?: WishBoard; side?: number }
+  | { t: 'wish'; title: string; text: string; color: number; board?: WishBoard; side?: number; slot?: number }
+  /** Take a lantern down to bless it (and, done, hang it back: the blessing counts). */
+  | { t: 'bless'; id: string; done?: boolean }
   /** Flag a lantern as unkind; enough different people and it comes down. */
   | { t: 'report'; id: string }
-  /** Join (or leave) the line to offer incense at a hall's table. The front of the line is the one offering. */
-  | { t: 'queue'; hall: string; join: boolean }
   /** Give one fruit from your basket to a deer (they eat any kind). */
   | { t: 'feed'; deer: string; fruit: Fruit }
   | { t: 'offer'; hall: string; kind: 'incense' }
@@ -144,8 +148,8 @@ export type ServerMsg =
       /** hallId -> today's offerings */
       offerings: Record<string, Offering[]>;
       wishes: Wish[];
-      /** Incense lines with anyone in them: hall → player ids, front first. */
-      queues: Record<string, string[]>;
+      /** Lanterns off their walls being blessed: wish id → who has it, and at which spot. */
+      blessings: Record<string, { by: string; spot: number }>;
     }
   | { t: 'join'; player: PlayerInfo & { tr: Transform } }
   | { t: 'leave'; id: string }
@@ -158,8 +162,8 @@ export type ServerMsg =
   | { t: 'strike'; inst: string; by: string }
   | { t: 'wishAdded'; wish: Wish }
   | { t: 'wishRemoved'; id: string }
-  /** A hall's incense line, front first. */
-  | { t: 'queue'; hall: string; ids: string[] }
+  /** A lantern taken down to be blessed (by) or hung back (by null, with its new count). */
+  | { t: 'blessing'; id: string; by: string | null; spot: number; prayers?: number }
   | { t: 'wishDenied'; reason: WishDenyReason }
   | { t: 'fed'; deer: string; by: string; fruit: Fruit }
   | { t: 'pickDenied'; fruit: string; reason: 'gone' | 'full' }

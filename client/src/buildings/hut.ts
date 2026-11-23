@@ -5,7 +5,24 @@ import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
 import { canvasTexture } from '../core/textures';
 import { buildRedLantern } from './hall';
-import { box, cylinder, hipRoofGeometry, mat } from './materials';
+import { box, cylinder, mat } from './materials';
+import { irimoyaRoof, roofTexture, shojiTexture } from './japaneseRoof';
+
+/** 方丈 style: natural wood, paper shōji, a curved roof of cypress bark (檜皮葺). */
+const HOJO_WOOD = 0x8a6a4a, HOJO_DARK = 0x4a3424, HOJO_ROOF = 0x6b4a33;
+function hojoRoof(g: THREE.Object3D, W: number, D: number, H: number, y: number, z = 0) {
+  const r = irimoyaRoof(W, D, H, { gable: 0.6, curve: 1.45, upturn: Math.min(0.15, 0.5 / H) });
+  r.roof.computeVertexNormals();
+  r.gable.computeVertexNormals();
+  const roof = new THREE.Mesh(r.roof, new THREE.MeshStandardMaterial({ map: roofTexture('bark', HOJO_ROOF), roughness: 1, side: THREE.DoubleSide }));
+  const gable = new THREE.Mesh(r.gable, mat(0xe8e2d2, { roughness: 0.9, side: THREE.DoubleSide }));
+  const edge = new THREE.Mesh(r.edge, mat(HOJO_DARK, { roughness: 0.8, side: THREE.DoubleSide }));
+  for (const m of [roof, gable, edge]) m.position.set(0, y, z);
+  g.add(edge);
+  roof.castShadow = roof.receiveShadow = true;
+  const xr = W / 2 - 0.3 * D;
+  g.add(roof, gable, box(xr * 2 + 0.3, 0.22, 0.3, mat(HOJO_DARK, { roughness: 0.8 }), 0, y + r.ridge - 0.1, z));
+}
 
 const W = 5.6, D = 4.2, H = 2.8, PL = 0.35;
 
@@ -47,24 +64,21 @@ function longHouse(ctx: WorldContext, x: number, z: number, L: number, Dp: numbe
   g.position.set(x, ctx.ground.heightAt(x, z), z);
   g.rotation.y = yaw;
   ctx.scene.add(g);
-  const red = mat(THEME.column, { roughness: 0.55 });
+  const red = mat(HOJO_DARK, { roughness: 0.7 }); // (posts: dark wood now)
   const Hh = 3.2, ld = Dp - 1.6; // walls set back behind a front veranda
   g.add(box(L, PL, Dp, mat(THEME.platformStone, { roughness: 0.95 }), 0, 0, 0));
   g.add(box(L - 0.4, Hh, ld, mat(THEME.wall, { roughness: 0.9 }), 0, PL, -0.7));
-  g.add(box(L - 0.34, 0.6, ld + 0.06, mat(THEME.wallBase, { roughness: 0.8 }), 0, PL, -0.7));
-  g.add(box(L, 0.3, Dp, mat(THEME.beam, { roughness: 0.6 }), 0, PL + Hh - 0.3, 0));
+  g.add(box(L - 0.34, 0.6, ld + 0.06, mat(HOJO_WOOD, { roughness: 0.8 }), 0, PL, -0.7));
+  g.add(box(L, 0.3, Dp, mat(HOJO_DARK, { roughness: 0.7 }), 0, PL + Hh - 0.3, 0));
   const n = Math.max(3, Math.round(L / 3.2));
   for (let i = 0; i <= n; i++) g.add(cylinder(0.11, 0.12, Hh, red, -L / 2 + 0.25 + (i * (L - 0.5)) / n, PL, Dp / 2 - 0.3, 8));
-  for (let i = 0; i < n; i++) {
-    const win = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.1), new THREE.MeshStandardMaterial({ map: latticeTex(), roughness: 0.8 }));
-    win.position.set(-L / 2 + 0.25 + ((i + 0.5) * (L - 0.5)) / n, PL + 1.6, -0.7 + ld / 2 + 0.01);
-    g.add(win);
-  }
-  const { geometry } = hipRoofGeometry(L + 1.6, Dp + 1.6, 1.6);
-  const roof = new THREE.Mesh(geometry, mat(THEME.roof, { roughness: 0.75, side: THREE.DoubleSide, flatShading: true }));
-  roof.position.y = PL + Hh;
-  roof.castShadow = true;
-  g.add(roof);
+  // a run of paper shōji along the front
+  const sho = shojiTexture();
+  sho.repeat.set((L - 0.6) / 1.6, 1);
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(L - 0.6, Hh - 0.6), new THREE.MeshStandardMaterial({ map: sho, roughness: 0.9 }));
+  front.position.set(0, PL + 0.3 + (Hh - 0.6) / 2, -0.7 + ld / 2 + 0.015);
+  g.add(front);
+  hojoRoof(g, L + 2.2, Dp + 2.2, 2.2, PL + Hh);
   const c = Math.abs(Math.cos(yaw)), s = Math.abs(Math.sin(yaw));
   ctx.collisions.addBoxCentered(x, z, c * L + s * Dp, s * L + c * Dp);
 }
@@ -77,14 +91,13 @@ function buildHut(ctx: WorldContext, x: number, z: number, yaw: number, scale = 
   g.scale.setScalar(scale);
   ctx.scene.add(g);
   const stone = mat(THEME.platformStone, { roughness: 0.95 });
-  const red = mat(THEME.column, { roughness: 0.55 });
-  const gold = mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 });
+  const red = mat(HOJO_DARK, { roughness: 0.7 }); // (posts: dark wood now)
 
   g.add(box(W + 1.2, PL, D + 2.2, stone, 0, 0, 0.5)); // platform with a porch in front
   g.add(box(2, PL * 0.5, 0.6, stone, 0, 0, D / 2 + 1.9)); // step
   g.add(box(W, H, D, mat(THEME.wall, { roughness: 0.9 }), 0, PL, 0));
-  g.add(box(W + 0.06, 0.6, D + 0.06, mat(THEME.wallBase, { roughness: 0.8 }), 0, PL, 0));
-  g.add(box(W + 0.3, 0.35, D + 0.3, mat(THEME.beam, { roughness: 0.6 }), 0, PL + H - 0.35, 0));
+  g.add(box(W + 0.06, 0.6, D + 0.06, mat(HOJO_WOOD, { roughness: 0.8 }), 0, PL, 0));
+  g.add(box(W + 0.3, 0.35, D + 0.3, mat(HOJO_DARK, { roughness: 0.7 }), 0, PL + H - 0.35, 0));
   // Front: lattice door and windows
   const door = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 2.1), new THREE.MeshStandardMaterial({ map: latticeTex(), roughness: 0.8 }));
   door.position.set(0, PL + 1.05, D / 2 + 0.01);
@@ -98,13 +111,7 @@ function buildHut(ctx: WorldContext, x: number, z: number, yaw: number, scale = 
   for (const [px, pz] of [[-W / 2, -D / 2], [W / 2, -D / 2], [-W / 2, D / 2], [W / 2, D / 2], [-W / 2 + 0.2, D / 2 + 1.25], [W / 2 - 0.2, D / 2 + 1.25]])
     g.add(cylinder(0.12, 0.14, H, red, px, PL, pz, 10));
   // Roof over house and porch
-  const { geometry, ridgeHalf } = hipRoofGeometry(W + 2.0, D + 3.2, 1.8);
-  const roof = new THREE.Mesh(geometry, mat(THEME.roof, { roughness: 0.75, side: THREE.DoubleSide, flatShading: true }));
-  roof.position.set(0, PL + H, 0.55);
-  roof.castShadow = roof.receiveShadow = true;
-  g.add(roof);
-  g.add(box(ridgeHalf * 2 + 0.4, 0.22, 0.26, mat(THEME.roofRidge, { roughness: 0.7 }), 0, PL + H + 1.68, 0.55));
-  for (const s of [-1, 1]) g.add(box(0.2, 0.45, 0.2, gold, s * (ridgeHalf + 0.15), PL + H + 1.75, 0.55));
+  hojoRoof(g, W + 2.4, D + 3.4, 2.1, PL + H, 0.55);
   // Two red lanterns under the porch eave
   for (const s of [-1, 1]) {
     const l = buildRedLantern(0.3);

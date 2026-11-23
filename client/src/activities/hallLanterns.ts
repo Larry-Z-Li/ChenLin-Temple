@@ -10,6 +10,7 @@ import { t } from '../i18n';
 import type { NetClient } from '../net/netClient';
 import type { LocalPlayer } from '../player/localPlayer';
 import type { LanternShot } from './bodhiBell';
+import type { BlessRoute, LanternBlessing } from './lanternBlessing';
 import { h } from '../ui/dom';
 import type { Hud } from '../ui/hud';
 import { LOTUS_COLOURS } from '../world/lanterns';
@@ -19,15 +20,19 @@ import { lanternGeometries, lanternHex, markHung, showWishForm, wishMeta, wishWa
 
 const GRID = 7; // 7 × 7 per side
 const COL = 0.95, ROW = 0.8, SCALE = 0.9;
-const PAGE = 20;
 const PER_WALL = GRID * GRID; // slots 0–48 the left wall (west), 49–97 the right
 const wallOf = (slot: number) => (slot < PER_WALL ? 0 : 1);
+/** An unclaimed lantern: dark red, unlit. */
+const DARK = new THREE.Color(0x4a1612);
+/** Where people stand to bless, either side of the incense stand (metres from the middle). */
+const SPOT_X = [-2.2, 2.2, -3.6, 3.6, -5, 5];
 
 /**
- * A hall's lantern wall (光明燈) — every hall has one: two 7×7 grids of small glowing lanterns on the
- * back wall, either side of the middle (the back door, where there is one) behind the altar. A writing table in each back corner (paper
- * lantern, string, scissors, pencil) lets you hang one — title, wish and colour — for 30 days; when
- * all 98 hooks are taken it turns you away. The wall itself opens the list of every wish.
+ * A hall's lantern wall (光明燈) — every hall has one: two 7×7 grids on the back wall either side of the
+ * middle, every hook hung with a dark red lantern. The wall and the writing table in its corner both open
+ * the grid of its 49 lanterns, numbered, with whose wish each is (– if nobody's): a free one lets you write
+ * a wish (title, wish, colour) and light it, for six months; a claimed one shows the wish, how many times
+ * it's been blessed, and 祝福願望 — carry it to the altar and bow three times with it (see LanternBlessing).
  */
 export class HallLanterns {
   private wishes = new Map<string, Wish>();
@@ -38,7 +43,6 @@ export class HallLanterns {
   private hooks: THREE.Vector3[] = [];
   private panel: HTMLElement;
   private pending: string | null = null;
-  private page = 0;
   /** Lanterns you've reported this visit. */
   private reported = new Set<string>();
   private hidden = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -50,13 +54,18 @@ export class HallLanterns {
   private walls: { at: THREE.Vector3; view: THREE.Vector3 }[] = [];
   /** Lantern size (smaller in lower halls, where the rows are closer). */
   private scale = SCALE;
+  private root: THREE.Group;
+  /** What's open in the panel (to refresh it when a lantern changes). */
+  private view: { side: number } | { wish: string } | null = null;
+  private routes: { start: { x: number; z: number; yaw: number }; side: number }[] = [];
+  private spotAt: (spot: number, side: number) => { path: { x: number; z: number }[]; yaw: number };
 
-  constructor(ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string, readonly hallId: string) {
+  constructor(ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string, readonly hallId: string, private blessing: LanternBlessing) {
     const hall = HALLS.find((x) => x.id === hallId)!;
     const F = PLATFORM_H, hw = hall.width / 2, wall = -hall.depth / 2 + 0.2; // inner face of the back wall
     const cx = (2 + hw) / 2; // middle of each wall stretch beside the middle 4 m
     // Built in the hall's own space (as if it faced south), then turned with the hall; W() gives world positions.
-    const root = new THREE.Group();
+    const root = (this.root = new THREE.Group());
     root.position.set(hall.x, 0, hall.z);
     root.rotation.y = hallYaw(hall);
     root.updateMatrixWorld();
@@ -92,38 +101,48 @@ export class HallLanterns {
     this.hooks.forEach((p, i) => hookMesh.setMatrixAt(i, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z)));
     root.add(hookMesh);
 
-    // ---- Lanterns (one per hook, hidden until hung): always lit indoors ----
+    // ---- Lanterns: one on every hook, dark red until someone lights it with a wish ----
     const { body, trim } = lanternGeometries();
     this.bodies = new THREE.InstancedMesh(body, colourGlowMaterial({ roughness: 0.6 }, (n) => 1.0 + 0.5 * n), HALL_WISH_SLOTS);
     this.trims = new THREE.InstancedMesh(trim, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }), HALL_WISH_SLOTS);
     const halo: number[] = [];
+    const still = new THREE.Matrix4();
     this.hooks.forEach((p, i) => {
-      this.bodies.setMatrixAt(i, this.hidden);
-      this.trims.setMatrixAt(i, this.hidden);
-      this.bodies.setColorAt(i, new THREE.Color(0xffffff));
+      still.compose(p, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, i, 0)), new THREE.Vector3(this.scale, this.scale, this.scale));
+      this.bodies.setMatrixAt(i, still);
+      this.trims.setMatrixAt(i, still);
+      this.bodies.setColorAt(i, DARK);
       halo.push(p.x, p.y - 0.55 * this.scale, p.z);
     });
     this.halos = haloPoints(halo, new Array(halo.length).fill(0), 0.95, 0.85, 0.6);
     root.add(this.bodies, this.trims, this.halos);
 
-    // ---- Writing tables in the back corners ----
-    // Each side is its own wall: its table hangs lanterns there, it fills up on its own, and lists its own wishes.
+    // ---- Writing tables in the back corners; table and wall both open that wall's grid ----
     [-1, 1].forEach((s, side) => {
       const tx = s * (hw - 1.4), tz = wall + 1.5;
       writingTable(ctx, root, tx, F, tz, W);
       rug(root, tx, F, tz + 1.05, 1.6, 1.1); // to stand on while you write
       const ti = W(tx, 0, tz + 0.9), wi = W(s * cx, 0, wall + 1.5);
-      ctx.interactions.add({
-        id: `hallwish-${hallId}-table${s}`, x: ti.x, z: ti.z, radius: 1.2,
-        prompt: () => ({ text: this.full(side) ? t('prompt.hallWishFull') : wishWait() ? t('prompt.wishWait', { s: wishWait() }) : t('prompt.hallWish') }),
-        onInteract: () => (this.full(side) ? this.hud.toast(t('hallWish.full')) : wishWait() ? this.hud.toast(t('wish.wait', { s: wishWait() })) : this.openForm(side)),
-      });
-      ctx.interactions.add({
-        id: `hallwish-${hallId}-wall${s}`, x: wi.x, z: wi.z, radius: 2.1,
-        prompt: () => ({ text: t('prompt.hallList', { n: this.onWall(side).length }) }),
-        onInteract: () => this.openList(side, 0),
-      });
+      for (const [key, p, r] of [['table', ti, 1.2], ['wall', wi, 2.1]] as const)
+        ctx.interactions.add({
+          id: `hallwish-${hallId}-${key}${s}`, x: p.x, z: p.z, radius: r,
+          prompt: () => ({ text: t('prompt.hallList', { n: this.onWall(side).length }) }),
+          onInteract: () => this.openGrid(side),
+        });
+      // where you stand to take a lantern down from this wall (facing it)
+      const st = W(s * cx, 0, wall + 1.7);
+      this.routes.push({ start: { x: st.x, z: st.z, yaw: root.rotation.y }, side: s });
     });
+
+    // ---- Places to bless, before the altar either side of the incense stand ----
+    const table = ctx.offeringTables.find((o) => o.hallId === hallId);
+    const tl = table ? root.worldToLocal(new THREE.Vector3(table.x, 0, table.z)) : new THREE.Vector3(0, 0, 0);
+    this.spotAt = (spot, s) => {
+      const sx = Math.max(-hw + 1.3, Math.min(hw - 1.3, tl.x + SPOT_X[spot % SPOT_X.length])), sz = tl.z + 1.9, aisle = s * (hw - 2.2);
+      // along the side of the hall (round the altar), then in to the spot
+      const path = [W(aisle, 0, wall + 1.7), W(aisle, 0, sz), W(sx, 0, sz)].map((v) => ({ x: v.x, z: v.z }));
+      return { path, yaw: root.rotation.y };
+    };
 
     this.panel = h('div', { class: 'wish-overlay hidden', onclick: (e: MouseEvent) => e.target === this.panel && this.close() });
     ui.append(this.panel);
@@ -132,10 +151,12 @@ export class HallLanterns {
     net.on('welcome', (msg) => {
       for (const id of [...this.wishes.keys()]) this.remove(id);
       for (const w of msg.wishes) if (mine(w)) this.add(w);
+      this.refresh();
     });
     net.on('wishAdded', (w) => {
       if (!mine(w)) return;
       this.add(w);
+      this.refresh();
       if (this.pending !== null && w.title === this.pending && w.name === this.myName) {
         this.pending = null;
         this.hud.toast(t('wish.hung'));
@@ -143,20 +164,24 @@ export class HallLanterns {
         this.onHung(this.shotFor(w.slot));
       }
     });
-    net.on('wishRemoved', (id) => this.remove(id));
+    net.on('wishRemoved', (id) => {
+      this.remove(id);
+      this.refresh();
+    });
     net.on('wishDenied', (reason) => {
-      if (this.pending === null) return; // the garden's desk
+      if (this.pending === null) return; // another wall's
       this.pending = null;
       this.hud.toast(t(reason === 'full' ? 'hallWish.full' : reason === 'empty' ? 'wish.empty' : (`wish.${reason}` as const)));
     });
 
-    // Gentle sway.
+    // Gentle sway (lit lanterns only).
     let acc = 0;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(this.scale, this.scale, this.scale);
     ctx.updaters.push((dt, time) => {
       if ((acc += dt) < 0.05 || !this.bySlot.size) return;
       acc = 0;
       for (const w of this.bySlot.values()) {
+        if (this.blessing.holder(w.id)) continue; // off the wall
         const k = this.shakeAt(w.slot);
         q.setFromEuler(e.set(Math.sin(time * 1.1 + w.slot) * 0.04 + k, w.slot, Math.sin(time * 0.8 + w.slot * 1.7) * 0.05 + k * 0.7));
         m.compose(this.hooks[w.slot], q, sc);
@@ -165,6 +190,33 @@ export class HallLanterns {
       }
       this.bodies.instanceMatrix.needsUpdate = this.trims.instanceMatrix.needsUpdate = true;
     });
+  }
+
+  /** A wish's lantern was taken down (or hung back) somewhere: show or hide it on this wall. */
+  heldChanged(id: string) {
+    const w = this.wishes.get(id);
+    if (!w) return;
+    const away = !!this.blessing.holder(id);
+    if (away) {
+      this.bodies.setMatrixAt(w.slot, this.hidden);
+      this.trims.setMatrixAt(w.slot, this.hidden);
+      this.bodies.instanceMatrix.needsUpdate = this.trims.instanceMatrix.needsUpdate = true;
+    }
+    this.halo(w.slot, away ? new THREE.Color(0, 0, 0) : new THREE.Color(lanternHex(w.color)));
+    this.refresh();
+  }
+
+  /** A wish's blessing count went up. */
+  counted(id: string, prayers: number) {
+    const w = this.wishes.get(id);
+    if (w) w.prayers = prayers;
+    this.refresh();
+  }
+
+  /** Its colour, if it's one of this wall's (for drawing it in someone's hands). */
+  colourOf(id: string) {
+    const w = this.wishes.get(id);
+    return w ? lanternHex(w.color) : null;
   }
 
   /** The camera's view of the whole wall your lantern is on (from the room), and how to shake it. */
@@ -188,14 +240,11 @@ export class HallLanterns {
 
   close() {
     this.panel.classList.add('hidden');
+    this.view = null;
   }
 
   private onWall(side: number) {
     return [...this.wishes.values()].filter((w) => wallOf(w.slot) === side);
-  }
-
-  private full(side: number) {
-    return this.onWall(side).length >= PER_WALL;
   }
 
   private add(w: Wish) {
@@ -217,9 +266,13 @@ export class HallLanterns {
     this.wishes.delete(id);
     if (this.bySlot.get(w.slot)?.id !== id) return;
     this.bySlot.delete(w.slot);
-    this.bodies.setMatrixAt(w.slot, this.hidden);
-    this.trims.setMatrixAt(w.slot, this.hidden);
+    // back to a dark lantern, still on its hook
+    const m = new THREE.Matrix4().compose(this.hooks[w.slot], new THREE.Quaternion().setFromEuler(new THREE.Euler(0, w.slot, 0)), new THREE.Vector3(this.scale, this.scale, this.scale));
+    this.bodies.setMatrixAt(w.slot, m);
+    this.trims.setMatrixAt(w.slot, m);
+    this.bodies.setColorAt(w.slot, DARK);
     this.bodies.instanceMatrix.needsUpdate = this.trims.instanceMatrix.needsUpdate = true;
+    this.bodies.instanceColor!.needsUpdate = true;
     this.halo(w.slot, new THREE.Color(0, 0, 0));
     this.relight();
   }
@@ -238,61 +291,84 @@ export class HallLanterns {
     col.needsUpdate = true;
   }
 
-  private openForm(side: number) {
-    showWishForm(this.panel, this.hud, 'hallWish.heading', (title, text, color) => {
-      this.pending = title;
-      this.net.hangWish(title, text, color, this.myName, this.freeSlot(side), this.hallId, side);
-      this.player.gesture('reach', 0.8);
-    }, () => this.close());
+  private refresh() {
+    const v = this.view;
+    if (!v || !this.isOpen) return;
+    if ('side' in v) this.openGrid(v.side);
+    else if (this.wishes.has(v.wish)) this.openWish(v.wish);
+    else this.close();
   }
 
-  /** Every wish on this wall, newest first, 20 to a page; ^ opens one up. */
-  private openList(side: number, page: number) {
-    const all = this.onWall(side).sort((a, b) => b.at - a.at);
-    const pages = Math.max(1, Math.ceil(all.length / PAGE));
-    this.page = Math.max(0, Math.min(pages - 1, page));
-    const rows = all.slice(this.page * PAGE, this.page * PAGE + PAGE).map((w) => {
-      // Report: anyone's but your own; enough different people and the server takes it down.
-      const report = w.name === this.myName ? null : (h('button', { class: 'wish-report', disabled: this.reported.has(w.id), i18n: this.reported.has(w.id) ? 'wish.reported' : 'wish.report' }) as HTMLButtonElement);
-      report?.addEventListener('click', () => {
-        this.reported.add(w.id);
-        this.net.reportWish(w.id);
-        report.disabled = true;
-        report.dataset.i18n = 'wish.reported';
-        report.textContent = t('wish.reported');
-        this.hud.toast(t('wish.reportThanks'));
-      });
-      const more = h('div', { class: 'wishlist-more' }, w.text ? h('p', { class: 'wish-body' }, w.text) : null, h('div', { class: 'wish-meta' }, wishMeta(w)), report);
-      const row = h('div', { class: 'wishlist-row' },
-        h('button', { class: 'wishlist-head', onclick: () => row.classList.toggle('open') },
-          h('span', { class: 'wishlist-dot', style: `background:#${lanternHex(w.color).toString(16).padStart(6, '0')}` }),
-          h('span', { class: 'wishlist-title' }, w.title),
-          h('span', { class: 'wishlist-name' }, w.name),
-          h('span', { class: 'wishlist-arrow' }, '^'),
-        ),
-        more,
-      );
-      return row;
+  /** The wall's 49 lanterns, numbered: whose wish each is, or – for a free one. */
+  private openGrid(side: number) {
+    this.view = { side };
+    const cells = Array.from({ length: PER_WALL }, (_, i) => {
+      const slot = side * PER_WALL + i, w = this.bySlot.get(slot), away = w && this.blessing.holder(w.id);
+      const cell = h('button', { class: `lg-cell${w ? ' claimed' : ''}${away ? ' away' : ''}`, title: w ? w.title : t('lantern.free') },
+        h('span', { class: 'lg-num' }, String(i + 1)),
+        h('span', { class: 'lg-name' }, w ? w.name : '–'),
+      ) as HTMLButtonElement;
+      if (w) cell.style.setProperty('--lc', `#${lanternHex(w.color).toString(16).padStart(6, '0')}`);
+      cell.addEventListener('click', () => (w ? this.openWish(w.id) : this.claim(side, slot)));
+      return cell;
     });
     this.panel.replaceChildren(
-      h('div', { class: 'wish-card wishlist-card' },
-        h('div', { class: 'wish-heading' }, t('hallWish.listTitle', { n: all.length, max: PER_WALL })),
-        h('div', { class: 'wishlist' }, ...(rows.length ? rows : [h('div', { class: 'wishlist-empty', i18n: 'hallWish.none' })])),
-        h('div', { class: 'wish-actions wishlist-pager' },
-          h('button', { class: 'pill-btn', i18n: 'hallWish.prev', disabled: this.page === 0, onclick: () => this.openList(side, this.page - 1) }),
-          h('span', { class: 'wishlist-page' }, `${this.page + 1} / ${pages}`),
-          h('button', { class: 'pill-btn', i18n: 'hallWish.next', disabled: this.page >= pages - 1, onclick: () => this.openList(side, this.page + 1) }),
-          h('button', { class: 'pill-btn', i18n: 'wish.close', onclick: () => this.close() }),
-        ),
+      h('div', { class: 'wish-card lantern-card' },
+        h('div', { class: 'wish-heading' }, t('lantern.gridTitle', { wall: t(side ? 'lantern.right' : 'lantern.left'), n: this.onWall(side).length, max: PER_WALL })),
+        h('div', { class: 'lantern-grid' }, ...cells),
+        h('div', { class: 'wish-actions' }, h('button', { class: 'pill-btn', i18n: 'wish.close', onclick: () => this.close() })),
       ),
     );
     this.panel.classList.remove('hidden');
   }
 
-  /** Offline only: the first empty hook on that wall. */
-  private freeSlot(side: number) {
-    for (let s = side * PER_WALL; s < (side + 1) * PER_WALL; s++) if (!this.bySlot.has(s)) return s;
-    return side * PER_WALL;
+  /** A free hook: write a wish and light its lantern. */
+  private claim(side: number, slot: number) {
+    if (wishWait()) return this.hud.toast(t('wish.wait', { s: wishWait() }));
+    this.view = null;
+    showWishForm(this.panel, this.hud, 'hallWish.heading', (title, text, color) => {
+      this.pending = title;
+      this.net.hangWish(title, text, color, this.myName, slot, this.hallId, side);
+      this.player.gesture('reach', 0.8);
+    }, () => this.openGrid(side));
+  }
+
+  /** A claimed lantern: the wish, how often it's been blessed, and 祝福願望. */
+  private openWish(id: string) {
+    const w = this.wishes.get(id);
+    if (!w) return;
+    this.view = { wish: id };
+    const side = wallOf(w.slot), holder = this.blessing.holder(id);
+    const report = w.name === this.myName ? null : (h('button', { class: 'wish-report', disabled: this.reported.has(w.id), i18n: this.reported.has(w.id) ? 'wish.reported' : 'wish.report' }) as HTMLButtonElement);
+    report?.addEventListener('click', () => {
+      this.reported.add(w.id);
+      this.net.reportWish(w.id);
+      report.disabled = true;
+      report.dataset.i18n = 'wish.reported';
+      report.textContent = t('wish.reported');
+      this.hud.toast(t('wish.reportThanks'));
+    });
+    const bless = h('button', { class: 'primary-btn', disabled: !!holder || this.blessing.active }, holder ? t('lantern.away') : t('lantern.bless')) as HTMLButtonElement;
+    bless.addEventListener('click', () => {
+      this.close();
+      const r = this.routes[side];
+      const route: BlessRoute = { hook: this.root.localToWorld(this.hooks[w.slot].clone().add(new THREE.Vector3(0, -0.5 * this.scale, 0))), start: r.start, to: (spot) => this.spotAt(spot, r.side) };
+      this.blessing.start(w.id, lanternHex(w.color), route);
+    });
+    this.panel.replaceChildren(
+      h('div', { class: 'wish-card' },
+        h('div', { class: 'wish-heading' }, `${t('lantern.number', { n: (w.slot % PER_WALL) + 1 })} · ${w.title}`),
+        w.text ? h('p', { class: 'wish-body' }, w.text) : null,
+        h('div', { class: 'wish-meta' }, wishMeta(w)),
+        h('div', { class: 'wish-meta' }, t('lantern.prayers', { n: w.prayers ?? 0 })),
+        report,
+        h('div', { class: 'wish-actions' },
+          h('button', { class: 'pill-btn', i18n: 'lantern.back', onclick: () => this.openGrid(side) }),
+          bless,
+        ),
+      ),
+    );
+    this.panel.classList.remove('hidden');
   }
 }
 

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Design Mocks</title>
+    <style>
+      html, body { margin: 0; background: #1b1d1f; color: #eee6d6; font: 14px system-ui, sans-serif; }
+      h2 { margin: 18px 20px 8px; font: 600 16px "Noto Serif TC", serif; letter-spacing: 0.08em; }
+      #maps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 0 20px; }
+      #maps figure { margin: 0; }
+      #maps canvas { width: 100%; aspect-ratio: 1; border-radius: 10px; display: block; }
+      #maps figcaption { margin-top: 6px; text-align: center; opacity: 0.8; }
+      #scene, #temples { width: calc(100% - 40px); height: 460px; margin: 0 20px 20px; border-radius: 10px; display: block; }
+    </style>
+  </head>
+  <body>
+    <h2>地圖 · Map styles</h2>
+    <div id="maps"></div>
+    <h2>人物 · Players &nbsp;·&nbsp; 樹 · Trees</h2>
+    <canvas id="scene"></canvas>
+    <h2>寺院 · Temples (exteriors): 禅宗様 · 和様 · 方丈</h2>
+    <canvas id="temples"></canvas>
+    <script type="module" src="/src/dev/mocks.ts"></script>
+  </body>
+</html>

@@ -23,5 +23,5 @@ requestAnimationFrame(() => setTimeout(() => {
   setTimeout(() => white.remove(), 3200);
 }, 300));
 entry.ready();
-const { name, color } = await entry.done;
-game.enter(name, color);
+const { name, color, hall } = await entry.done;
+game.enter(name, color, hall);

@@ -9,7 +9,8 @@ import type { ThangkaEntry } from '../content/manifest';
 import { inscription, onLocaleChange, t, type I18nKey } from '../i18n';
 import { clamp } from '../core/math';
 import { furnishHall, type CushionBlock } from './hallFurnishings';
-import { box, cylinder, hipRoofGeometry, mat } from './materials';
+import { box, cylinder, mat } from './materials';
+import { bellWindow, cutHole, irimoyaRoof, roofTexture } from './japaneseRoof';
 import { buildOfferingTable } from './offeringTable';
 import { buildStatueSlot } from './statue';
 import { nightGlow } from '../world/nightGlow';
@@ -19,6 +20,8 @@ import { addLampAt } from '../world/lightPool';
 const T = 0.4; // wall thickness
 const PORCH = 1.6; // platform margin around the walls
 const DOOR_H = 3.9;
+/** 禅宗様 colours: natural and dark wood, a dark grey tile roof. */
+const ZEN_WOOD = 0x5a3b26, ZEN_WOOD_DARK = 0x3f2a1c, ZEN_ROOF = 0x5a5752;
 
 /**
  * Build a hall. Halls facing east or west are built facing south around the origin inside a turned
@@ -109,7 +112,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
     return m;
   };
   const wallMat = mat(THEME.wall, { roughness: 0.9 });
-  const baseMat = mat(THEME.wallBase, { roughness: 0.8 });
+  const baseMat = mat(ZEN_WOOD_DARK, { roughness: 0.75 }); // 禅宗様: dark wood skirting, not a red band
   const wallX = (x0: number, x1: number, z: number) => {
     const w = x1 - x0, cx = (x0 + x1) / 2;
     g.add(blocker(box(w, H, T, wallMat, cx, F, z)));
@@ -166,17 +169,17 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
     } else ceilPlane(width, depth, hx, hz, F + H - 0.02);
   }
 
-  // Painted beam band under the eaves
-  const beamMat = mat(THEME.beam, { roughness: 0.6 });
+  // Dark wooden beams under the eaves (禅宗様)
+  const beamMat = mat(ZEN_WOOD_DARK, { roughness: 0.6 });
   const bandY = F + H - 0.7;
   g.add(box(width + 0.6, 0.7, 0.3, beamMat, hx, bandY, front + 0.1));
   g.add(box(width + 0.6, 0.7, 0.3, beamMat, hx, bandY, back - 0.1));
   g.add(box(0.3, 0.7, depth + 0.6, beamMat, hx - hw - 0.1, bandY, hz));
   g.add(box(0.3, 0.7, depth + 0.6, beamMat, hx + hw + 0.1, bandY, hz));
-  g.add(box(width + 0.7, 0.18, 0.34, mat(THEME.beamAccent), hx, bandY - 0.18, front + 0.1));
+  g.add(box(width + 0.7, 0.18, 0.34, mat(ZEN_WOOD), hx, bandY - 0.18, front + 0.1));
 
   // Porch columns (front), or corner columns for the open shrine
-  const colMat = mat(THEME.column, { roughness: 0.55 });
+  const colMat = mat(ZEN_WOOD, { roughness: 0.6 });
   const colZs = isShrine ? [front - 0.4, back + 0.4] : [front + 1.0];
   const nCols = isShrine ? 2 : Math.max(4, 2 * Math.round(width / 8));
   for (const cz of colZs)
@@ -200,29 +203,67 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
     });
   }
 
+  // ---- 禅宗様 walls: dark posts and a tie beam framing the plaster, bell-shaped windows (花頭窓) on the sides ----
+  if (!isShrine) {
+    const post = mat(ZEN_WOOD, { roughness: 0.6 }), out = T / 2 + 0.03;
+    const doors: [number, number][] = [[hx - fd / 2 - 0.2, hx + fd / 2 + 0.2]];
+    const clear = (x: number, gaps: [number, number][]) => !gaps.some(([a, b]) => x > a && x < b);
+    const nX = Math.max(3, Math.round(width / 3.2)), nZ = Math.max(3, Math.round(depth / 3.2));
+    for (let i = 0; i <= nX; i++) {
+      const x = hx - hw + (i * width) / nX;
+      if (clear(x, doors)) g.add(box(0.26, H, 0.06, post, x, F, front + out));
+      if (!def.backDoor || clear(x, [[hx - 2.2, hx + 2.2]])) g.add(box(0.26, H, 0.06, post, x, F, back - out));
+    }
+    for (let i = 0; i <= nZ; i++) for (const s of [-1, 1]) g.add(box(0.06, H, 0.26, post, hx + s * (hw + out), F, back + (i * depth) / nZ));
+    // the tie beam (長押) across each wall, broken at the doors
+    for (const [x0, x1] of [[hx - hw, hx - fd / 2], [hx + fd / 2, hx + hw]]) g.add(box(x1 - x0, 0.2, 0.07, post, (x0 + x1) / 2, F + 2.3, front + out + 0.01));
+    for (const s of [-1, 1]) g.add(box(0.07, 0.2, depth, post, hx + s * (hw + out + 0.01), F + 2.3, hz));
+    const winMat = mat(0x2a1d14, { roughness: 0.8, side: THREE.DoubleSide });
+    for (const s of [-1, 1])
+      for (const wz of [hz - depth / 4, hz + depth / 4]) {
+        const win = new THREE.Mesh(bellWindow(1.3, 1.7), winMat);
+        win.position.set(hx + s * (hw + out + 0.02), F + 1.25, wz);
+        win.rotation.y = s * Math.PI / 2;
+        g.add(win);
+      }
+  }
+
   // ---- Roof ----
   const eave = isShrine ? 1.6 : 2.4;
-  const roofMat = mat(THEME.roof, { roughness: 0.75, side: THREE.DoubleSide, flatShading: true });
-  const ridgeMat = mat(THEME.roofRidge, { roughness: 0.7 });
-  const addRoof = (W: number, D: number, RH: number, y: number) => {
-    const { geometry, ridgeHalf } = hipRoofGeometry(W, D, RH);
-    const roof = new THREE.Mesh(geometry, roofMat);
-    roof.position.set(hx, y, hz);
+  const roofMat = new THREE.MeshStandardMaterial({ map: roofTexture('tile', ZEN_ROOF), roughness: 0.75, side: THREE.DoubleSide });
+  const gableMat = mat(THEME.wall, { roughness: 0.9, side: THREE.DoubleSide }), edgeMat = mat(ZEN_WOOD_DARK, { roughness: 0.7, side: THREE.DoubleSide });
+  const ridgeMat = mat(0x2b2b2e, { roughness: 0.7 });
+  /** A curved 入母屋 roof (gable < 1) or a hipped skirt (gable ≈ 1); returns how high its corners turn up. */
+  const addRoof = (W: number, D: number, RH: number, y: number, o: { gable: number; curve: number; upturn: number }, ring = false) => {
+    const upturn = Math.min(o.upturn, 1.5 / (0.9 * RH)); // corners rise at most ~1.5 m
+    const r = irimoyaRoof(W, D, RH, { ...o, upturn });
+    if (ring) r.roof = cutHole(r.roof, hw + T / 2, hd + T / 2); // only outside the walls (inside is the room)
+    r.roof.computeVertexNormals();
+    r.gable.computeVertexNormals();
+    const roof = new THREE.Mesh(r.roof, roofMat), gable = new THREE.Mesh(r.gable, gableMat), edge = new THREE.Mesh(r.edge, edgeMat);
+    for (const m of [roof, gable, edge]) m.position.set(hx, y, hz);
     roof.castShadow = roof.receiveShadow = true;
-    g.add(roof);
-    if (ridgeHalf > 0.3) g.add(box(ridgeHalf * 2 + 0.6, 0.45, 0.5, ridgeMat, hx, y + RH - 0.15, hz));
-    // gilded finials at the ridge ends
-    for (const s of [-1, 1]) g.add(box(0.35, 0.9, 0.35, mat(THEME.goldLeaf, { metalness: 0.8, roughness: 0.3 }), hx + s * (ridgeHalf + 0.2), y + RH, hz));
+    g.add(roof, gable, edge);
+    if (o.gable < 0.99) {
+      const xr = W / 2 - (o.gable * D) / 2; // the ridge runs between the gables
+      g.add(box(xr * 2 + 0.4, 0.4, 0.42, ridgeMat, hx, y + r.ridge - 0.12, hz));
+      for (const s of [-1, 1]) g.add(box(0.42, 0.85, 0.5, ridgeMat, hx + s * (xr + 0.1), y + r.ridge - 0.12, hz)); // 鴟尾-like ends
+    }
+    return upturn * RH * 0.9;
   };
   const W = width + eave * 2, D = depth + eave * 2;
+  let lift = 0;
   if (def.roofTiers === 2) {
     const RH = D * 0.38;
-    addRoof(W, D, RH * 0.5, F + H);
+    lift = addRoof(W, D, RH * 0.5, F + H, { gable: 0.999, curve: 1.25, upturn: 0.35 });
     const cy = F + H + RH * 0.3;
     g.add(box(width * 0.74, 2.4, depth * 0.62, wallMat, hx, cy - 0.6, hz));
     g.add(box(width * 0.74 + 0.3, 0.6, depth * 0.62 + 0.3, beamMat, hx, cy + 1.2, hz));
-    addRoof(width * 0.74 + eave * 2, depth * 0.62 + eave * 2, RH * 0.55, cy + 1.8);
-  } else addRoof(W, D, D * (isShrine ? 0.42 : 0.4), F + H);
+    addRoof(width * 0.74 + eave * 2, depth * 0.62 + eave * 2, RH * 0.7, cy + 1.8, { gable: 0.55, curve: 1.7, upturn: 0.5 });
+  } else {
+    if (!isShrine) addRoof(width + 2.6, depth + 2.6, 1.3, F + DOOR_H + 0.25, { gable: 0.999, curve: 1.2, upturn: 0.35 }, true); // 裳階, above the door
+    lift = addRoof(W, D, D * 0.36, F + H, { gable: 0.55, curve: 1.7, upturn: 0.5 });
+  }
 
   // ---- Red lanterns under the front eave, wind bells at the eave corners (gently swaying) ----
   const swaying: { obj: THREE.Object3D; amp: number; speed: number; phase: number }[] = [];
@@ -238,7 +279,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     const b = buildWindBell();
     b.userData.dynamic = b.userData.rigid = true;
-    b.position.set(hx + sx * (hw + eave - 0.3), F + H - 0.02, hz + sz * (hd + eave - 0.3));
+    b.position.set(hx + sx * (hw + eave - 0.3), F + H + lift * 0.8 - 0.05, hz + sz * (hd + eave - 0.3)); // under the up-turned corner
     g.add(b);
     swaying.push({ obj: b, amp: 0.14, speed: 2.3, phase: sx * 3 + sz });
   }
@@ -331,7 +372,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
     }
   }
 
-  // ---- Thangkas on the side walls (and back wall when there's no back door) ----
+  // ---- Thangkas on the side walls ----
   if (!isShrine && def.thangkas > 0) {
     const pool = thangkas.filter((e) => !e.hall || e.hall === def.id);
     let k = 0;
@@ -346,15 +387,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
       east.rotation.y = -Math.PI / 2;
       g.add(west, east);
     }
-    if (!def.backDoor) {
-      for (const s of [-1, 1]) {
-        const bx = hx + s * (altarW / 2 + 2.2);
-        if (Math.abs(bx - hx) > hw - 1.2) continue;
-        const th = buildThangka(next());
-        th.position.set(bx, ty + 0.3, back + T / 2 + 0.04);
-        g.add(th);
-      }
-    }
+    // (the back wall is the lantern wall now: no thangkas there)
   }
   return g;
 }

@@ -27,13 +27,13 @@ export interface NetEvents {
   strike: (inst: string, by: string) => void;
   wishAdded: (wish: Wish) => void;
   wishRemoved: (id: string) => void;
+  blessing: (id: string, by: string | null, spot: number, prayers?: number) => void;
   wishDenied: (reason: WishDenyReason) => void;
   fed: (deer: string, by: string, fruit: Fruit) => void;
   pickDenied: (fruit: string, reason: 'gone' | 'full') => void;
   offered: (hall: string, offering: Offering, by: string) => void;
   offerDenied: (reason: 'noFruit' | 'full') => void;
   newDay: () => void;
-  queue: (hall: string, ids: string[]) => void;
 }
 
 /**
@@ -121,7 +121,7 @@ export class NetClient {
       case 'strike': return this.emit('strike', msg.inst, msg.by);
       case 'wishAdded': return this.emit('wishAdded', msg.wish);
       case 'wishRemoved': return this.emit('wishRemoved', msg.id);
-      case 'queue': return this.emit('queue', msg.hall, msg.ids);
+      case 'blessing': return this.emit('blessing', msg.id, msg.by, msg.spot, msg.prayers);
       case 'wishDenied': return this.emit('wishDenied', msg.reason);
       case 'fed': return this.emit('fed', msg.deer, msg.by, msg.fruit);
       case 'pickDenied': return this.emit('pickDenied', msg.fruit, msg.reason);
@@ -163,13 +163,13 @@ export class NetClient {
 
   /** Offline the lantern goes up locally (lost on reload). */
   hangWish(title: string, text: string, color: number, name: string, slot: number, board: WishBoard = 'garden', side?: number) {
-    if (!this.send({ t: 'wish', title, text, color, board, side })) this.emit('wishAdded', { id: `l${++this.localSeq}`, board, slot, title, text, color, name, at: Date.now() });
+    if (!this.send({ t: 'wish', title, text, color, board, side, slot })) this.emit('wishAdded', { id: `l${++this.localSeq}`, board, slot, title, text, color, name, at: Date.now() });
   }
 
   /** Flag a lantern as unkind (the server takes it down after enough different people do). */
-  /** Join or leave a hall's incense line. False when offline (then there's no line to wait in). */
-  queue(hall: string, join: boolean) {
-    return this.send({ t: 'queue', hall, join });
+  /** Take a lantern down to bless it, or (done) hang it back. False when offline. */
+  bless(id: string, done = false) {
+    return this.send({ t: 'bless', id, done });
   }
 
   reportWish(id: string) {

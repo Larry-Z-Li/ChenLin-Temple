@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ANIMS, FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, type PlayerInfo, type Transform } from '../../../shared/protocol';
+import { ANIMS, FLAG_CLOUD, FLAG_GLOW_SHIFT, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LANTERN, FLAG_LISTENING, type PlayerInfo, type Transform } from '../../../shared/protocol';
 import { damp, dampAngle } from '../core/math';
 import { Avatar } from '../player/avatar';
 
@@ -49,8 +49,11 @@ export class RemotePlayers {
     }
   }
 
+  /** The colour of the lantern a player is carrying to bless (set by the game). */
+  lanternOf: (id: string) => number | null = () => null;
+
   update(dt: number, camera: THREE.Camera) {
-    for (const r of this.map.values()) {
+    for (const [id, r] of this.map) {
       const p = r.avatar.root.position, [x, y, z, yaw, a] = r.target;
       const dist = Math.hypot(x - p.x, z - p.z);
       if (dist > 25) p.set(x, y, z); // teleport (e.g. just sat down far away)
@@ -66,6 +69,7 @@ export class RemotePlayers {
       r.avatar.setListening((flags & FLAG_LISTENING) !== 0);
       r.avatar.setIncense(flags & FLAG_INCENSE ? (flags & FLAG_INCENSE_LIT ? 2 : 1) : 0);
       r.avatar.setCloud((flags & FLAG_CLOUD) !== 0);
+      r.avatar.holdLantern(flags & FLAG_LANTERN ? (this.lanternOf(id) ?? 0xffc46a) : null, 1 + ((flags >> FLAG_GLOW_SHIFT) & 3) * (2 / 3));
       r.avatar.setTagVisible(camera.position.distanceTo(p) < 28);
       r.avatar.update(dt, r.speed);
     }

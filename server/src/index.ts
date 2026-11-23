@@ -34,7 +34,7 @@ import {
   WISH_TEXT_MAX,
   WISH_TITLE_MAX,
   WISH_TTL_MS,
-  QUEUE_MAX,
+  BLESS_SPOTS,
   type Wish,
   type ClientMsg,
   type PlayerInfo,
@@ -165,21 +165,6 @@ const MAX_TRACKED_FRUIT = 3000;
 /** hallId -> today's offerings, with absolute timestamps. */
 const offerings = new Map<string, (Omit<Offering, 'ago'> & { at: number })[]>();
 const MAX_HALLS = 32;
-/** hallId -> the incense line, front first (the front is the one offering), and since when the front has been there. */
-const queues = new Map<string, { ids: string[]; since: number }>();
-/** The front gets this long to offer (a hidden tab stops its clock) before the line moves on without them. */
-const QUEUE_TURN_MS = 25_000;
-function setQueue(hall: string, ids: string[]) {
-  const q = queues.get(hall);
-  if (q && q.ids[0] === ids[0]) q.ids = ids;
-  else queues.set(hall, { ids, since: Date.now() });
-  if (!ids.length) queues.delete(hall);
-  broadcast({ t: 'queue', hall, ids });
-}
-/** Out of every line (left, joined another, or gone). */
-function leaveQueues(id: string, except?: string) {
-  for (const [hall, q] of queues) if (hall !== except && q.ids.includes(id)) setQueue(hall, q.ids.filter((x) => x !== id));
-}
 let offeringSeq = 0;
 
 const dayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TEMPLE_TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -248,6 +233,22 @@ function underLimit(key: string, max: number, windowMs: number, now = Date.now()
   return list.length < max;
 }
 const noteHit = (key: string, now = Date.now()) => recent.get(key)?.push(now) ?? recent.set(key, [now]);
+
+/** Lanterns off the wall being blessed: wish id → who, which spot before the altar, since when. */
+const blessings = new Map<string, { by: string; spot: number; board: string; since: number }>();
+/** A blessing takes about 20 s; under this it doesn't count, over BLESS_MAX_MS the lantern goes back by itself. */
+const BLESS_MIN_MS = 8_000, BLESS_MAX_MS = 90_000;
+function endBlessing(id: string, counted: boolean) {
+  const b = blessings.get(id);
+  if (!b) return;
+  blessings.delete(id);
+  const w = wishes.get(id);
+  if (w && counted) {
+    w.prayers = (w.prayers ?? 0) + 1;
+    saveWishes();
+  }
+  broadcast({ t: 'blessing', id, by: null, spot: b.spot, prayers: w?.prayers ?? 0 });
+}
 
 const onBoardExists = (board: string) => [...wishes.values()].some((w) => w.board === board);
 
@@ -321,7 +322,7 @@ function handle(c: Client, msg: ClientMsg) {
       picked: pickedAgo,
       offerings: liveOfferings(now),
       wishes: [...wishes.values()].map(pub),
-      queues: Object.fromEntries([...queues].map(([hall, q]) => [hall, q.ids])),
+      blessings: Object.fromEntries([...blessings].map(([id, b]) => [id, { by: b.by, spot: b.spot }])),
     });
     broadcast({ t: 'join', player: { ...c.info, tr: c.tr } }, c.id);
     return;
@@ -379,7 +380,10 @@ function handle(c: Client, msg: ClientMsg) {
       // The hall has two walls (left, right), each filling on its own; the garden is one set of racks.
       const half = HALL_WISH_SLOTS / 2, side = isHall && (msg.side === 0 || msg.side === 1) ? msg.side : null;
       const [lo, hi] = board === 'garden' ? [0, WISH_SLOTS] : side === null ? [0, HALL_WISH_SLOTS] : [side * half, side * half + half];
-      let slot = [...Array(hi - lo).keys()].map((s) => s + lo).find((s) => !used.has(s));
+      // a hook picked on the wall's grid, if it's still free; otherwise the first free one
+      const asked = isHall && Number.isInteger(msg.slot) && msg.slot! >= lo && msg.slot! < hi ? msg.slot! : null;
+      if (asked !== null && used.has(asked)) return send(c, { t: 'wishDenied', reason: 'taken' });
+      let slot = asked ?? [...Array(hi - lo).keys()].map((s) => s + lo).find((s) => !used.has(s));
       // The hall's wall turns you away when every hook is taken.
       if (slot === undefined && isHall) return send(c, { t: 'wishDenied', reason: 'full' });
       // The cooldown follows the person (their address), not the connection: reloading doesn't reset it.
@@ -405,13 +409,16 @@ function handle(c: Client, msg: ClientMsg) {
       broadcast({ t: 'wishAdded', wish: pub(wish) });
       break;
     }
-    case 'queue': {
-      if (typeof msg.hall !== 'string' || !ID_RE.test(msg.hall)) return;
-      const ids = queues.get(msg.hall)?.ids ?? [];
-      if (!msg.join) return ids.includes(c.id) ? setQueue(msg.hall, ids.filter((x) => x !== c.id)) : undefined;
-      if (ids.includes(c.id) || ids.length >= QUEUE_MAX || (!queues.has(msg.hall) && queues.size >= MAX_HALLS)) return;
-      leaveQueues(c.id, msg.hall); // one line at a time
-      setQueue(msg.hall, [...ids, c.id]);
+    case 'bless': {
+      const w = typeof msg.id === 'string' ? wishes.get(msg.id) : undefined;
+      if (!w || w.board === 'garden') return;
+      const b = blessings.get(w.id);
+      if (msg.done) return b?.by === c.id ? endBlessing(w.id, Date.now() - b.since >= BLESS_MIN_MS) : undefined;
+      if (b || [...blessings.values()].some((x) => x.by === c.id)) return; // in someone's hands already; one at a time
+      const taken = new Set([...blessings.values()].filter((x) => x.board === w.board).map((x) => x.spot));
+      const spot = [...Array(BLESS_SPOTS).keys()].find((i) => !taken.has(i)) ?? taken.size % BLESS_SPOTS; // all taken: share
+      blessings.set(w.id, { by: c.id, spot, board: w.board ?? '', since: Date.now() });
+      broadcast({ t: 'blessing', id: w.id, by: c.id, spot });
       break;
     }
     case 'report': {
@@ -528,7 +535,7 @@ wss.on('connection', (ws, req) => {
     }
   });
   ws.on('close', () => {
-    leaveQueues(c.id);
+    for (const [id, b] of blessings) if (b.by === c.id) endBlessing(id, false);
     const n = (connsByIp.get(c.ip) ?? 1) - 1;
     if (n > 0) connsByIp.set(c.ip, n);
     else connsByIp.delete(c.ip);
@@ -552,11 +559,11 @@ setInterval(() => {
   if (any) broadcast({ t: 'snap', tr });
 }, 1000 / SNAPSHOT_HZ);
 
-// An incense line whose front has stalled (tab hidden, crashed) moves on.
+// A lantern held too long (a closed tab, a stalled client) goes back on its wall.
 setInterval(() => {
   const now = Date.now();
-  for (const [hall, q] of queues) if (now - q.since > QUEUE_TURN_MS) setQueue(hall, q.ids.slice(1));
-}, 2000);
+  for (const [id, b] of blessings) if (now - b.since > BLESS_MAX_MS || !wishes.has(id)) endBlessing(id, false);
+}, 3000);
 
 // New day in the temple's time zone: clear offerings.
 setInterval(() => {

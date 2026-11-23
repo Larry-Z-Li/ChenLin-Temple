@@ -5,6 +5,7 @@ import type { StupaSpot } from '../buildings/stupas';
 import type { WorldContext } from '../core/context';
 import { mulberry32 } from '../core/math';
 import type { Ground } from '../core/ground';
+import { assetUrl } from '../content/manifest';
 
 /** Traditional order: blue (sky), white (air), red (fire), green (water), yellow (earth). */
 const COLORS = [0x2a6fd6, 0xf4f1e8, 0xc8302c, 0x2f9e4f, 0xf2c230].map((c) => new THREE.Color(c));
@@ -68,8 +69,13 @@ export function buildPrayerFlags(ctx: WorldContext, stupas: StupaSpot[]) {
   const strings = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(linePts, 3)), new THREE.LineBasicMaterial({ color: 0xd8d0c0 }));
   ctx.scene.add(strings);
 
-  const flagGeo = new THREE.PlaneGeometry(0.32, 0.4).translate(0, -0.22, 0); // hangs just below the string
-  const flags = new THREE.InstancedMesh(flagGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, side: THREE.DoubleSide }), base.length);
+  // Each flag carries the wind-horse (lungta) print: black ink on white, so the flag's colour (the
+  // instance colour) fills the cloth and the ink stays dark. Portrait, like the woodblock.
+  const flagGeo = new THREE.PlaneGeometry(0.3, 0.5).translate(0, -0.27, 0); // hangs just below the string
+  const print = new THREE.TextureLoader().load(assetUrl('flags', 'lungta.jpg'));
+  print.colorSpace = THREE.SRGBColorSpace;
+  print.anisotropy = 4;
+  const flags = new THREE.InstancedMesh(flagGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, map: print, roughness: 0.9, side: THREE.DoubleSide }), base.length);
   flags.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   base.forEach((_, i) => flags.setColorAt(i, COLORS[i % COLORS.length]));
   flags.frustumCulled = false;

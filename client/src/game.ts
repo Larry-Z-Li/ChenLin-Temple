@@ -7,6 +7,7 @@ import { Instruments } from './activities/instruments';
 import { buildFloodlights, buildNightLights, LightPool } from './world/lightPool';
 import { BodhiBell } from './activities/bodhiBell';
 import { HallLanterns } from './activities/hallLanterns';
+import { LanternBlessing } from './activities/lanternBlessing';
 import { Offerings } from './activities/offerings';
 import { SeatSession } from './activities/seatSession';
 import { SutraReader } from './activities/sutraReader';
@@ -185,7 +186,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     onChants: () => chantPanel.show(!chantPanel.isOpen),
     onFastTravel: () => (insideHall() ? hud.toast(t('travel.inside')) : (seat.endStanding(), bigMap.toggle(true))),
     onMap: () => bigMap.toggle(),
-    onPrompt: () => (offerings.queued ? offerings.leaveLine() : !seat.seated && ctx.interactions.trigger()),
+    onPrompt: () => !seat.seated && ctx.interactions.trigger(),
     onBow: () => bow(),
     onBeadStep: (dir) => mala.step(dir),
     onGraphics: () => applyGraphics(),
@@ -227,7 +228,12 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const wildlife = new Wildlife(ctx, net, offerings, player, () => remotes.positions()); // registers the cat before the instruments pick it up
   const instruments = new Instruments(ctx, net, player);
   // A lantern wall (光明燈) in every hall (not the open shrines).
-  const lanternWalls = staticBuild(() => HALLS.filter((h) => h.kind === 'hall').map((h) => new HallLanterns(ctx, net, hud, player, uiEl, settings.name, h.id)));
+  const blessing = new LanternBlessing(ctx, net, player, hud);
+  const lanternWalls = staticBuild(() => HALLS.filter((h) => h.kind === 'hall').map((h) => new HallLanterns(ctx, net, hud, player, uiEl, settings.name, h.id, blessing)));
+  blessing.onHeld = (id) => lanternWalls.forEach((w) => w.heldChanged(id));
+  blessing.onCount = (id, n) => lanternWalls.forEach((w) => w.counted(id, n));
+  const lanternColour = (id: string) => lanternWalls.map((w) => w.colourOf(id)).find((c) => c !== null) ?? null;
+  remotes.lanternOf = (pid) => blessing.colourHeldBy(pid, lanternColour);
   const hallWishes = lanternWalls.find((w) => w.hallId === 'baosheng')!;
   const bodhiBell = staticBuild(() => new BodhiBell(ctx));
   for (const w of lanternWalls) w.onHung = (shot) => bodhiBell.ring(shot);
@@ -279,7 +285,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     }
     if (e.code === 'KeyM') return bigMap.toggle(), true;
     if (e.code === 'Escape' && bigMap.isOpen) return bigMap.show(false), true;
-    if (e.code === 'Escape' && offerings.queued) return offerings.leaveLine(), true;
+    if (e.code === 'Escape' && blessing.active) return blessing.cancel(), true;
     const openWall = lanternWalls.find((w) => w.isOpen);
     if (e.code === 'Escape' && openWall) return openWall.close(), true;
     if (e.code === 'KeyC') return chantPanel.show(!chantPanel.isOpen), true; // listening works anywhere
@@ -295,6 +301,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   let sendAcc = 0, mapAcc = 0, lastSent = '';
   const intro = new Intro(ctx, camera, player, ridge);
   const lookDir = new THREE.Vector3();
+  let landYaw = SPAWN.yaw;
 
   // Frame rate: the optional counter, and 'auto' graphics stepping down to low (and remembering it)
   // when this device can't keep up on high. Measured twice a second; a hidden tab doesn't count.
@@ -336,7 +343,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     if (landing && !cloud.riding) {
       landing = false;
       document.body.classList.remove('intro'); // landed: show the HUD
-      rig.lookAlong(SPAWN.yaw, 0.3, 6); // one slow pan round to face the temple (only after the start trip)
+      rig.lookAlong(landYaw, 0.3, 6); // one slow pan round to face the temple (or the hall) — only after the start trip
       join();
     }
 
@@ -350,7 +357,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     if (seat.standingFocus && (input.isDown('KeyW', 'KeyA', 'KeyS', 'KeyD') || Math.hypot(input.stick.x, input.stick.y) > 0.3)) seat.endStanding();
     document.body.classList.toggle('cinematic', bodhiBell.active); // the bell's camera: bottom buttons out of the way
     if (bodhiBell.active) hud.setPrompt(null);
-    else if (!seat.seated && !cloud.riding && !offerings.busy) {
+    else if (!seat.seated && !cloud.riding && !offerings.busy && !blessing.active) {
       const it = ctx.interactions.update(player.pos.x, player.pos.z);
       const p = it?.prompt();
       hud.setPrompt(p?.text ?? null, p?.busy);
@@ -358,6 +365,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
 
     wheels.update(dt);
     offerings.update(dt);
+    blessing.update(dt);
     remotes.update(dt, camera);
     for (const u of ctx.updaters) u(dt, time);
     seat.update(dt);
@@ -378,7 +386,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     sendAcc += dt;
     if (sendAcc >= 1 / SNAPSHOT_HZ) {
       sendAcc = 0;
-      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0) | (cloud.riding ? FLAG_CLOUD : 0);
+      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0) | (cloud.riding ? FLAG_CLOUD : 0) | blessing.flags;
       const tr = player.transform(flags), key = tr.join(',');
       if (key !== lastSent) {
         net.sendMove(tr);
@@ -406,13 +414,13 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
 
   // Debug handle for the console during development.
   // For poking at from the console, and for `npm run tour` (scripts/tour.mjs).
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, hallWishes, lights, bodhiBell, renderer, setDebugHours, intro, hud, bigMap, travelSpots: TRAVEL_SPOTS };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, hallWishes, lights, bodhiBell, renderer, setDebugHours, intro, hud, bigMap, travelSpots: TRAVEL_SPOTS, lanternBlessing: blessing };
 
   return {
     /** The entry screen's robe picker: recolour the pacing monk. */
     preview: (color: string) => player.avatar.setColor(color),
     /** Enter: fly the monk down from the mountain to the gate by cloud, then go online. */
-    enter(name: string, color: string) {
+    enter(name: string, color: string, hallId?: string) {
       unlockAudio();
       ambient.setOn(settings.musicOn);
       player.avatar.setColor(color);
@@ -425,8 +433,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       // Keep facing the way the start screen looked (out over the valley); the flight doesn't turn the view.
       const f = camera.getWorldDirection(new THREE.Vector3());
       rig.setYaw(Math.atan2(-f.x, -f.z));
-      if (!cloud.flyTo({ x: SPAWN.x, z: SPAWN.z, yaw: SPAWN.yaw })) {
-        player.pos.set(SPAWN.x, ctx.ground.heightAt(SPAWN.x, SPAWN.z), SPAWN.z);
+      // the front gate, or (from the start menu's hall buttons) straight to a hall's door
+      const dest = TRAVEL_SPOTS.find((s) => s.key === hallId)?.arrive ?? { x: SPAWN.x, z: SPAWN.z, yaw: SPAWN.yaw };
+      landYaw = dest.yaw;
+      if (!cloud.flyTo(dest)) {
+        player.pos.set(dest.x, ctx.ground.heightAt(dest.x, dest.z), dest.z);
         landing = false;
         document.body.classList.remove('intro');
         join();

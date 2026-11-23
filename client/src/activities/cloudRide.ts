@@ -21,6 +21,8 @@ export class CloudRide {
   private curve: THREE.CatmullRomCurve3 | null = null;
   private t = 0;
   private duration = 4;
+  /** Which way the rider faces for the whole flight. */
+  private heading = 0;
   private dest: TravelSpot['arrive'] | null = null;
   // Golden motes trailing the cloud
   private trail: THREE.Points;
@@ -50,14 +52,18 @@ export class CloudRide {
     const g = this.ctx.ground;
     const to = new THREE.Vector3(dest.x, g.heightAt(dest.x, dest.z) + FEET, dest.z);
     const dist = Math.hypot(to.x - from.x, to.z - from.z);
-    const top = Math.max(from.y, to.y) + clamp(14 + dist * 0.16, 16, 42);
+    // Up almost straight above the roofs and trees (~26 m), across above the tallest pagodas, then down almost
+    // straight onto the spot (arrival spots are in the open, so nothing is in the way of the climb or the drop).
+    const lift = 26, cruise = Math.max(from.y, to.y) + clamp(30 + dist * 0.04, 32, 44);
     const along = (k: number, h: number) => new THREE.Vector3().lerpVectors(from, to, k).setY(h);
+    const k0 = Math.min(0.06, 2.5 / Math.max(dist, 1)), k1 = 1 - k0;
     this.curve = new THREE.CatmullRomCurve3(
-      [from.clone().setY(from.y + FEET), along(0.18, from.y + top * 0.55), along(0.5, top), along(0.82, to.y + top * 0.5), to],
+      [from.clone().setY(from.y + FEET), along(k0, from.y + lift), along(0.3, cruise), along(0.7, cruise), along(k1, to.y + lift), to],
       false,
       'centripetal',
     );
-    this.duration = clamp(dist / 40, 2.6, 6);
+    this.duration = clamp((dist + 2 * lift) / 42, 3, 7.5);
+    this.heading = dist > 0.5 ? Math.atan2(-(to.x - from.x), -(to.z - from.z)) : this.player.yaw;
     this.dest = dest;
     this.riding = true;
     this.t = 0;
@@ -89,10 +95,9 @@ export class CloudRide {
     const k = Math.min(1, this.t / this.duration);
     const u = -(Math.cos(Math.PI * k) - 1) / 2; // ease in and out
     const p = this.curve.getPointAt(u);
-    const tan = this.curve.getTangentAt(u);
-    const yaw = Math.atan2(-tan.x, -tan.z);
     this.player.pos.copy(p);
-    this.player.yaw = dampAngle(this.player.yaw, yaw, 6, dt);
+    // face the destination, steadily (the path's own direction is nearly vertical on the climb and the drop)
+    this.player.yaw = dampAngle(this.player.yaw, this.heading, 6, dt);
     // Pulled back to see the grounds go by, but never turned: the view keeps facing the way it did.
     this.rig.frame(0.38, 12);
 

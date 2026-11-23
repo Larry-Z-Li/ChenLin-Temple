@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Anim } from '../../../shared/protocol';
 import { damp } from '../core/math';
 import { glowTexture, textTexture } from '../core/textures';
+import { lanternGeometries } from '../activities/wishLanterns';
 import { CLOUD_TOP, makeCloud } from '../world/cloud';
 
 /** Joint targets (radians, except hipY in metres). Limbs hang along -Y; +x rotation swings them forward. */
@@ -233,6 +234,38 @@ export class Avatar {
     this.incense.stick.visible = state > 0;
     this.incense.tip.visible = state === 2;
   }
+
+  /**
+   * A lantern carried from the right hand (blessing a wish), glowing `glow` times its usual brightness
+   * (1–3); null puts it away.
+   */
+  holdLantern(color: number | null, glow = 1) {
+    if (color === null) {
+      if (this.lantern) this.lantern.g.visible = false;
+      return;
+    }
+    if (!this.lantern) {
+      const { body, trim } = lanternGeometries();
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 });
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(body, mat), new THREE.Mesh(trim, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 })));
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      halo.position.y = -0.55;
+      g.add(halo);
+      g.scale.setScalar(0.5);
+      this.joints.rHand.add(g);
+      this.lantern = { g, mat, halo };
+    }
+    const { g, mat, halo } = this.lantern;
+    g.visible = true;
+    mat.color.setHex(color);
+    mat.emissive.setHex(color);
+    mat.emissiveIntensity = 0.45 * glow;
+    halo.material.color.setHex(color);
+    halo.material.opacity = Math.min(1, 0.22 * glow);
+    halo.scale.setScalar(0.9 + 0.45 * glow);
+  }
+  private lantern: { g: THREE.Group; mat: THREE.MeshStandardMaterial; halo: THREE.Sprite } | null = null;
 
   /** Hide name tags beyond a distance to reduce clutter. */
   setTagVisible(v: boolean) {
