@@ -78,6 +78,10 @@ export class LocalPlayer {
 
   /** Dev preview only (F): fly freely, through walls and ground. */
   flying = false;
+  /** Beads and/or a sutra in hand on your feet (their pose); you can walk with them. */
+  holdAnim: Anim | null = null;
+  /** While the beads are out, ← → turn them instead of walking. */
+  arrowsForBeads = false;
 
   update(dt: number, input: Input, camYaw: number, collisions: CollisionWorld, ground: Ground) {
     if (this.flying && this.mode === 'free') return this.fly(dt, input, camYaw);
@@ -89,8 +93,8 @@ export class LocalPlayer {
     let mx = 0, mz = 0;
     if (input.isDown('KeyW', 'ArrowUp')) mz -= 1;
     if (input.isDown('KeyS', 'ArrowDown')) mz += 1;
-    if (input.isDown('KeyA', 'ArrowLeft')) mx -= 1;
-    if (input.isDown('KeyD', 'ArrowRight')) mx += 1;
+    if (input.isDown('KeyA') || (!this.arrowsForBeads && input.isDown('ArrowLeft'))) mx -= 1;
+    if (input.isDown('KeyD') || (!this.arrowsForBeads && input.isDown('ArrowRight'))) mx += 1;
     // Keyboard is full speed; the touch joystick is analog (pushed to the edge = faster walk).
     let mag = mx || mz ? 1 : 0;
     if (!mag && (input.stick.x || input.stick.y)) {
@@ -126,7 +130,8 @@ export class LocalPlayer {
     if (this.speed > 0.3) this.yaw = dampAngle(this.yaw, Math.atan2(-this.vel.x, -this.vel.y), 10, dt);
     this.gestureLeft -= dt;
     if (this.gestureAnim && this.gestureLeft <= 0) this.gestureAnim = null;
-    this.avatar.anim = this.speed > 0.3 ? (this.speed > (WALK + RUN) / 2 ? 'run' : 'walk') : (this.gestureAnim ?? 'idle');
+    this.avatar.anim = this.speed > 0.3 ? (this.speed > (WALK + RUN) / 2 ? 'run' : 'walk') : (this.gestureAnim ?? this.holdAnim ?? 'idle');
+    this.avatar.hold = this.holdAnim; // walking, the arms keep what they hold
     this.sync(dt);
   }
 

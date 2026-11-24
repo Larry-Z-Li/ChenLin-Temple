@@ -6,7 +6,8 @@ import { damp } from '../core/math';
 export class ChantPlayer {
   tracks: AudioEntry[] = [];
   index = -1;
-  loop = false;
+  /** Repeat the current chant (on by default: a mantra goes round and round). */
+  loop = true;
   private el = new Audio();
   private level = 0;
   private fadingOut = false;
@@ -34,6 +35,21 @@ export class ChantPlayer {
     return !this.el.paused;
   }
 
+  /** Where we are in the current chant, and how long it is (seconds; 0 until it's loaded). */
+  get time() {
+    return this.el.currentTime || 0;
+  }
+  get duration() {
+    return Number.isFinite(this.el.duration) ? this.el.duration : 0;
+  }
+  seek(seconds: number) {
+    if (this.duration) this.el.currentTime = Math.max(0, Math.min(this.duration, seconds));
+  }
+  /** As it plays (a few times a second), and when a chant's length becomes known. */
+  onTime(fn: () => void) {
+    for (const ev of ['timeupdate', 'loadedmetadata', 'durationchange', 'emptied']) this.el.addEventListener(ev, fn);
+  }
+
   play(i: number) {
     if (!this.tracks.length) return;
     this.index = (i + this.tracks.length) % this.tracks.length;
@@ -42,6 +58,17 @@ export class ChantPlayer {
     this.level = settings.chantVolume;
     void this.el.play().catch(() => {});
     this.changed();
+  }
+
+  /**
+   * From inside a click: load chant `i` and start-and-stop it silently, so that playing it later (with no
+   * click to hand, e.g. on landing) is allowed — browsers, Safari above all, only let sound start from a click.
+   */
+  prime(i: number) {
+    if (!this.tracks.length || this.index >= 0) return;
+    this.el.src = assetUrl('chants', this.tracks[i % this.tracks.length].file);
+    this.el.muted = true;
+    void this.el.play().then(() => this.el.pause()).catch(() => {}).finally(() => (this.el.muted = false));
   }
 
   toggle() {

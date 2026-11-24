@@ -93,6 +93,8 @@ const heldScale = new THREE.Vector3(), qHand = new THREE.Quaternion(), qRoot = n
 
 export class Avatar {
   readonly root = new THREE.Group();
+  /** Beads / a sutra in hand while walking: the arms and head keep that pose (the legs walk). */
+  hold: Anim | null = null;
   private hips = new THREE.Group();
   private torso = new THREE.Group();
   private head = new THREE.Group();
@@ -284,7 +286,8 @@ export class Avatar {
 
   update(dt: number, speed = 0) {
     const carrying = !!this.lantern?.g.visible, moving = this.anim === 'walk' || this.anim === 'idle' || this.anim === 'run';
-    const target = carrying && moving ? CARRY : carrying && this.anim === 'bow' ? CARRY_BOW : this.clasp && moving && this.anim !== 'run' ? CLASP : POSES[this.anim];
+    const holding = !!this.hold && (this.anim === 'walk' || this.anim === 'run'); // beads / a sutra, on the move
+    const target = carrying && moving ? CARRY : carrying && this.anim === 'bow' ? CARRY_BOW : holding ? POSES[this.hold!] : this.clasp && moving && this.anim !== 'run' ? CLASP : POSES[this.anim];
     const p = this.pose;
     const rate = 8;
     for (const k in target) (p as unknown as Record<string, number>)[k] = damp((p as unknown as Record<string, number>)[k], (target as unknown as Record<string, number>)[k], rate, dt);
@@ -310,7 +313,7 @@ export class Avatar {
     j.rThigh.rotation.z = p.rThighZ;
     j.lShin.rotation.z = p.lShinZ;
     j.rShin.rotation.z = p.rShinZ;
-    const armSwing = this.clasp || carrying ? 0 : swing * 0.6;
+    const armSwing = this.clasp || carrying || holding ? 0 : swing * 0.6;
     j.lHand.visible = j.rHand.visible = !this.clasp || carrying; // hands up the sleeves (unless carrying)
     j.lArm.rotation.x = p.lArm - armSwing;
     j.rArm.rotation.x = p.rArm + armSwing;

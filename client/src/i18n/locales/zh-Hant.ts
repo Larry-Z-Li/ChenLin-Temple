@@ -36,7 +36,7 @@ const zhHant: Record<I18nKey, string> = {
   'help.chants': 'C：梵唄（隨處可聽，行走時亦可）',
   'help.map': 'M：寺院全圖',
   'help.leave': 'Esc：起身／關閉',
-  'help.seated': '蒲團上：1 大禮拜 · 2 念珠 · 3 經文 · C 梵唄。長椅上：2 念珠 · 3 經文。站立時：2 念珠 · 3 經文（走動即收起）',
+  'help.seated': '蒲團上：1 大禮拜 · 2 念珠 · 3 經文 · C 梵唄。長椅上：2 念珠 · 3 經文。站立時：2 念珠 · 3 經文（可邊走邊持；再按或 Esc 收起）',
   'help.beads': '念珠：← / → 撥動一顆',
 
   'prompt.sit': '跪坐蒲團',

@@ -95,8 +95,8 @@ export const HALLS: HallDef[] = [
   gateHall('guanyin', -39.5, -27, ['cintamanicakra']), // 開門 NW · 如意輪觀音
   gateHall('yangsheng', 0, -28, ['sarvanivarana'], { depth: 21, backDoor: true }), // 休門 N · 除蓋障菩薩 (a back door through to Chengjiu)
   gateHall('caishen', 39.5, -27, ['akashagarbha', 'daikokuten']), // 生門 NE · 虛空藏菩薩, 大黑天財神
-  gateHall('zangmi', -39.5, 9, ['samantabhadra', 'amitabha'], { facing: 'east' }), // 驚門 W · 普賢菩薩, 阿彌陀佛 — faces the stupa
-  gateHall('dongmi', 39.5, 9, ['bhaisajyaguru', 'akshobhya', 'vajrapani'], { facing: 'west' }), // 傷門 E · 藥師佛, 阿閦佛, 金剛手菩薩 — faces the stupa
+  gateHall('zangmi', -39.5, 9, ['samantabhadra', 'amitabha']), // 驚門 W · 普賢菩薩, 阿彌陀佛
+  gateHall('dongmi', 39.5, 9, ['bhaisajyaguru', 'akshobhya', 'vajrapani']), // 傷門 E · 藥師佛, 阿閦佛, 金剛手菩薩
   gateHall('dizang', -39.5, 45, ['ksitigarbha']), // 死門 SW · 地藏王菩薩
   gateHall('guoxue', 0, 45, ['maitreya'], { depth: 21, backDoor: true }), // 景門 S · 彌勒菩薩 (a back door from the stupa court)
   gateHall('wenshu', 39.5, 45, ['manjushri']), // 杜門 SE · 文殊菩薩
@@ -124,6 +124,8 @@ export const GREAT_STUPA = { x: MID.x, z: MID.z, base: 24, height: 26 };
 export const PLAZA = { x: 0, z: 97 + DZ, halfW: 27, halfD: 13 };
 
 /** Stone-paved ground: the plaza, the stupa court, the walk around it, and straight walks to the doors. */
+/** The outer gravel loop's east/west line; the straight walks out of the court's side gates end on it. */
+const SIDE_WALK_X = 44;
 export const PAVED: Rect[] = [
   { minX: -8, maxX: 8, minZ: 110 + DZ, maxZ: 119 + DZ }, // where you arrive, outside the gate
   { minX: -27, maxX: 27, minZ: 84 + DZ, maxZ: 110 + DZ }, // the plaza 廣場
@@ -135,8 +137,8 @@ export const PAVED: Rect[] = [
   // straight walks
   { minX: -3, maxX: 3, minZ: hall('yangsheng').z + hall('yangsheng').depth / 2 + STAIRS, maxZ: -16 }, // ring → Yangsheng's door
   { minX: -3, maxX: 3, minZ: hall('chengjiu').z + hall('chengjiu').depth / 2 + STAIRS, maxZ: hall('yangsheng').z - hall('yangsheng').depth / 2 - STAIRS }, // Yangsheng's back door → Chengjiu
-  { minX: hall('zangmi').x + hall('zangmi').depth / 2 + STAIRS, maxX: -28.5, minZ: 6.5, maxZ: 11.5 }, // west gate → Zangmi's door
-  { minX: 28.5, maxX: hall('dongmi').x - hall('dongmi').depth / 2 - STAIRS, minZ: 6.5, maxZ: 11.5 }, // east gate → Dongmi's door
+  { minX: -SIDE_WALK_X, maxX: -28.5, minZ: 6.5, maxZ: 11.5 }, // west gate → the outer loop (on round to Zangmi's door)
+  { minX: 28.5, maxX: SIDE_WALK_X, minZ: 6.5, maxZ: 11.5 }, // east gate → the outer loop (on round to Dongmi's door)
   { minX: -3, maxX: 3, minZ: 34.5, maxZ: hall('guoxue').z - hall('guoxue').depth / 2 - STAIRS }, // ring → Guoxue's back door
   { minX: -3, maxX: 3, minZ: hall('guoxue').z + hall('guoxue').depth / 2 + STAIRS, maxZ: hall('baosheng').z - hall('baosheng').depth / 2 - STAIRS }, // Guoxue → Baosheng's back door
   { minX: -3, maxX: 3, minZ: hall('baosheng').z + hall('baosheng').depth / 2 + STAIRS, maxZ: 84 + DZ }, // Baosheng → the plaza
@@ -300,15 +302,18 @@ export const LANTERN_STRINGS: [[number, number, number], [number, number, number
 ];
 
 /** Low paper path lanterns (行燈): straight runs [x0, z0] → [x1, z1] with a light every `step` metres. */
-/** Where a south-facing hall's front stairs end; and how far out (east/west) the side halls' stairs reach. */
+/** Where a south-facing hall's front stairs end. */
 const doorZ = (id: string) => hall(id).z + hall(id).depth / 2 + STAIRS;
-const sideDoorX = hall('dongmi').x - hall('dongmi').depth / 2 - STAIRS;
+const sideDoorX = SIDE_WALK_X;
 export const PATH_LIGHT_RUNS: { from: [number, number]; to: [number, number]; step: number }[] = [
   { from: [-8.4, 112 + DZ], to: [-8.4, 118 + DZ], step: 6 }, { from: [8.4, 112 + DZ], to: [8.4, 118 + DZ], step: 6 },
   // along the straight walks to the four facing doors
   { from: [-4.2, -18], to: [-4.2, doorZ('yangsheng') + 0.7], step: 5 }, { from: [4.2, -18], to: [4.2, doorZ('yangsheng') + 0.7], step: 5 },
   { from: [-31, 4.8], to: [-sideDoorX + 1.3, 4.8], step: 5 }, { from: [31, 4.8], to: [sideDoorX - 1.3, 4.8], step: 5 },
   { from: [-31, 13.2], to: [-sideDoorX + 1.3, 13.2], step: 5 }, { from: [31, 13.2], to: [sideDoorX - 1.3, 13.2], step: 5 },
+  // the orchard at night: one in the middle of each square of four trees, and a row along its entrance side
+  ...[0.5, 1.5, 2.5].map((k) => ({ from: [ORCHARD.minX + k * ORCHARD.spacing, ORCHARD.minZ + ORCHARD.spacing / 2] as [number, number], to: [ORCHARD.minX + k * ORCHARD.spacing, ORCHARD.maxZ - ORCHARD.spacing / 2] as [number, number], step: ORCHARD.spacing })),
+  { from: [ORCHARD.minX - 2.2, ORCHARD.minZ], to: [ORCHARD.minX - 2.2, ORCHARD.maxZ], step: ORCHARD.spacing },
 ];
 /** And a ring of them around the release pond. */
 export const POND_LIGHT_RING = { radius: POND.radius + 2.2, count: 22 };
@@ -399,7 +404,7 @@ const snapEnds = (path: [number, number][]) => {
  * cherry grove, a pair down to the plaza's corners, and spurs out to the corner pagodas, the bridges,
  * the pond, the bell, the spring and the monks' and abbot's quarters. World coordinates.
  */
-const LOOP_X = 44, NORTH_Z = -29, SOUTH_Z = 79.5;
+const LOOP_X = SIDE_WALK_X, NORTH_Z = -29, SOUTH_Z = 79.5;
 const mirror = (p: [number, number][]) => p.map(([x, z]) => [-x, z] as [number, number]);
 const both = (p: [number, number][]) => [p, mirror(p)];
 const hallDoor = (id: string): [number, number] => {
@@ -412,7 +417,7 @@ export const FOOTPATHS: [number, number][][] = [
   [[hallDoor('guanyin')[0], hallDoor('guanyin')[1]], [hallDoor('guanyin')[0], NORTH_Z], [-hallDoor('guanyin')[0], NORTH_Z], [hallDoor('caishen')[0], hallDoor('caishen')[1]]],
   [[hallDoor('dizang')[0], hallDoor('dizang')[1]], [hallDoor('dizang')[0], SOUTH_Z], [-hallDoor('dizang')[0], SOUTH_Z], [hallDoor('wenshu')[0], hallDoor('wenshu')[1]]],
   ...both([[-LOOP_X, NORTH_Z], [-LOOP_X, 100], [-27, 128]]), // the loop's sides, on down to the plaza's corners
-  ...both([[-LOOP_X, hallDoor('zangmi')[1]], hallDoor('zangmi')]), // the side halls' doors
+  ...both([[hallDoor('zangmi')[0], 30], hallDoor('zangmi')]), // the side halls' doors, straight up from the path below them (z = 30)
   [[0, NORTH_Z], hallDoor('yangsheng')], [[0, SOUTH_Z], hallDoor('guoxue')],
   // diagonals from the stupa court's ring walk
   ...both([[-28.5, -16], [-LOOP_X, NORTH_Z]]),

@@ -141,7 +141,7 @@ export class Hud {
       { class: 'seatbar hidden' },
       mk('prostrate', '1', 'seat.prostrate'),
       mk('beads', '2', 'seat.beads'),
-      h('button', { class: 'seat-btn', onclick: () => cb.onChants() }, h('kbd', {}, 'C'), h('span', { i18n: 'hud.chants' })),
+      (this.chantBtns[0] = h('button', { class: 'seat-btn', onclick: () => cb.onChants() }, h('kbd', {}, 'C'), h('span', { i18n: 'hud.chants' })) as HTMLButtonElement),
       mk('sutra', '3', 'seat.sutras'),
       mk('stand', 'Esc', 'seat.stand'),
     );
@@ -160,7 +160,7 @@ export class Hud {
       { class: 'quick-actions' },
       h('button', { class: 'icon-btn', i18n: 'bow.button', onclick: () => cb.onBow() }),
       this.standBtns.beads,
-      h('button', { class: 'icon-btn', i18n: 'hud.chants', onclick: () => cb.onChants() }),
+      (this.chantBtns[1] = h('button', { class: 'icon-btn', i18n: 'hud.chants', onclick: () => cb.onChants() }) as HTMLButtonElement),
       this.standBtns.sutra,
       h('button', { class: 'icon-btn', i18n: 'hud.fastTravel', onclick: () => cb.onFastTravel() }),
     );
@@ -192,6 +192,12 @@ export class Hud {
   }
 
   /** The frame-rate line (only shown when turned on). */
+  /** The 梵唄 buttons (seated bar, standing row): lit while a chant is playing. */
+  private chantBtns: HTMLButtonElement[] = [];
+  setChantPlaying(on: boolean) {
+    for (const b of this.chantBtns) b.classList.toggle('chant-on', on);
+  }
+
   setFps(fps: number, draws: number) {
     if (settings.showFps) this.fpsEl.textContent = `${Math.round(fps)} fps · ${draws} draws`;
   }

@@ -13,7 +13,6 @@ import type { LanternShot } from './bodhiBell';
 import type { BlessRoute, LanternBlessing } from './lanternBlessing';
 import { h } from '../ui/dom';
 import type { Hud } from '../ui/hud';
-import { LOTUS_COLOURS } from '../world/lanterns';
 import { addLamp, type Lamp } from '../world/lightPool';
 import { colourGlowMaterial, haloPoints } from '../world/nightGlow';
 import { lanternGeometries, lanternHex, markHung, showWishForm, wishMeta, wishWait } from './wishLanterns';
@@ -23,7 +22,7 @@ const COL = 0.95, ROW = 0.8, SCALE = 0.9;
 const PER_WALL = GRID * GRID; // slots 0–48 the left wall (west), 49–97 the right
 const wallOf = (slot: number) => (slot < PER_WALL ? 0 : 1);
 /** An unclaimed lantern, unlit: a deep maroon. Kept very dark, as the lanterns' shared material also glows in its colour. */
-const DARK = new THREE.Color(0x24090a);
+const DARK = new THREE.Color(0x3c1210);
 /** Where people stand to bless, either side of the incense stand (metres from the middle). */
 const SPOT_X = [-2.2, 2.2, -3.6, 3.6, -5, 5];
 
@@ -395,8 +394,8 @@ function writingTable(ctx: WorldContext, parent: THREE.Object3D, x: number, F: n
   const g = new THREE.Group();
   g.add(box(1.1, 0.06, 0.62, wood, x, top - 0.06, z));
   for (const [dx, dz] of [[-0.48, -0.24], [0.48, -0.24], [-0.48, 0.24], [0.48, 0.24]]) g.add(box(0.06, 0.74, 0.06, wood, x + dx, F, z + dz));
-  // paper lantern (unlit) on a little stand
-  const paper = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8).scale(1, 1.15, 1), mat(LOTUS_COLOURS[1], { roughness: 0.7 }));
+  // paper lantern on a little stand, unlit like the ones on the wall waiting for a wish
+  const paper = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8).scale(1, 1.15, 1), mat(DARK.getHex(), { roughness: 0.7 }));
   paper.position.set(x - 0.34, top + 0.17, z - 0.1);
   g.add(paper, cylinder(0.07, 0.07, 0.03, mat(THEME.goldLeaf, { metalness: 0.6, roughness: 0.4 }), x - 0.34, top, z - 0.1, 10));
   // coil of red string

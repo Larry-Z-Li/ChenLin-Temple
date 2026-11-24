@@ -18,6 +18,7 @@ import { Soundscape } from './audio/soundscape';
 import { buildBenches } from './buildings/benches';
 import { buildDecor } from './buildings/decor';
 import { buildDecorations } from './buildings/decorations';
+import { buildNineSyllables } from './buildings/nineSyllables';
 import { buildHall } from './buildings/hall';
 import { buildHuts } from './buildings/hut';
 import { buildPagodas } from './buildings/pagodas';
@@ -210,6 +211,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   void soundscape.init();
   const sutra = new SutraReader(uiEl);
   const chantPanel = new ChantPanel(uiEl, chants);
+  chants.onChange(() => hud.setChantPlaying(chants.playing)); // the 梵唄 buttons light up while one plays
   const mala = new Mala(camera);
   if (isTouchDevice) mountJoystick(uiEl, input);
 
@@ -364,6 +366,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       document.body.classList.remove('intro'); // landed: show the HUD
       rig.lookAlong(landYaw, 0.3, 6); // one slow pan round to face the temple (or the hall) — only after the start trip
       join();
+      if (chants.index < 0) chants.play(0); // landed: the first chant, on repeat
     }
 
     cloud.update(dt);
@@ -372,8 +375,6 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     updateInteriors(camera, graphicsLevel() === 'low' ? 1 : 2);
     if (!bodhiBell.active) player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground); // stand still while the bell rings
 
-    // Walking puts standing beads or a sutra away.
-    if (seat.standingFocus && (input.isDown('KeyW', 'KeyA', 'KeyS', 'KeyD') || Math.hypot(input.stick.x, input.stick.y) > 0.3)) seat.endStanding();
     document.body.classList.toggle('cinematic', bodhiBell.active); // the bell's camera: bottom buttons out of the way
     if (bodhiBell.active) hud.setPrompt(null);
     else if (!seat.seated && !cloud.riding && !offerings.busy && !blessing.active) {
@@ -433,11 +434,15 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
 
   // Debug handle for the console during development.
   // For poking at from the console, and for `npm run tour` (scripts/tour.mjs).
+  // 九字: on the gate halls' roofs, and 前 under the great incense burner
+  void buildNineSyllables(scene, (x, z) => ctx.ground.heightAt(x, z));
   (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, hallWishes, lights, bodhiBell, renderer, setDebugHours, intro, hud, bigMap, travelSpots: TRAVEL_SPOTS, lanternBlessing: blessing };
 
   return {
     /** The entry screen's robe picker: recolour the pacing monk. */
     preview: (color: string) => player.avatar.setColor(color),
+    /** The click that enters: ready the first chant (六字大明咒) to play when you land (see `landed`). */
+    startChant: () => chants.prime(0),
     /** Enter: fly the monk down from the mountain to the gate (or a hall) by cloud, then go online. */
     enter(name: string, color: string, hallId?: string) {
       unlockAudio();
@@ -460,6 +465,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
         landing = false;
         document.body.classList.remove('intro');
         join();
+        if (chants.index < 0) chants.play(0);
       }
     },
   };

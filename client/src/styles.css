@@ -84,6 +84,11 @@ body.reading .minimap { display: none; }
 .sutra-text p { margin: 0 0 1em; }
 
 .chant-panel { left: 16px; bottom: 112px; width: min(340px, calc(100vw - 32px)); max-height: 50vh; }
+/* chant progress: elapsed · bar · length */
+.chant-progress { display: flex; align-items: center; gap: 8px; padding: 8px 12px 0; font: 12px var(--sans); font-variant-numeric: tabular-nums; color: var(--muted); }
+.chant-progress input[type='range'] { flex: 1; min-width: 60px; accent-color: var(--accent); }
+/* a 梵唄 button while a chant plays */
+.chant-on { background: rgba(217, 164, 65, 0.3) !important; border-color: var(--accent) !important; box-shadow: 0 0 10px rgba(217, 164, 65, 0.45); }
 .transport { display: flex; gap: 6px; align-items: center; padding: 10px; border-top: 1px solid var(--panel-border); }
 .transport input[type='range'] { flex: 1; min-width: 60px; accent-color: var(--accent); }
 

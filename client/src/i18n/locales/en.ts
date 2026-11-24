@@ -34,7 +34,7 @@ const en = {
   'help.chants': 'C: chants (listen anywhere, even while walking)',
   'help.map': 'M: temple map',
   'help.leave': 'Esc: stand up / close',
-  'help.seated': 'On a cushion: 1 prostrations · 2 prayer beads · 3 sutras · C chants. On a bench: 2 prayer beads · 3 sutras. Standing: 2 prayer beads · 3 sutras (walk to put them away)',
+  'help.seated': 'On a cushion: 1 prostrations · 2 prayer beads · 3 sutras · C chants. On a bench: 2 prayer beads · 3 sutras. Standing: 2 prayer beads · 3 sutras (walk with them; press again or Esc to put them away)',
   'help.beads': 'Prayer beads: ← / → move one bead',
 
   'prompt.sit': 'Kneel on cushion',

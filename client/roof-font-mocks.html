@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roof Lettering</title>
+    <!-- only the one character, from each font (text=臨) -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@900&family=Yuji+Syuku&family=Zen+Old+Mincho:wght@900&family=Shippori+Mincho+B1:wght@800&family=Noto+Sans+TC:wght@900&family=Rampart+One&family=Kaisei+Tokumin:wght@800&family=Zen+Antique&family=Yuji+Boku&family=Kaisei+Decol:wght@700&family=Train+One&family=LXGW+WenKai+TC:wght@700&text=%E8%87%A8&display=block" />
+    <style>
+      /* Dev page: 15 ways to letter the 九字 on the gate halls' roofs — fonts and finishes, on dark roof tiles. */
+      html, body { margin: 0; background: #15171c; color: #d9d2c4; font-family: system-ui, sans-serif; }
+      .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 14px; }
+      figure { margin: 0; }
+      canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 8px; }
+      figcaption { font-size: 12px; padding: 6px 2px 0; color: #b9b2a4; }
+      figcaption b { color: #f0e6cf; font-weight: 600; }
+      @media (max-width: 800px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+  </head>
+  <body>
+    <div class="grid" id="grid"></div>
+    <script>
+      const CH = '臨', S = 360;
+      let seed = 3;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+      /** Dark round-tile roof (本瓦葺): rows of half-round tiles running down to the eave. */
+      function tiles(g) {
+        g.fillStyle = '#26272b'; g.fillRect(0, 0, S, S);
+        for (let x = -6; x < S; x += 24) {
+          const gr = g.createLinearGradient(x, 0, x + 16, 0);
+          gr.addColorStop(0, '#1d1e21'); gr.addColorStop(0.45, '#4a4b50'); gr.addColorStop(1, '#1d1e21');
+          g.fillStyle = gr; g.fillRect(x, 0, 16, S);
+        }
+        g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2;
+        for (let y = 18; y < S; y += 30) { g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke(); }
+      }
+      const text = (g, font, size = 250) => { g.font = `${font.weight ?? 400} ${size}px "${font.family}"`; g.textAlign = 'center'; g.textBaseline = 'middle'; };
+      const gold = (g) => { const gr = g.createLinearGradient(0, 50, 0, 310); gr.addColorStop(0, '#ffe7a3'); gr.addColorStop(0.5, '#e2b04e'); gr.addColorStop(1, '#a8741f'); return gr; };
+      const C = [S / 2, S / 2 + 10];
+      /** Draw the character to an offscreen canvas (for effects that work on its shape). */
+      const shape = (font, size = 250, fill = '#fff') => { const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); text(g, font, size); g.fillStyle = fill; g.fillText(CH, ...C); return c; };
+
+      const STYLES = [
+        ['金箔 Gold leaf', { family: 'Noto Serif TC', weight: 900 }, (g, f) => { text(g, f); g.lineJoin = 'round'; g.strokeStyle = 'rgba(40,20,8,0.85)'; g.lineWidth = 12; g.strokeText(CH, ...C); g.fillStyle = gold(g); g.fillText(CH, ...C); }],
+        ['書道 Brush, cream ink', { family: 'Yuji Syuku' }, (g, f) => { text(g, f, 270); g.fillStyle = 'rgba(246,236,214,0.93)'; g.fillText(CH, ...C); }],
+        ['朱漆 Vermilion lacquer', { family: 'Zen Old Mincho', weight: 900 }, (g, f) => { text(g, f); g.lineJoin = 'round'; g.strokeStyle = '#d9a441'; g.lineWidth = 8; g.strokeText(CH, ...C); g.fillStyle = '#b8301c'; g.fillText(CH, ...C); }],
+        ['石刻 Carved into the tiles', { family: 'Shippori Mincho B1', weight: 800 }, (g, f) => { text(g, f); g.fillStyle = 'rgba(0,0,0,0.7)'; g.fillText(CH, C[0] - 3, C[1] - 3); g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillText(CH, C[0] + 3, C[1] + 3); g.fillStyle = '#1a1b1e'; g.fillText(CH, ...C); }],
+        ['燈光 Glowing (night)', { family: 'Noto Sans TC', weight: 900 }, (g, f) => { g.fillStyle = 'rgba(0,0,10,0.45)'; g.fillRect(0, 0, S, S); text(g, f); g.shadowColor = 'rgba(255,200,90,1)'; g.shadowBlur = 40; g.fillStyle = '#fff1c4'; g.fillText(CH, ...C); g.shadowBlur = 14; g.fillText(CH, ...C); g.shadowBlur = 0; }],
+        ['立體 3-D outline', { family: 'Rampart One' }, (g, f) => { text(g, f, 260); g.fillStyle = '#f6f1e6'; g.fillText(CH, ...C); }],
+        ['翡翠 Translucent jade', { family: 'Kaisei Tokumin', weight: 800 }, (g, f) => {
+          const c = shape(f), t = c.getContext('2d'); t.globalCompositeOperation = 'source-in';
+          const gr = t.createLinearGradient(0, 40, S, S); gr.addColorStop(0, 'rgba(150,240,200,0.75)'); gr.addColorStop(0.5, 'rgba(60,170,120,0.5)'); gr.addColorStop(1, 'rgba(20,110,80,0.65)'); t.fillStyle = gr; t.fillRect(0, 0, S, S);
+          t.globalCompositeOperation = 'source-atop'; t.fillStyle = 'rgba(255,255,255,0.35)'; t.beginPath(); t.moveTo(0, 120); t.lineTo(S, 40); t.lineTo(S, 80); t.lineTo(0, 160); t.fill();
+          g.drawImage(c, 0, 0); text(g, f); g.strokeStyle = 'rgba(210,255,235,0.7)'; g.lineWidth = 2; g.strokeText(CH, ...C); }],
+        ['青銅 Bronze, verdigris', { family: 'Zen Antique' }, (g, f) => {
+          const c = shape(f, 260), t = c.getContext('2d'); t.globalCompositeOperation = 'source-in';
+          const gr = t.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, '#7fb5a0'); gr.addColorStop(1, '#3f6e5d'); t.fillStyle = gr; t.fillRect(0, 0, S, S);
+          t.globalCompositeOperation = 'source-atop';
+          for (let i = 0; i < 500; i++) { t.fillStyle = rnd() < 0.5 ? 'rgba(160,110,50,0.6)' : 'rgba(210,240,225,0.35)'; t.fillRect(rnd() * S, rnd() * S, 3, 3); }
+          g.drawImage(c, 0, 0); }],
+        ['瓦嵌 Gold tile mosaic', { family: 'Noto Sans TC', weight: 900 }, (g, f) => {
+          const N = 52, c = document.createElement('canvas'); c.width = c.height = N; const t = c.getContext('2d');
+          t.font = `${f.weight ?? 400} ${N * 0.8}px "${f.family}"`; t.textAlign = 'center'; t.textBaseline = 'middle'; t.fillStyle = '#fff'; t.fillText(CH, N / 2, N / 2 + 0.6);
+          const d = t.getImageData(0, 0, N, N).data, q = S / N;
+          for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (d[(y * N + x) * 4 + 3] > 150) { const k = 0.8 + rnd() * 0.3; g.fillStyle = `rgb(${236 * k | 0},${188 * k | 0},${84 * k | 0})`; g.fillRect(x * q + 1, y * q + 1, q - 2, q - 2); } }],
+        ['風化 Weathered ink', { family: 'Yuji Boku' }, (g, f) => {
+          const c = shape(f, 270, 'rgba(240,230,210,0.85)'), t = c.getContext('2d'); t.globalCompositeOperation = 'destination-out';
+          for (let i = 0; i < 1600; i++) { t.fillStyle = `rgba(0,0,0,${0.4 + rnd() * 0.6})`; t.beginPath(); t.arc(rnd() * S, rnd() * S, 0.8 + rnd() * 2.6, 0, 7); t.fill(); }
+          g.drawImage(c, 0, 0); }],
+        ['印章 Seal disc (白文)', { family: 'Noto Serif TC', weight: 900 }, (g, f) => { g.fillStyle = '#b3281e'; g.beginPath(); g.arc(S / 2, S / 2, 150, 0, 7); g.fill(); g.strokeStyle = '#d9a441'; g.lineWidth = 8; g.stroke(); text(g, f, 200); g.fillStyle = '#fff6e6'; g.fillText(CH, S / 2, S / 2 + 8); }],
+        ['白釉 White glaze', { family: 'Kaisei Decol', weight: 700 }, (g, f) => { text(g, f); g.fillStyle = 'rgba(40,60,90,0.6)'; g.fillText(CH, C[0] + 5, C[1] + 6); g.fillStyle = '#f4f1ea'; g.fillText(CH, ...C); }],
+        ['浮雕 Raised gold relief', { family: 'Shippori Mincho B1', weight: 800 }, (g, f) => { text(g, f); g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillText(CH, C[0] + 6, C[1] + 7); g.fillStyle = '#7a5418'; g.fillText(CH, C[0] + 2, C[1] + 2); g.fillStyle = gold(g); g.fillText(CH, ...C); g.strokeStyle = 'rgba(255,248,215,0.55)'; g.lineWidth = 1.5; g.strokeText(CH, C[0] - 1, C[1] - 1); }],
+        ['雙鉤 Double-line, gold', { family: 'Train One' }, (g, f) => { text(g, f, 260); g.fillStyle = gold(g); g.fillText(CH, ...C); }],
+        ['楷書 Black ink, gold edge', { family: 'LXGW WenKai TC', weight: 700 }, (g, f) => { text(g, f, 260); g.lineJoin = 'round'; g.strokeStyle = '#d9a441'; g.lineWidth = 10; g.strokeText(CH, ...C); g.fillStyle = '#141210'; g.fillText(CH, ...C); }],
+      ];
+
+      (async () => {
+        await Promise.all(STYLES.map(([, f]) => document.fonts.load(`${f.weight ?? 400} 40px "${f.family}"`, CH).catch(() => null)));
+        const grid = document.getElementById('grid');
+        STYLES.forEach(([name, f, draw], i) => {
+          const fig = document.createElement('figure'), c = document.createElement('canvas');
+          c.width = c.height = S;
+          const g = c.getContext('2d');
+          tiles(g);
+          draw(g, f);
+          const cap = document.createElement('figcaption');
+          cap.innerHTML = `<b>${i + 1} · ${name}</b><br>${f.family}`;
+          fig.append(c, cap);
+          grid.append(fig);
+        });
+        document.body.dataset.ready = '1';
+      })();
+    </script>
+  </body>
+</html>

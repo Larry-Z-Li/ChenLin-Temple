@@ -15,7 +15,7 @@ const progress = (p: number) => loader?.style.setProperty('--p', String(p));
 await setLocale(settings.lang);
 progress(0.2);
 let game: Awaited<ReturnType<typeof import('./game').startGame>> | null = null;
-const entry = showEntry(ui, (color) => game?.preview(color));
+const entry = showEntry(ui, (color) => game?.preview(color), () => game?.startChant());
 const { startGame } = await import('./game');
 progress(0.55);
 game = await startGame(app, ui);

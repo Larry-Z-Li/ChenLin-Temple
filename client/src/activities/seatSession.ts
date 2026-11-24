@@ -35,7 +35,7 @@ const PROSTRATION: [Anim, number][] = [
 ];
 const PROSTRATION_REPS = 3;
 
-/** Standing in place with beads or a sutra (no seat): walk away, press it again or Esc to stop. */
+/** On your feet with beads or a sutra (no seat): you can walk with them; press it again or Esc to put them away. */
 const STANDING = {
   focuses: ['beads', 'sutra'] as Focus[],
   anim: { none: 'idle', beads: 'standBeads', sutra: 'standRead', prostrate: 'idle' } as Record<Focus, Anim>,
@@ -111,7 +111,6 @@ export class SeatSession {
     if (!this.standing) {
       if (player.mode !== 'free') return;
       this.standing = true;
-      player.anchor(player.pos.x, player.pos.y, player.pos.z, player.yaw, 'ritual', STANDING.anim[f]);
     }
     this.setFocus(f);
   }
@@ -122,6 +121,7 @@ export class SeatSession {
   }
 
   private request(s: Seat) {
+    if (this.standing) this.endStanding(); // sitting down: the standing beads / sutra go, the seat's take over
     if (this.seat || this.d.player.mode !== 'free') return;
     this.pending = s.id;
     this.d.net.requestSeat(s.id, null);
@@ -195,9 +195,10 @@ export class SeatSession {
     if (this.beads) this.renderBeads(mala.count, mala.round);
     else if (!prostrate) hud.setInfo(null);
     hud.setSeatState([this.beads && 'beads', this.reading && 'sutra', prostrate && 'prostrate'].filter(Boolean) as Focus[]);
-    if (this.standing && this.focus === 'none') {
-      this.standing = false;
-      player.release();
+    if (this.standing) { // free to walk: just what's in hand, and ← → for the beads
+      if (this.focus === 'none') this.standing = false;
+      player.holdAnim = this.standing ? this.pose() : null;
+      player.arrowsForBeads = this.standing && this.beads;
       return;
     }
     player.setAnchorAnim(this.pose());
@@ -219,7 +220,8 @@ export class SeatSession {
   bow() {
     if ((!this.seat && !this.standing) || this.focus === 'prostrate') return;
     this.bowLeft = 2.4;
-    this.d.player.setAnchorAnim(this.kind().bow);
+    if (this.standing) this.d.player.gesture(this.kind().bow, 2.4);
+    else this.d.player.setAnchorAnim(this.kind().bow);
   }
 
   private renderBeads(n: number, round: number) {
@@ -257,7 +259,7 @@ export class SeatSession {
   }
 
   update(dt: number) {
-    if (this.bowLeft > 0 && (this.bowLeft -= dt) <= 0 && (this.seat || this.standing)) this.d.player.setAnchorAnim(this.pose());
+    if (this.bowLeft > 0 && (this.bowLeft -= dt) <= 0 && this.seat) this.d.player.setAnchorAnim(this.pose());
     const p = this.prost;
     if (p) {
       p.t += dt;

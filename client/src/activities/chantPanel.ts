@@ -9,6 +9,10 @@ export class ChantPanel {
   private list: HTMLElement;
   private playBtn: HTMLButtonElement;
   private loopBtn: HTMLButtonElement;
+  private seekBar: HTMLInputElement;
+  private timeEl: HTMLElement;
+  private lengthEl: HTMLElement;
+  private dragging = false;
   private open = false;
 
   constructor(parent: HTMLElement, private player: ChantPlayer) {
@@ -20,12 +24,24 @@ export class ChantPanel {
     } }, '↻');
     const vol = h('input', { type: 'range', min: '0', max: '1', step: '0.01', value: String(settings.chantVolume), i18nTitle: 'chant.volume' }) as HTMLInputElement;
     vol.addEventListener('input', () => player.setVolume(Number(vol.value)));
+    // progress: where we are, a bar to drag, and the chant's length
+    this.seekBar = h('input', { type: 'range', min: '0', max: '1000', step: '1', value: '0', class: 'chant-seek' }) as HTMLInputElement;
+    this.seekBar.addEventListener('pointerdown', () => (this.dragging = true));
+    this.seekBar.addEventListener('change', () => (this.dragging = false));
+    this.seekBar.addEventListener('input', () => {
+      player.seek((Number(this.seekBar.value) / 1000) * player.duration);
+      this.renderTime();
+    });
+    this.timeEl = h('span', {}, '0:00');
+    this.lengthEl = h('span', {}, '0:00');
+    player.onTime(() => this.renderTime());
 
     this.el = h(
       'aside',
       { class: 'panel chant-panel hidden' },
       h('div', { class: 'panel-head' }, h('div', { class: 'panel-title', i18n: 'chant.title' })),
       this.list,
+      h('div', { class: 'chant-progress' }, this.timeEl, this.seekBar, this.lengthEl),
       h(
         'div',
         { class: 'transport' },
@@ -48,6 +64,14 @@ export class ChantPanel {
     this.open = v;
     this.el.classList.toggle('hidden', !v);
     this.render();
+  }
+
+  private renderTime() {
+    const p = this.player, mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+    this.timeEl.textContent = mmss(p.time);
+    this.lengthEl.textContent = mmss(p.duration);
+    this.seekBar.disabled = !p.duration;
+    if (!this.dragging) this.seekBar.value = String(p.duration ? Math.round((p.time / p.duration) * 1000) : 0);
   }
 
   private render() {

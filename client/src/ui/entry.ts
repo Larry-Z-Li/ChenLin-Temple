@@ -12,7 +12,8 @@ import { playQimenWarp } from './qimenWarp';
  * and robe colour. `onRobe` recolours the pacing monk as you choose; `done` resolves on Enter (the
  * click that also unlocks audio). Enter stays disabled until `ready()` — the world is still loading.
  */
-export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) {
+/** `onGo` runs inside the click that enters, so anything it starts may make sound (browsers allow that only from a click). */
+export function showEntry(parent: HTMLElement, onRobe: (color: string) => void, onGo?: () => void) {
   let resolve!: (v: { name: string; color: string; hall?: string }) => void;
   const done = new Promise<{ name: string; color: string; hall?: string }>((r) => (resolve = r));
   const name = h('input', { class: 'text-input', maxlength: '20', value: settings.name, 'data-i18n-placeholder': 'entry.namePlaceholder', autocomplete: 'nickname' }) as HTMLInputElement;
@@ -61,6 +62,7 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) 
   const go = (hall?: string) => {
     if (!ready) return;
     unlockAudio();
+    onGo?.();
     settings.name = sanitizeName(name.value || name.placeholder);
     settings.color = color;
     saveSettings();
