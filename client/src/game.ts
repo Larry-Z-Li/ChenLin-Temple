@@ -204,10 +204,10 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const pollHeadcount = () =>
     fetch('/api/status')
       .then((r) => r.json())
-      .then((s: { present: number; max?: number }) => {
+      .then((s: { present: number; max?: number; full?: boolean }) => {
         if (!inIntro()) return;
         hud.setStatus('online', s.present);
-        headcount = { present: s.present, max: s.max ?? Infinity };
+        headcount = { present: s.present, max: s.full ? s.present : s.max ?? Infinity }; // (full counts every connection, not just those placed)
         headcountListeners.forEach((fn) => fn(headcount!.present, headcount!.max));
       })
       .catch(() => {});

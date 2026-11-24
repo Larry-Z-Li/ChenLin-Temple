@@ -92,7 +92,9 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url?.startsWith('/api/remove-wish')) return removeWishByHand(req, res);
   if (req.url === '/api/status') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ present: [...clients.values()].filter((c) => c.info).length, max: MAX_PLAYERS }));
+    // present: those actually in the temple (placed, so others can see them); the limit counts every joined connection
+    const joined = [...clients.values()].filter((c) => c.info);
+    res.end(JSON.stringify({ present: joined.filter((c) => c.placed).length, max: MAX_PLAYERS, full: joined.length >= MAX_PLAYERS }));
     return;
   }
   if (!fs.existsSync(STATIC_DIR)) {
