@@ -42,6 +42,7 @@ import {
   type Transform,
 } from '../../shared/protocol';
 import { isBlocked } from '../../shared/moderation';
+import { openStore } from './store';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS ?? 150);
@@ -173,26 +174,33 @@ const dayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TEMPLE_TZ, year: 
 const dayKey = () => dayFormat.format(new Date());
 let currentDay = dayKey();
 
-// ---------- Wish lanterns (persisted to a JSON file; see README for hosting caveats) ----------
+// ---------- Wish lanterns (kept in the store: Upstash Redis when configured, else a JSON file; see store.ts) ----------
 const DATA_DIR = process.env.DATA_DIR ?? path.resolve(here, '../data');
-const WISH_FILE = path.join(DATA_DIR, 'wishes.json');
+const store = openStore(DATA_DIR);
 /** Saved with who hung it and who reported it (hashes); `pub` strips those before anything is sent. */
 type StoredWish = Wish & { owner?: string; reports?: string[] };
 const wishes = new Map<string, StoredWish>();
 const pub = ({ owner: _o, reports: _r, ...w }: StoredWish): Wish => w;
-try {
-  const list = JSON.parse(fs.readFileSync(WISH_FILE, 'utf8')) as StoredWish[];
-  for (const w of list) if (w && typeof w.id === 'string' && Date.now() - w.at < WISH_TTL_MS) wishes.set(w.id, w.board === 'hall' ? { ...w, board: 'baosheng' } : w); // the first wall was baosheng's
-  console.log(`Loaded ${wishes.size} wish lanterns`);
-} catch {
-  /* none yet */
+/** Only once the saved lanterns are in may we save: saving after a failed load would wipe them. */
+let wishesLoaded = false;
+for (let attempt = 1; attempt <= 5 && !wishesLoaded; attempt++) {
+  try {
+    const list = JSON.parse((await store.load('wishes.json')) ?? '[]') as StoredWish[];
+    for (const w of list) if (w && typeof w.id === 'string' && Date.now() - w.at < WISH_TTL_MS) wishes.set(w.id, w.board === 'hall' ? { ...w, board: 'baosheng' } : w); // the first wall was baosheng's
+    wishesLoaded = true;
+    console.log(`Loaded ${wishes.size} wish lanterns from ${store.kind}`);
+  } catch (e) {
+    console.warn(`[wishes] load failed (attempt ${attempt}):`, (e as Error).message);
+    await new Promise((r) => setTimeout(r, attempt * 2000));
+  }
 }
+if (!wishesLoaded) console.error('[wishes] could not load the saved lanterns: new ones will NOT be saved (so the old ones are not overwritten)');
 let saveTimer: NodeJS.Timeout | null = null;
 function saveWishes() {
+  if (!wishesLoaded) return;
   saveTimer ??= setTimeout(() => {
     saveTimer = null;
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFile(WISH_FILE, JSON.stringify([...wishes.values()]), (e) => e && console.warn('[wishes] save failed', e.message));
+    store.save('wishes.json', JSON.stringify([...wishes.values()])).catch((e) => console.warn('[wishes] save failed', (e as Error).message));
   }, 2000);
 }
 function pruneWishes(now = Date.now()) {
@@ -207,20 +215,16 @@ function pruneWishes(now = Date.now()) {
 setInterval(pruneWishes, 10 * 60 * 1000);
 
 /** The salt that keeps the address hashes from being reversed; kept beside the lanterns so limits survive restarts. */
-const SALT = (() => {
-  const f = path.join(DATA_DIR, 'salt');
+const SALT = await (async () => {
   try {
-    return fs.readFileSync(f, 'utf8');
+    const saved = await store.load('salt');
+    if (saved) return saved;
   } catch {
-    const s = randomBytes(16).toString('hex');
-    try {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(f, s);
-    } catch {
-      /* read-only disk: limits just reset on restart */
-    }
-    return s;
+    return randomBytes(16).toString('hex'); // store unreachable: limits just reset on restart (don't overwrite)
   }
+  const s = randomBytes(16).toString('hex');
+  await store.save('salt', s).catch(() => {});
+  return s;
 })();
 const hashWho = (ip: string) => createHash('sha256').update(SALT + ip).digest('hex').slice(0, 16);
 /** The visitor's address: the first X-Forwarded-For entry behind Render's proxy, else the socket's. */

@@ -18,6 +18,12 @@ services:
       # Offerings (incense, fruit) clear at midnight in this time zone.
       - key: TEMPLE_TZ
         value: Asia/Taipei
+      # Where the wish lanterns are kept: Upstash Redis (free; upstash.com → create a Redis database → its
+      # REST URL and token). Without these they live in a file that the free plan wipes on every deploy.
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
       # Optional: lets you take a lantern down by hand (see README). Render asks for the value.
       - key: ADMIN_KEY
         sync: false
