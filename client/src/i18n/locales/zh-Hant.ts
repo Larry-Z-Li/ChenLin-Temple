@@ -121,6 +121,10 @@ const zhHant: Record<I18nKey, string> = {
   'sutra.smaller': '縮小字體',
 
   'chant.title': '梵唄',
+  'merit.title': '功德',
+  'merit.rank': '階位',
+  'merit.novice': '初學',
+  'merit.merit': '功德',
   'chant.empty': '尚無梵唄：請加入 /assets/chants/index.json',
   'chant.play': '播放',
   'chant.pause': '暫停',

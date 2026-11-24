@@ -1,10 +1,11 @@
 import type { Fruit } from '../../../shared/protocol';
-import { graphicsLevel, saveSettings, settings } from '../config/settings';
+import { graphicsLevel, isTouchDevice, saveSettings, settings } from '../config/settings';
 import { FRUIT_TYPES } from '../config/theme';
 import { LOCALES, getLocale, setLocale, t, type I18nKey } from '../i18n';
 import type { NetStatus } from '../net/netClient';
 import { refreshSky } from '../world/sky';
 import { h } from './dom';
+import { icon } from './icons';
 
 export type Focus = 'none' | 'beads' | 'sutra' | 'prostrate';
 export type SeatAction = 'beads' | 'sutra' | 'prostrate' | 'stand';
@@ -120,9 +121,8 @@ export class Hud {
         'div',
         { class: 'row' },
         this.musicBtn,
-        h('button', { class: 'icon-btn', i18nTitle: 'hud.map', onclick: () => cb.onMap() }, '◫'),
-        h('button', { class: 'icon-btn', i18nTitle: 'hud.settings', onclick: () => this.toggleSettings() }, '⚙'),
-        h('button', { class: 'icon-btn', i18nTitle: 'hud.help', onclick: () => this.toggleHelp() }, '?'),
+        h('button', { class: 'icon-btn', i18nTitle: 'hud.settings', onclick: () => this.toggleSettings() }, icon('gear') as unknown as Node),
+        h('button', { class: 'icon-btn', i18nTitle: 'hud.help', onclick: () => this.toggleHelp() }, icon('help') as unknown as Node),
       ),
     );
 
@@ -153,19 +153,41 @@ export class Hud {
     );
     this.inventory = h('div', { class: 'inventory hidden' });
     // Standing: bow, beads, chants, sutras, fast travel.
-    this.standBtns.beads = h('button', { class: 'icon-btn', i18n: 'seat.beads', onclick: () => cb.onStandAction('beads') }) as HTMLButtonElement;
-    this.standBtns.sutra = h('button', { class: 'icon-btn', i18n: 'seat.sutras', onclick: () => cb.onStandAction('sutra') }) as HTMLButtonElement;
+    // each with a line icon over its label (the label a span of its own: a locale change rewrites only that)
+    const act = (name: string, key: I18nKey, onclick: () => void) => h('button', { class: 'icon-btn', onclick }, icon(name) as unknown as Node, h('span', { i18n: key })) as HTMLButtonElement;
+    this.standBtns.beads = act('beads', 'seat.beads', () => cb.onStandAction('beads'));
+    this.standBtns.sutra = act('sutra', 'seat.sutras', () => cb.onStandAction('sutra'));
     const quick = h(
       'div',
       { class: 'quick-actions' },
-      h('button', { class: 'icon-btn', i18n: 'bow.button', onclick: () => cb.onBow() }),
+      act('bow', 'bow.button', () => cb.onBow()),
       this.standBtns.beads,
-      (this.chantBtns[1] = h('button', { class: 'icon-btn', i18n: 'hud.chants', onclick: () => cb.onChants() }) as HTMLButtonElement),
+      (this.chantBtns[1] = act('chant', 'hud.chants', () => cb.onChants())),
       this.standBtns.sutra,
-      h('button', { class: 'icon-btn', i18n: 'hud.fastTravel', onclick: () => cb.onFastTravel() }),
+      act('cloud', 'hud.fastTravel', () => cb.onFastTravel()),
     );
 
-    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, quick, this.toasts, this.help, this.settingsPanel);
+    // 功德: rank and merit (nothing earns it yet). Folded to start with on a portrait phone; while any other menu
+    // is open it goes away altogether (it can't be opened over them), coming back as it was.
+    let meritOpen = !(isTouchDevice && matchMedia('(orientation: portrait)').matches);
+    this.meritN = h('b', {}, '0');
+    this.merit = h(
+      'div',
+      { class: `merit${meritOpen ? ' open' : ''}` },
+      h('button', { class: 'merit-toggle', 'aria-expanded': String(meritOpen), onclick: () => {
+        meritOpen = !meritOpen;
+        this.merit.classList.toggle('open', meritOpen);
+        this.merit.firstElementChild!.setAttribute('aria-expanded', String(meritOpen));
+      } }, h('span', { i18n: 'merit.title' }), h('span', { class: 'merit-caret', 'aria-hidden': 'true' })),
+      h('div', { class: 'merit-body' },
+        h('div', { class: 'merit-row' }, h('span', { i18n: 'merit.rank' }), h('b', { i18n: 'merit.novice' })),
+        h('div', { class: 'merit-row' }, h('span', { i18n: 'merit.merit' }), this.meritN),
+      ),
+    );
+    const othersOpen = () => !!parent.querySelector('.panel:not(.hidden), .wish-overlay:not(.hidden), .bigmap:not(.hidden)');
+    new MutationObserver(() => this.merit.classList.toggle('away', othersOpen())).observe(parent, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+
+    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, quick, this.merit, this.toasts, this.help, this.settingsPanel);
     parent.append(this.root);
     this.renderMusic();
     this.renderFps();
@@ -180,7 +202,7 @@ export class Hud {
   }
 
   renderMusic(available = true) {
-    this.musicBtn.textContent = settings.musicOn ? '♪' : '♪̸';
+    this.musicBtn.replaceChildren(icon(settings.musicOn ? 'music' : 'musicOff'));
     this.musicBtn.classList.toggle('off', !settings.musicOn);
     this.musicBtn.title = available ? t('hud.music') : t('hud.noAmbient');
   }
@@ -196,6 +218,13 @@ export class Hud {
   private chantBtns: HTMLButtonElement[] = [];
   setChantPlaying(on: boolean) {
     for (const b of this.chantBtns) b.classList.toggle('chant-on', on);
+  }
+
+  private merit!: HTMLElement;
+  private meritN!: HTMLElement;
+  /** The merit shown (nothing earns any yet). */
+  setMerit(n: number) {
+    this.meritN.textContent = String(n);
   }
 
   setFps(fps: number, draws: number) {

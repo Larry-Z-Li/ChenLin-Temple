@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Anim } from '../../../shared/protocol';
 import { damp } from '../core/math';
 import { glowTexture, textTexture } from '../core/textures';
-import { lanternGeometries } from '../activities/wishLanterns';
+import { chaliceGeometries, lanternGeometries } from '../activities/wishLanterns';
 import { CLOUD_TOP, makeCloud } from '../world/cloud';
 
 /** Joint targets (radians, except hipY in metres). Limbs hang along -Y; +x rotation swings them forward. */
@@ -250,21 +250,25 @@ export class Avatar {
    * A lantern carried before you in both hands (blessing a wish), glowing `glow` times its usual brightness
    * (1–20), `size` its world scale (the wall lantern's); null puts it away.
    */
-  holdLantern(color: number | null, glow = 1, size = LANTERN_HELD) {
+  holdLantern(color: number | null, glow = 1, size = LANTERN_HELD, kind: 'lantern' | 'chalice' = 'lantern') {
     if (color === null) {
       if (this.lantern) this.lantern.g.visible = false;
       return;
     }
+    if (this.lantern && this.lantern.kind !== kind) {
+      this.joints.rHand.remove(this.lantern.g);
+      this.lantern = null;
+    }
     if (!this.lantern) {
-      const { body, trim } = lanternGeometries();
+      const { body, trim } = kind === 'chalice' ? chaliceGeometries() : lanternGeometries();
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 });
       const g = new THREE.Group();
       g.add(new THREE.Mesh(body, mat), new THREE.Mesh(trim, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 })));
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-      halo.position.y = -0.55;
+      halo.position.y = kind === 'chalice' ? 0.47 : -0.55; // at the flame, or the lantern's middle
       g.add(halo);
       this.joints.rHand.add(g);
-      this.lantern = { g, mat, halo };
+      this.lantern = { g, mat, halo, kind };
     }
     const { g, mat, halo } = this.lantern;
     g.visible = true;
@@ -277,7 +281,7 @@ export class Avatar {
     halo.material.opacity = Math.min(1, 0.22 * glow);
     halo.scale.setScalar(((0.9 + 0.4 * glow) * 0.5) / size); // in metres, whatever the lantern's size
   }
-  private lantern: { g: THREE.Group; mat: THREE.MeshStandardMaterial; halo: THREE.Sprite } | null = null;
+  private lantern: { g: THREE.Group; mat: THREE.MeshStandardMaterial; halo: THREE.Sprite; kind: 'lantern' | 'chalice' } | null = null;
 
   /** Hide name tags beyond a distance to reduce clutter. */
   setTagVisible(v: boolean) {

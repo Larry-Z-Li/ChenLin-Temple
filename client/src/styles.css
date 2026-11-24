@@ -1,10 +1,13 @@
 :root {
-  --ink: #f6efe2;
-  --muted: #c9bfae;
-  --panel: rgba(28, 20, 16, 0.72);
-  --panel-border: rgba(217, 164, 65, 0.35);
-  --accent: #d9a441;
-  --accent-ink: #2a1a0e;
+  /* UI direction A · Glass: white text; frosted light glass for controls, darker frosted glass for panels of text */
+  --ink: #ffffff;
+  --muted: rgba(255, 255, 255, 0.72);
+  --panel: rgba(22, 24, 30, 0.46);
+  --glass: rgba(255, 255, 255, 0.16);
+  --glass-blur: blur(18px) saturate(1.4);
+  --panel-border: rgba(255, 255, 255, 0.26);
+  --accent: #ffffff;
+  --accent-ink: #17191d;
   --maroon: #8e2b1f;
   --radius: 12px;
   --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Noto Serif TC', 'Songti TC', 'PMingLiU', 'Noto Serif', serif;
@@ -61,9 +64,9 @@ body.reading .minimap { display: none; }
 .minimap { cursor: pointer; }
 .bigmap { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(10, 8, 6, 0.55); }
 .bigmap.hidden { display: none; }
-.bigmap-card { position: relative; padding: 14px 16px 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(10px); text-align: center; }
-.bigmap-title { font: 600 20px var(--serif); color: var(--accent); margin-bottom: 8px; letter-spacing: 0.1em; }
-.bigmap-canvas { display: block; border-radius: 50%; background: rgba(20, 16, 12, 0.6); }
+.bigmap-card { position: relative; padding: 14px 16px 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(10px); text-align: center; width: min-content; max-width: calc(100vw - 16px); box-sizing: border-box; } /* hugs the map: a long title wraps instead of widening it */
+.bigmap-title { font: 600 clamp(16px, 4.6vw, 20px)/1.35 var(--serif); color: var(--accent); margin-bottom: 8px; letter-spacing: 0.1em; padding: 2px 40px 0; } /* clear of the ✕ */
+.bigmap-canvas { display: block; margin: 0 auto; border-radius: 50%; background: rgba(20, 16, 12, 0.6); }
 .bigmap-close { position: absolute; top: 10px; right: 10px; }
 .minimap { position: fixed; right: 16px; bottom: 16px; width: 200px; height: 200px; border-radius: 50%; border: 1px solid var(--panel-border); background: rgba(20, 16, 12, 0.5); }
 
@@ -111,7 +114,7 @@ body.intro .minimap, body.intro .minimap-btn, body.intro .joystick { display: no
   background: linear-gradient(90deg, rgba(16, 20, 26, 0.62) 0%, rgba(16, 20, 26, 0.38) 34%, rgba(16, 20, 26, 0.08) 62%, transparent 80%), rgba(70, 80, 90, 0.22);
 }
 .entry.out { opacity: 0; }
-.entry-panel { pointer-events: auto; width: min(440px, 100%); display: grid; gap: 18px; text-align: left; color: #f6efe0; }
+.entry-panel { pointer-events: auto; width: min(440px, 100%); min-width: 0; /* may shrink below its longest line, so nothing runs off a narrow phone */ display: grid; gap: 18px; text-align: left; color: #f6efe0; }
 .entry-kicker { font: 500 12px var(--caps); letter-spacing: 0.32em; text-transform: uppercase; color: #dcbc84; }
 .entry-title { margin: 0; font: 600 clamp(46px, 7vw, 80px)/1.12 var(--display); letter-spacing: 0.08em; color: #fbf6ea; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35); }
 .entry-titlerow { display: flex; align-items: flex-start; gap: 14px; }
@@ -129,8 +132,14 @@ body.intro .minimap, body.intro .minimap-btn, body.intro .joystick { display: no
 .entry-go:disabled { opacity: 0.55; cursor: progress; transform: none; }
 .entry-arrow { font-size: 20px; }
 .entry-hall { width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 6px; border: 1px solid rgba(243, 220, 170, 0.55); background: rgba(16, 20, 26, 0.35); color: #f3dcaa; font: 600 15px var(--display); letter-spacing: 0.12em; cursor: pointer; text-align: center; }
-html[lang='en'] .entry-hall { letter-spacing: 0.02em; } /* the wide spacing suits the characters, not English */
-html[lang='en'] .entry-go { letter-spacing: 0.06em; }
+/* English labels are much wider than the characters: two buttons a row, and the gold ones may wrap */
+html[lang='en'] .entry-title { white-space: nowrap; font-size: clamp(26px, 7.4vw, 60px); } /* "Chenlin Academy" on one line, sized to the screen */
+html[lang='en'] .entry-titlerow { min-width: 0; }
+html[lang='en'] .entry-kicker { letter-spacing: 0.2em; }
+html[lang='en'] .entry-cta { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+html[lang='en'] .entry-cta .entry-go { grid-column: span 1; }
+html[lang='en'] .entry-go { letter-spacing: 0.04em; font-size: 15px; line-height: 1.2; white-space: normal; text-align: center; }
+html[lang='en'] .entry-hall { letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .entry-hall:hover { background: rgba(243, 220, 170, 0.16); }
 .entry-hall:disabled { opacity: 0.45; cursor: progress; }
 .entry-full { font: 600 13px var(--sans); letter-spacing: 0.08em; color: #ffd9a8; background: rgba(120, 30, 20, 0.55); border: 1px solid rgba(255, 190, 140, 0.45); border-radius: 6px; padding: 8px 12px; width: max-content; max-width: 100%; box-sizing: border-box; }
@@ -170,7 +179,7 @@ html[lang='en'] .entry-go { letter-spacing: 0.06em; }
 .quick-actions .icon-btn { height: 44px; padding: 0 16px; font-family: var(--serif); }
 .quick-actions { flex-wrap: wrap; justify-content: center; width: max-content; max-width: calc(100vw - 24px); }
 .quick-actions .icon-btn.active { background: rgba(217, 164, 65, 0.22); border-color: var(--accent); }
-.inventory { position: absolute; left: 16px; bottom: 70px; display: flex; flex-wrap: wrap; gap: 6px; max-width: 50vw; }
+.inventory { position: absolute; left: 16px; bottom: 124px; display: flex; flex-wrap: wrap; gap: 6px; max-width: 50vw; }
 .fruit-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border); font-size: 13px; }
 .fruit-dot { width: 10px; height: 10px; border-radius: 50%; }
 .bead-btns { position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%); display: flex; gap: 72px; }
@@ -179,6 +188,21 @@ html[lang='en'] .entry-go { letter-spacing: 0.06em; }
 /* ---------- Touch ---------- */
 .joystick { position: fixed; left: 24px; bottom: 24px; width: 120px; height: 120px; border-radius: 50%; background: rgba(28, 20, 16, 0.35); border: 1px solid var(--panel-border); touch-action: none; display: grid; place-items: center; }
 .joy-knob { width: 52px; height: 52px; border-radius: 50%; background: rgba(217, 164, 65, 0.75); pointer-events: none; }
+/* 功德: a drawer against the screen's left edge (lower left; on phones under the name in portrait, mid-left in landscape).
+   Folded, only its edge tab shows (the ›); it slides out to open and back to fold. */
+.merit { position: absolute; left: 0; bottom: 16px; width: 176px; border-radius: 0 14px 14px 0; border: 1px solid var(--panel-border); border-left: 0; background: var(--panel); backdrop-filter: blur(8px); color: var(--ink); overflow: hidden; transition: translate 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.merit:not(.open) { translate: calc(-100% + 44px) 0; }
+.merit.away { display: none; }
+.merit-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 12px 16px 12px 14px; border: 0; background: transparent; color: var(--accent); font: 600 15px var(--serif); letter-spacing: 0.12em; cursor: pointer; }
+.merit-caret { flex: none; width: 10px; height: 10px; border-right: 2.5px solid currentColor; border-bottom: 2.5px solid currentColor; transform: rotate(135deg); transition: transform 0.38s; } /* ‹ open: push it back */
+.merit:not(.open) .merit-caret { transform: rotate(-45deg); } /* › folded: pull it out */
+.merit-body { display: grid; gap: 6px; max-height: 0; opacity: 0; padding: 0 14px; font: 13px var(--sans); transition: max-height 0.38s, opacity 0.25s, padding 0.38s; }
+.merit.open .merit-body { max-height: 90px; opacity: 1; padding: 0 14px 12px; }
+.merit-row { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; }
+.merit-row span { color: var(--muted); }
+.merit-row b { font: 600 15px var(--serif); }
+@media (orientation: portrait) and (max-width: 640px) { body.touch .merit { top: 84px; bottom: auto; } }
+@media (orientation: landscape) and (max-height: 540px) { body.touch .merit { top: 50%; bottom: auto; transform: translateY(-50%); } }
 body.touch .quick-actions { bottom: 160px; }
 body.touch .inventory { bottom: 212px; left: 24px; }
 body.touch .chant-panel { bottom: 252px; left: 24px; }
@@ -254,3 +278,22 @@ body.beads-sutra .info { left: 16px; transform: none; max-width: max(180px, calc
 .wishlist-pager { align-items: center; justify-content: space-between; }
 .wishlist-page { font-size: 14px; opacity: 0.8; }
 .wishlist-pager .pill-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* ---------- Glass (UI direction A) ---------- */
+.icon-btn, .seatbar, .merit, .minimap-btn, .joystick, .quick-actions { background: var(--glass); }
+.icon-btn, .panel, .prompt, .info, .seatbar, .merit, .toast, .minimap-btn, .quick-actions, .wish-card, .bigmap-card, .joystick { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+.icon-btn { border-radius: 12px; display: inline-grid; place-items: center; }
+.icon-btn .ico { width: 18px; height: 18px; }
+.brand .title, .brand .status { text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5); }
+.panel-title { font-family: var(--sans); font-weight: 600; letter-spacing: 0.04em; }
+/* the action bar: one dock, a line icon over each label; the one in use solid white */
+.quick-actions { gap: 4px; padding: 6px; border-radius: 22px; border: 1px solid var(--panel-border); }
+.quick-actions .icon-btn { height: auto; min-width: 64px; padding: 8px 10px 6px; gap: 3px; border: 0; border-radius: 14px; background: transparent; font: 500 12px var(--sans); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.quick-actions .icon-btn .ico { width: 20px; height: 20px; }
+.quick-actions .icon-btn.active, .quick-actions .icon-btn.chant-on, .seat-btn.active, .seat-btn.chant-on { background: #fff !important; color: var(--accent-ink) !important; border-color: transparent !important; box-shadow: none !important; }
+.chant-on { background: rgba(255, 255, 255, 0.85) !important; color: var(--accent-ink) !important; box-shadow: none; }
+.merit { border-radius: 0 14px 14px 0; }
+.minimap { border: 2px solid rgba(255, 255, 255, 0.55); }
+.joy-knob { background: rgba(255, 255, 255, 0.78); }
+@media (max-width: 640px) { .quick-actions .icon-btn { min-width: 56px; padding: 7px 6px 5px; font-size: 11px; } }
+

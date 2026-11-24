@@ -30,6 +30,29 @@ export function lanternGeometries() {
   };
 }
 
+/**
+ * A butter lamp (酥油燈) standing on its foot at the origin, about half a metre tall: a gold chalice — lotus
+ * foot, a knotted stem set with turquoise and coral, a silver band round the cup — with its butter and wick
+ * (trim); and its flame (body: tinted per instance, lit in the wish's colour, hidden while unlit).
+ */
+export function chaliceGeometries() {
+  const lathe = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 24);
+  const stones = Array.from({ length: 6 }, (_, i) => {
+    const a = (i / 6) * Math.PI * 2;
+    return paint(new THREE.SphereGeometry(0.014, 6, 4).translate(Math.cos(a) * 0.064, 0.215, Math.sin(a) * 0.064), i % 2 ? 0xb5452f : 0x2aa79b);
+  });
+  return {
+    body: whiteColors(new THREE.SphereGeometry(0.03, 10, 8).scale(1, 2.6, 1).translate(0, 0.47, 0)),
+    trim: mergeGeometries([
+      paint(lathe([[0.001, 0], [0.16, 0], [0.165, 0.03], [0.13, 0.05], [0.14, 0.08], [0.1, 0.13], [0.06, 0.15], [0.045, 0.19], [0.068, 0.215], [0.045, 0.24], [0.04, 0.265], [0.075, 0.285], [0.16, 0.34], [0.19, 0.385], [0.196, 0.405], [0.172, 0.405], [0.168, 0.385], [0.001, 0.385]]), THEME.goldLeaf),
+      paint(new THREE.TorusGeometry(0.176, 0.011, 6, 32).rotateX(Math.PI / 2).translate(0, 0.35, 0), 0xc9ccd2), // silver band
+      paint(new THREE.CylinderGeometry(0.166, 0.166, 0.01, 24).translate(0, 0.39, 0), 0xf0dc9a), // the butter
+      paint(new THREE.CylinderGeometry(0.004, 0.004, 0.04, 4).translate(0, 0.41, 0), 0x2a1a10), // wick
+      ...stones,
+    ]),
+  };
+}
+
 export const lanternHex = (color: number) => LOTUS_COLOURS[color] ?? LOTUS_COLOURS[0];
 
 /** The writing form (title, wish, colour) shown in `panel`; `onHang` gets the trimmed title (non-empty). */

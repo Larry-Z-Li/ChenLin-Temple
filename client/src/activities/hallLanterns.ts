@@ -15,10 +15,14 @@ import { h } from '../ui/dom';
 import type { Hud } from '../ui/hud';
 import { addLamp, type Lamp } from '../world/lightPool';
 import { colourGlowMaterial, haloPoints } from '../world/nightGlow';
-import { lanternGeometries, lanternHex, markHung, showWishForm, wishMeta, wishWait } from './wishLanterns';
+import { chaliceGeometries, lanternGeometries, lanternHex, markHung, showWishForm, wishMeta, wishWait } from './wishLanterns';
 
 const GRID = 7; // 7 × 7 per side
 const COL = 0.95, ROW = 0.8, SCALE = 0.9;
+/** Mock: this hall's walls are butter lamps on shelves instead of hanging lanterns (same grid, same wishes). */
+const CHALICE_HALL = 'baosheng';
+/** How far below a lantern's hook a lamp's shelf sits (the lamps fill the same band of wall). */
+const SHELF_DROP = 0.7;
 const PER_WALL = GRID * GRID; // slots 0–48 the left wall (west), 49–97 the right
 const wallOf = (slot: number) => (slot < PER_WALL ? 0 : 1);
 /** An unclaimed lantern, unlit: a deep maroon. Kept very dark, as the lanterns' shared material also glows in its colour. */
@@ -45,6 +49,8 @@ export class HallLanterns {
   /** Lanterns you've reported this visit. */
   private reported = new Set<string>();
   private hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+  /** Butter lamps on shelves (the mock hall) rather than lanterns on hooks. */
+  readonly chalices: boolean;
   /** Your own lantern just went up (the great bell rings for you, and the camera visits it). */
   onHung: (shot: LanternShot) => void = () => {};
   /** Lanterns being shaken: slot → start (ms). */
@@ -61,6 +67,7 @@ export class HallLanterns {
 
   constructor(ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string, readonly hallId: string, private blessing: LanternBlessing) {
     const hall = HALLS.find((x) => x.id === hallId)!;
+    this.chalices = hallId === CHALICE_HALL;
     const F = PLATFORM_H, hw = hall.width / 2, wall = -hall.depth / 2 + 0.2; // inner face of the back wall
     const cx = (2 + hw) / 2; // middle of each wall stretch beside the middle 4 m
     // Built in the hall's own space (as if it faced south), then turned with the hall; W() gives world positions.
@@ -85,8 +92,18 @@ export class HallLanterns {
     this.scale = SCALE * Math.min(1, row / ROW);
     for (const s of [-1, 1]) {
       const gx = s * cx;
-      for (let r = 0; r < GRID; r++) root.add(box(w, 0.07, 0.08, red, gx, rail0 + r * row - 0.035, wall + 0.06));
-      for (const e of [-1, 1]) root.add(box(0.12, GRID * row + 0.3, 0.12, red, gx + (e * w) / 2, rail0 - 0.9, wall + 0.06));
+      if (this.chalices) {
+        // shelves: a lacquered board under each row with a gold lip, deep sides; a ladder leaning beside them
+        for (let r = 0; r < GRID; r++) {
+          const y = rail0 + r * row - SHELF_DROP;
+          root.add(box(w, 0.05, 0.46, red, gx, y - 0.05, wall + 0.23), box(w, 0.035, 0.025, gold, gx, y - 0.06, wall + 0.47));
+        }
+        for (const e of [-1, 1]) root.add(box(0.1, GRID * row + 0.3, 0.48, red, gx + (e * w) / 2, rail0 - 0.9, wall + 0.24));
+        root.add(ladder(gx + s * (w / 2 + 0.42), F, wall));
+      } else {
+        for (let r = 0; r < GRID; r++) root.add(box(w, 0.07, 0.08, red, gx, rail0 + r * row - 0.035, wall + 0.06));
+        for (const e of [-1, 1]) root.add(box(0.12, GRID * row + 0.3, 0.12, red, gx + (e * w) / 2, rail0 - 0.9, wall + 0.06));
+      }
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.55), new THREE.MeshStandardMaterial({ map: signTexture() }));
       sign.position.set(gx, rail0 + (GRID - 1) * row + 0.55, wall + 0.04);
       root.add(sign);
@@ -94,24 +111,24 @@ export class HallLanterns {
       const cy = rail0 + ((GRID - 1) * row) / 2 + 0.2;
       this.walls.push({ at: W(gx, cy, wall), view: W(gx, cy - 0.3, wall + 7.4) });
       for (let r = 0; r < GRID; r++)
-        for (let c = 0; c < GRID; c++) this.hooks.push(new THREE.Vector3(gx + (c - (GRID - 1) / 2) * COL, rail0 + (GRID - 1 - r) * row, wall + 0.36));
+        for (let c = 0; c < GRID; c++) this.hooks.push(new THREE.Vector3(gx + (c - (GRID - 1) / 2) * COL, rail0 + (GRID - 1 - r) * row - (this.chalices ? SHELF_DROP : 0), wall + (this.chalices ? 0.25 : 0.36)));
     }
     const hookMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.012, 0.012, 0.28, 5).rotateX(Math.PI / 2).translate(0, 0, -0.13), gold, HALL_WISH_SLOTS);
     this.hooks.forEach((p, i) => hookMesh.setMatrixAt(i, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z)));
-    root.add(hookMesh);
+    if (!this.chalices) root.add(hookMesh); // (lamps stand on shelves: no hooks)
 
     // ---- Lanterns: one on every hook, dark red until someone lights it with a wish ----
-    const { body, trim } = lanternGeometries();
+    const { body, trim } = this.chalices ? chaliceGeometries() : lanternGeometries();
     this.bodies = new THREE.InstancedMesh(body, colourGlowMaterial({ roughness: 0.6 }, (n) => 1.0 + 0.5 * n), HALL_WISH_SLOTS);
     this.trims = new THREE.InstancedMesh(trim, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }), HALL_WISH_SLOTS);
     const halo: number[] = [];
     const still = new THREE.Matrix4();
     this.hooks.forEach((p, i) => {
       still.compose(p, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, i, 0)), new THREE.Vector3(this.scale, this.scale, this.scale));
-      this.bodies.setMatrixAt(i, still);
+      this.bodies.setMatrixAt(i, this.chalices ? this.hidden : still); // an unlit lamp has no flame
       this.trims.setMatrixAt(i, still);
       this.bodies.setColorAt(i, DARK);
-      halo.push(p.x, p.y - 0.55 * this.scale, p.z);
+      halo.push(p.x, p.y + (this.chalices ? 0.47 : -0.55) * this.scale, p.z);
     });
     this.halos = haloPoints(halo, new Array(halo.length).fill(0), 0.95, 0.85, 0.6);
     root.add(this.bodies, this.trims, this.halos);
@@ -176,12 +193,21 @@ export class HallLanterns {
 
     // Gentle sway (lit lanterns only).
     let acc = 0;
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(this.scale, this.scale, this.scale);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(this.scale, this.scale, this.scale), flame = new THREE.Vector3();
     ctx.updaters.push((dt, time) => {
       if ((acc += dt) < 0.05 || !this.bySlot.size) return;
       acc = 0;
       for (const w of this.bySlot.values()) {
         if (this.blessing.holder(w.id)) continue; // off the wall
+        if (this.chalices) { // a lamp stays put; its flame flickers
+          q.setFromEuler(e.set(0, w.slot, 0));
+          m.compose(this.hooks[w.slot], q, sc);
+          this.trims.setMatrixAt(w.slot, m);
+          const f = 1 + Math.sin(time * 9 + w.slot * 2.3) * 0.08 + Math.sin(time * 23 + w.slot) * 0.05;
+          m.compose(this.hooks[w.slot], q, flame.set(this.scale * f, this.scale, this.scale * f));
+          this.bodies.setMatrixAt(w.slot, m);
+          continue;
+        }
         const k = this.shakeAt(w.slot);
         q.setFromEuler(e.set(Math.sin(time * 1.1 + w.slot) * 0.04 + k, w.slot, Math.sin(time * 0.8 + w.slot * 1.7) * 0.05 + k * 0.7));
         m.compose(this.hooks[w.slot], q, sc);
@@ -266,9 +292,9 @@ export class HallLanterns {
     this.wishes.delete(id);
     if (this.bySlot.get(w.slot)?.id !== id) return;
     this.bySlot.delete(w.slot);
-    // back to a dark lantern, still on its hook
+    // back to a dark lantern, still on its hook (a lamp, its flame out)
     const m = new THREE.Matrix4().compose(this.hooks[w.slot], new THREE.Quaternion().setFromEuler(new THREE.Euler(0, w.slot, 0)), new THREE.Vector3(this.scale, this.scale, this.scale));
-    this.bodies.setMatrixAt(w.slot, m);
+    this.bodies.setMatrixAt(w.slot, this.chalices ? this.hidden : m);
     this.trims.setMatrixAt(w.slot, m);
     this.bodies.setColorAt(w.slot, DARK);
     this.bodies.instanceMatrix.needsUpdate = this.trims.instanceMatrix.needsUpdate = true;
@@ -352,7 +378,7 @@ export class HallLanterns {
     bless.addEventListener('click', () => {
       this.close();
       const r = this.routes[side];
-      const route: BlessRoute = { hook: this.root.localToWorld(this.hooks[w.slot].clone().add(new THREE.Vector3(0, -0.5 * this.scale, 0))), scale: this.scale, start: r.start, to: (spot) => this.spotAt(spot, r.side) };
+      const route: BlessRoute = { hook: this.root.localToWorld(this.chalices ? this.hooks[w.slot].clone() : this.hooks[w.slot].clone().add(new THREE.Vector3(0, -0.5 * this.scale, 0))), scale: this.scale, kind: this.chalices ? 'chalice' : 'lantern', start: r.start, to: (spot) => this.spotAt(spot, r.side) };
       this.blessing.start(w.id, lanternHex(w.color), route);
     });
     this.panel.replaceChildren(
@@ -430,4 +456,14 @@ function writingTable(ctx: WorldContext, parent: THREE.Object3D, x: number, F: n
   parent.add(g);
   const p = W(x, 0, z), turned = Math.abs(Math.sin(parent.rotation.y)) > 0.5;
   ctx.collisions.addBoxCentered(p.x, p.z, turned ? 0.72 : 1.2, turned ? 1.2 : 0.72);
+}
+
+/** A wooden ladder leaning against the wall beside the lamp shelves (the mock hall's prop). */
+function ladder(x: number, F: number, wall: number) {
+  const g = new THREE.Group(), wood = mat(0x6b4a2e, { roughness: 0.85 }), L = 3.4;
+  for (const s of [-1, 1]) g.add(box(0.06, L, 0.06, wood, s * 0.22, 0, 0));
+  for (let y = 0.28; y < L - 0.1; y += 0.32) g.add(box(0.44, 0.04, 0.05, wood, 0, y, 0));
+  g.position.set(x, F, wall + 0.75);
+  g.rotation.x = -Math.asin(0.62 / L); // its top against the wall
+  return g;
 }

@@ -54,6 +54,8 @@ export class RemotePlayers {
 
   /** The colour of the lantern a player is carrying to bless (set by the game). */
   lanternOf: (id: string) => number | null = () => null;
+  /** …and whether it's a lantern or a butter lamp. */
+  lampKindOf: (id: string) => 'lantern' | 'chalice' = () => 'lantern';
 
   update(dt: number, camera: THREE.Camera) {
     for (const [id, r] of this.map) {
@@ -72,7 +74,7 @@ export class RemotePlayers {
       r.avatar.setListening((flags & FLAG_LISTENING) !== 0);
       r.avatar.setIncense(flags & FLAG_INCENSE ? (flags & FLAG_INCENSE_LIT ? 2 : 1) : 0);
       r.avatar.setCloud((flags & FLAG_CLOUD) !== 0);
-      r.avatar.holdLantern(flags & FLAG_LANTERN ? (this.lanternOf(id) ?? 0xffc46a) : null, 1 + ((flags >> FLAG_GLOW_SHIFT) & 3) * ((BLESS_GLOW - 1) / 3));
+      r.avatar.holdLantern(flags & FLAG_LANTERN ? (this.lanternOf(id) ?? 0xffc46a) : null, 1 + ((flags >> FLAG_GLOW_SHIFT) & 3) * ((BLESS_GLOW - 1) / 3), undefined, flags & FLAG_LANTERN ? this.lampKindOf(id) : 'lantern');
       r.avatar.setTagVisible(camera.position.distanceTo(p) < 28);
       r.avatar.update(dt, r.speed);
     }

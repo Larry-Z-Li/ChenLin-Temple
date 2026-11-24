@@ -119,6 +119,10 @@ const en = {
   'sutra.smaller': 'Smaller text',
 
   'chant.title': 'Chants',
+  'merit.title': 'Merit',
+  'merit.rank': 'Rank',
+  'merit.novice': 'Novice',
+  'merit.merit': 'Merit',
   'chant.empty': 'No chants yet: add them to /assets/chants/index.json',
   'chant.play': 'Play',
   'chant.pause': 'Pause',

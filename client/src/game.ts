@@ -251,6 +251,10 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   blessing.onCount = (id, n) => lanternWalls.forEach((w) => w.counted(id, n));
   const lanternColour = (id: string) => lanternWalls.map((w) => w.colourOf(id)).find((c) => c !== null) ?? null;
   remotes.lanternOf = (pid) => blessing.colourHeldBy(pid, lanternColour);
+  remotes.lampKindOf = (pid) => {
+    const id = blessing.heldBy(pid);
+    return id && lanternWalls.find((w) => w.colourOf(id) !== null)?.chalices ? 'chalice' : 'lantern';
+  };
   const hallWishes = lanternWalls.find((w) => w.hallId === 'baosheng')!;
   const bodhiBell = staticBuild(() => new BodhiBell(ctx));
   for (const w of lanternWalls) w.onHung = (shot) => bodhiBell.ring(shot);

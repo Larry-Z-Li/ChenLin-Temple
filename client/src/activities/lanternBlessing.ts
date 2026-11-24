@@ -5,7 +5,9 @@ import { t } from '../i18n';
 import type { NetClient } from '../net/netClient';
 import type { LocalPlayer } from '../player/localPlayer';
 import type { Hud } from '../ui/hud';
-import { lanternGeometries } from './wishLanterns';
+import { chaliceGeometries, lanternGeometries } from './wishLanterns';
+
+export type LampKind = 'lantern' | 'chalice';
 
 /** Where to go, and how, for one blessing (all world space; the wall supplies it). */
 export interface BlessRoute {
@@ -13,6 +15,8 @@ export interface BlessRoute {
   hook: THREE.Vector3;
   /** The lantern's size on the wall (it keeps it all the way down, in your hands and back up). */
   scale: number;
+  /** A hanging lantern, or a butter lamp off a shelf (the mock hall). */
+  kind?: LampKind;
   start: { x: number; z: number; yaw: number };
   /** The way from `start` to the spot, ending at it, and which way the spot faces (the altar). */
   to: (spot: number) => { path: { x: number; z: number }[]; yaw: number };
@@ -34,21 +38,29 @@ export class LanternBlessing {
   readonly held = new Map<string, { by: string; spot: number }>();
   private job: { id: string; color: number; route: BlessRoute; phase: Phase; t: number; path: { x: number; z: number }[]; leg: number; yaw: number; back: { x: number; z: number }[] } | null = null;
   private glow = 1;
-  private floater: THREE.Group;
-  private floaterMat: THREE.MeshStandardMaterial;
+  private floaters = {} as Record<LampKind, { g: THREE.Group; mat: THREE.MeshStandardMaterial }>;
+  /** The one floating down / back up for the current blessing (a lantern, or a lamp). */
+  private get floater() {
+    return this.floaters[this.job?.route.kind ?? 'lantern'].g;
+  }
+  private get floaterMat() {
+    return this.floaters[this.job?.route.kind ?? 'lantern'].mat;
+  }
   /** A wall's lantern changed hands (hide it on the wall, or show it again). */
   onHeld: (id: string) => void = () => {};
   /** The count went up (refresh an open panel). */
   onCount: (id: string, prayers: number) => void = () => {};
 
   constructor(private ctx: WorldContext, private net: NetClient, private player: LocalPlayer, private hud: Hud) {
-    const { body, trim } = lanternGeometries();
-    this.floaterMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 });
-    this.floater = new THREE.Group();
-    this.floater.add(new THREE.Mesh(body, this.floaterMat), new THREE.Mesh(trim, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 })));
-    this.floater.scale.setScalar(0.55);
-    this.floater.visible = false;
-    ctx.scene.add(this.floater);
+    for (const kind of ['lantern', 'chalice'] as const) {
+      const { body, trim } = kind === 'chalice' ? chaliceGeometries() : lanternGeometries();
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 });
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(body, mat), new THREE.Mesh(trim, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 })));
+      g.visible = false;
+      ctx.scene.add(g);
+      this.floaters[kind] = { g, mat };
+    }
 
     net.on('welcome', (msg) => {
       const was = [...this.held.keys()];
@@ -79,6 +91,12 @@ export class LanternBlessing {
   }
 
   /** The colour of the lantern a player is carrying (for drawing it in their hands), if any. */
+  /** The wish whose lantern `player` is carrying, if any. */
+  heldBy(player: string) {
+    for (const [id, b] of this.held) if (b.by === player) return id;
+    return null;
+  }
+
   colourHeldBy(player: string, colourOf: (id: string) => number | null) {
     for (const [id, b] of this.held) if (b.by === player) return colourOf(id);
     return null;
@@ -119,6 +137,7 @@ export class LanternBlessing {
     this.floaterMat.color.setHex(j.color);
     this.floaterMat.emissive.setHex(j.color);
     this.floaterMat.emissiveIntensity = 0.45;
+    this.floaters[j.route.kind === 'chalice' ? 'lantern' : 'chalice'].g.visible = false;
     this.floater.scale.setScalar(j.route.scale);
     this.floater.visible = true;
   }
@@ -172,7 +191,7 @@ export class LanternBlessing {
         this.floater.position.lerpVectors(j.route.hook, this.handAt(v), e);
         if (k < 1) break;
         this.floater.visible = false;
-        this.player.avatar.holdLantern(j.color, 1, j.route.scale);
+        this.player.avatar.holdLantern(j.color, 1, j.route.scale, j.route.kind);
         this.go('walk');
         break;
       }
@@ -214,13 +233,13 @@ export class LanternBlessing {
         break;
       }
     }
-    if (this.job && (j.phase === 'walk' || j.phase === 'bow' || j.phase === 'dim' || j.phase === 'back')) this.player.avatar.holdLantern(j.color, this.glow, j.route.scale);
+    if (this.job && (j.phase === 'walk' || j.phase === 'bow' || j.phase === 'dim' || j.phase === 'back')) this.player.avatar.holdLantern(j.color, this.glow, j.route.scale, j.route.kind);
   }
 
   private finish() {
     this.job = null;
     this.glow = 1;
-    this.floater.visible = false;
+    for (const f of Object.values(this.floaters)) f.g.visible = false;
     this.player.avatar.holdLantern(null);
     this.player.release();
     this.ctx.interactions.enabled = true;

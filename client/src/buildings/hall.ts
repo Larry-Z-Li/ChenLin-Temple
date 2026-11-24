@@ -375,7 +375,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
   // ---- Kneeling cushions, then the furnishings around them ----
   const thangkaZs = Array.from({ length: def.thangkas }, (_, i) => back + 4 + (i * (depth - 8)) / Math.max(1, def.thangkas - 1));
   if (def.seats > 0) {
-    const block = buildCushions(ctx, g, def, hx, F, tableZ + 2.6, front - T / 2);
+    const block = buildCushions(ctx, g, def, hx, F, tableZ + (wideAltar || def.width > 24 ? 2.6 : 3.6), front - T / 2); // one-deity gate halls: a metre more before the altar
     if (!isShrine) {
       furnishHall(ctx, g, { def, hx, hz, hw, F, H, front, back, frontInner: front - T / 2, altarZ, altarW, tableZ, tableLen, thangkaZs }, block);
     }

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UI Mocks</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap" />
+    <style>
+      /* Dev page: three modern directions for the in-temple HUD, each on a desktop screen and a phone. Static (no game). */
+      html, body { margin: 0; background: #0e1014; color: #ddd6c8; font-family: Inter, "Noto Sans TC", system-ui, sans-serif; }
+      h2 { font: 600 15px Inter, sans-serif; letter-spacing: 0.06em; margin: 26px 24px 10px; color: #f0e6d0; }
+      h2 small { font-weight: 400; color: #9a927f; margin-left: 10px; letter-spacing: 0; }
+      .row { display: flex; gap: 22px; padding: 0 24px; align-items: flex-start; flex-wrap: wrap; }
+      .screen { position: relative; overflow: hidden; border-radius: 14px; background: url('/mocks/ui-bg.jpg') center / cover; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
+      .desk { width: 960px; height: 540px; }
+      .phone { width: 300px; height: 640px; border-radius: 34px; border: 8px solid #1b1d22; background-position: 46% center; }
+      .screen * { box-sizing: border-box; }
+      .ico { width: 18px; height: 18px; display: block; }
+
+      /* ---------- shared layout ---------- */
+      .top { position: absolute; top: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+      .brand b { display: block; font-size: 17px; }
+      .brand span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 3px; }
+      .brand span::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #5fd38a; box-shadow: 0 0 8px #5fd38a; }
+      .tools { display: flex; gap: 8px; }
+      .tool { width: 38px; height: 38px; display: grid; place-items: center; }
+      .merit { position: absolute; left: 0; bottom: 18px; padding: 10px 14px 10px 12px; min-width: 150px; }
+      .merit .hd { display: flex; justify-content: space-between; align-items: center; font-weight: 600; letter-spacing: 0.12em; }
+      .merit .hd i { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+      .merit .r { display: flex; justify-content: space-between; gap: 18px; font-size: 12px; margin-top: 6px; }
+      .merit .r b { font-size: 14px; }
+      .dock { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; }
+      .act { display: grid; justify-items: center; gap: 3px; min-width: 64px; padding: 8px 10px 6px; font-size: 12px; cursor: default; }
+      .act .ico { width: 20px; height: 20px; }
+      .now { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 14px; width: 360px; }
+      .now .t { flex: 1; min-width: 0; }
+      .now .t b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .now .bar { height: 3px; border-radius: 2px; margin-top: 6px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+      .now .bar i { display: block; height: 100%; width: 22%; }
+      .now .t small { font-size: 11px; opacity: 0.7; }
+      .now .pp { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+      .mini { position: absolute; right: 16px; bottom: 16px; width: 150px; height: 150px; border-radius: 50%; background: url('/mocks/ui-bg.jpg') 40% 30% / 520px; }
+      .mapbtn, .joy { display: none; }
+      .phone .top { top: 18px; left: 14px; right: 14px; }
+      .phone .brand b { font-size: 15px; }
+      .phone .tool { width: 34px; height: 34px; }
+      .phone .tools { gap: 6px; }
+      .phone .merit { top: 78px; bottom: auto; min-width: 0; padding: 14px 10px; }
+      .phone .merit .hd span, .phone .merit .r { display: none; }
+      .phone .merit .hd i { transform: rotate(-45deg); }
+      .phone .dock { bottom: 150px; gap: 2px; }
+      .phone .act { min-width: 48px; padding: 7px 2px 5px; font-size: 11px; }
+      .phone .now { width: 262px; bottom: 216px; }
+      .phone .mini { display: none; }
+      .phone .mapbtn { display: grid; place-items: center; position: absolute; right: 16px; bottom: 34px; width: 54px; height: 54px; border-radius: 50%; font-size: 13px; }
+      .phone .joy { display: block; position: absolute; left: 22px; bottom: 26px; width: 108px; height: 108px; border-radius: 50%; }
+      .phone .joy::after { content: ''; position: absolute; left: 33px; top: 33px; width: 42px; height: 42px; border-radius: 50%; }
+
+      /* ---------- A · Glass: frosted light, hairline borders, monochrome icons ---------- */
+      .glass { color: #fff; }
+      .glass .brand b { font-weight: 600; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45); }
+      .glass .tool, .glass .merit, .glass .dock, .glass .now, .glass .mapbtn, .glass .joy { background: rgba(255, 255, 255, 0.14); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border: 1px solid rgba(255, 255, 255, 0.28); }
+      .glass .tool { border-radius: 12px; }
+      .glass .merit { border-left: 0; border-radius: 0 14px 14px 0; }
+      .glass .dock { border-radius: 22px; }
+      .glass .act { border-radius: 14px; }
+      .glass .act.on { background: rgba(255, 255, 255, 0.92); color: #1c1a18; }
+      .glass .now { border-radius: 16px; }
+      .glass .now .bar i { background: #fff; }
+      .glass .now .pp { background: #fff; color: #1c1a18; }
+      .glass .mini { border: 2px solid rgba(255, 255, 255, 0.5); }
+      .glass .joy::after { background: rgba(255, 255, 255, 0.75); }
+
+      /* ---------- B · Ink & gold: deep charcoal, gold hairlines, serif titles (the current feel, sharpened) ---------- */
+      .ink { color: #f1e7d2; }
+      .ink .brand b { font-family: "Noto Serif TC", serif; letter-spacing: 0.08em; }
+      .ink .tool, .ink .merit, .ink .dock, .ink .now, .ink .mapbtn, .ink .joy { background: rgba(18, 16, 14, 0.78); border: 1px solid rgba(214, 170, 92, 0.35); backdrop-filter: blur(8px); }
+      .ink .tool { border-radius: 50%; color: #d9b06a; }
+      .ink .merit { border-left: 0; border-radius: 0 10px 10px 0; color: #d9b06a; }
+      .ink .merit .hd span { font-family: "Noto Serif TC", serif; }
+      .ink .merit .r { color: #b9ad97; }
+      .ink .merit .r b { color: #f1e7d2; font-family: "Noto Serif TC", serif; }
+      .ink .dock { border-radius: 12px; gap: 0; padding: 0; overflow: hidden; }
+      .ink .act { border-right: 1px solid rgba(214, 170, 92, 0.18); padding: 9px 12px 7px; font-family: "Noto Serif TC", serif; letter-spacing: 0.08em; color: #d8ccb2; }
+      .ink .act:last-child { border-right: 0; }
+      .ink .act.on { color: #1a140c; background: linear-gradient(180deg, #f0d49a, #c9973f); }
+      .ink .now { border-radius: 10px; }
+      .ink .now .t b { font-family: "Noto Serif TC", serif; letter-spacing: 0.04em; }
+      .ink .now .bar i { background: linear-gradient(90deg, #c9973f, #f0d49a); }
+      .ink .now .pp { background: linear-gradient(180deg, #f0d49a, #c9973f); color: #1a140c; }
+      .ink .mini { border: 2px solid #c9a24a; box-shadow: 0 0 0 4px rgba(18, 16, 14, 0.7); }
+      .ink .joy::after { background: #c9973f; }
+      .ink .mapbtn { color: #d9b06a; font-family: "Noto Serif TC", serif; }
+
+      /* ---------- C · Paper: warm off-white cards, soft shadows, vermilion accent ---------- */
+      .paper { color: #2b2520; }
+      .paper .brand b { color: #fff; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5); }
+      .paper .brand span { color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
+      .paper .tool, .paper .merit, .paper .dock, .paper .now, .paper .mapbtn, .paper .joy { background: #f7f2e8; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28); border: 0; }
+      .paper .tool { border-radius: 12px; color: #3a312a; }
+      .paper .merit { border-radius: 0 16px 16px 0; color: #b5321f; }
+      .paper .merit .r { color: #7a6e62; }
+      .paper .merit .r b { color: #2b2520; }
+      .paper .dock { border-radius: 20px; padding: 6px; }
+      .paper .act { border-radius: 14px; color: #4a4038; }
+      .paper .act.on { background: #b5321f; color: #fff6ec; }
+      .paper .now { border-radius: 18px; }
+      .paper .now .bar { background: #e4dccd; }
+      .paper .now .bar i { background: #b5321f; }
+      .paper .now .pp { background: #b5321f; color: #fff6ec; }
+      .paper .mini { border: 4px solid #f7f2e8; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); }
+      .paper .joy { background: rgba(247, 242, 232, 0.55); }
+      .paper .joy::after { background: #b5321f; }
+      .paper .mapbtn { color: #b5321f; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div id="mocks"></div>
+    <script>
+      // One HUD, three skins; each drawn on a desktop screen and a phone.
+      const I = {
+        music: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+        gear: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+        help: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
+        bow: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9"/><path d="M12 3c-2 3-4 6-4 9a4 4 0 0 0 8 0c0-3-2-6-4-9z"/><path d="M8 21h8"/></svg>',
+        beads: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="11" r="6.5" stroke-dasharray="2.2 2.3"/><circle cx="12" cy="20" r="1.6"/></svg>',
+        chant: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>',
+        sutra: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 5c3-1 6-1 8 1v14c-2-2-5-2-8-1z"/><path d="M20 5c-3-1-6-1-8 1v14c2-2 5-2 8-1z"/></svg>',
+        cloud: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 18z"/></svg>',
+        pause: '<svg class="ico" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+      };
+      const hud = () => `
+        <div class="top"><div class="brand"><b>辰霖學院</b><span>2 人在此</span></div>
+          <div class="tools"><div class="tool">${I.music}</div><div class="tool">${I.gear}</div><div class="tool">${I.help}</div></div></div>
+        <div class="merit"><div class="hd"><span>功德</span><i></i></div><div class="r"><span>階位</span><b>初學</b></div><div class="r"><span>功德</span><b>108</b></div></div>
+        <div class="now"><div class="t"><b>六字大明咒</b><small>7:02 / 32:03</small><div class="bar"><i></i></div></div><div class="pp">${I.pause}</div></div>
+        <div class="dock">
+          <div class="act">${I.bow}合掌</div><div class="act">${I.beads}念珠</div><div class="act on">${I.chant}梵唄</div><div class="act">${I.sutra}經文</div><div class="act">${I.cloud}傳送</div>
+        </div>
+        <div class="mini"></div><div class="mapbtn">地圖</div><div class="joy"></div>`;
+      const THEMES = [
+        ['glass', 'A · Glass', 'frosted light, hairline borders, line icons; the action bar like a dock'],
+        ['ink', 'B · Ink & gold', 'deep charcoal with gold hairlines and serif titles; a segmented bar (today’s feel, sharpened)'],
+        ['paper', 'C · Paper', 'warm off-white cards with soft shadows and a vermilion accent; bright and friendly'],
+      ];
+      document.getElementById('mocks').innerHTML = THEMES.map(([k, name, note]) => `
+        <h2>${name}<small>${note}</small></h2>
+        <div class="row"><div class="screen desk ${k}">${hud()}</div><div class="screen phone ${k}">${hud()}</div></div>`).join('');
+      document.body.dataset.ready = '1';
+    </script>
+  </body>
+</html>
