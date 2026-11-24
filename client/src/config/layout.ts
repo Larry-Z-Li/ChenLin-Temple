@@ -405,6 +405,8 @@ const snapEnds = (path: [number, number][]) => {
  * the pond, the bell, the spring and the monks' and abbot's quarters. World coordinates.
  */
 const LOOP_X = SIDE_WALK_X, NORTH_Z = -29, SOUTH_Z = 79.5;
+/** Just outside the corner halls' outer eaves (x ±71.3 walls + 2.4 eaves). */
+const CORNER_X = 76.5;
 const mirror = (p: [number, number][]) => p.map(([x, z]) => [-x, z] as [number, number]);
 const both = (p: [number, number][]) => [p, mirror(p)];
 const hallDoor = (id: string): [number, number] => {
@@ -426,9 +428,10 @@ export const FOOTPATHS: [number, number][][] = [
   ...both([[-22, NORTH_Z], [-22, -70], [-6, -74]]),
   ...both([[-22, -70], [-24, -110], [-12, -128]]),
   // north-west: the pond, the abbot, Ruyi pagoda · north-east: Duobao pagoda
-  [[-LOOP_X - 15.3, NORTH_Z], [-75, -36], [POND_PAVILION.walkX1, POND.z]],
-  [[-75, -36], [-90, -70], [-96, -88], [-120, -84], [-128, -82.5]],
-  [[LOOP_X + 15.3, NORTH_Z], [75, -36], [82.5, -70]],
+  // (along the loop past the hall's corner first: cutting across, they ran over its front porch)
+  [[-LOOP_X - 15.3, NORTH_Z], [-CORNER_X, NORTH_Z], [-CORNER_X, -36], [POND_PAVILION.walkX1, POND.z]],
+  [[-CORNER_X, -36], [-90, -70], [-96, -88], [-120, -84], [-128, -82.5]],
+  [[LOOP_X + 15.3, NORTH_Z], [CORNER_X, NORTH_Z], [CORNER_X, -36], [82.5, -70]],
   // west: the great bell and the west bridge · east: the monks' courtyard and the orchard bridge
   [[-LOOP_X, 30], [-90, 30], [-104, 44], bridgeEnd(0, 1)],
   [[LOOP_X, -12], [80, -12], bridgeEnd(2, -1)],

@@ -162,7 +162,7 @@ export function twinkleStars(pos: number[], tint: number[], size: number[], amp:
 
 /** The dome cap carrying the chart; `night` 0 (day) … 1 (night). */
 export function buildSkyChart(scene: THREE.Scene) {
-  const radius = 1350, phiMax = THREE.MathUtils.degToRad(54); // from the zenith down to 36° above the horizon: the chart sits high overhead
+  const radius = 1350, phiMax = THREE.MathUtils.degToRad(70); // from the zenith down to 20° above the horizon
   const geo = new THREE.SphereGeometry(radius, 96, 48, 0, Math.PI * 2, 0, phiMax);
   const pos = geo.attributes.position, uv = geo.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
