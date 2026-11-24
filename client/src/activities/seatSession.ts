@@ -67,6 +67,8 @@ export class SeatSession {
   private pending: string | null = null;
   private prost: { rep: number; step: number; t: number } | null = null;
   private bowLeft = 0;
+  /** One full prostration (大禮拜) done (功德). */
+  onProstration: () => void = () => {};
 
   constructor(private d: Deps) {
     for (const s of d.ctx.seats.values()) {
@@ -267,6 +269,7 @@ export class SeatSession {
         p.t = 0;
         if (++p.step >= PROSTRATION.length) {
           p.step = 0;
+          this.onProstration();
           if (++p.rep >= PROSTRATION_REPS) return this.setFocus('none'); // back to sitting
         }
       }

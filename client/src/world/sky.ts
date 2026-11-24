@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildSkyChart, twinkleStars } from './skyChart';
+import { buildSkyClouds } from './skyClouds';
 import { DEFAULT_TEMPLE_TZ } from '../../../shared/protocol';
 import { settings } from '../config/settings';
 import { lerp, mulberry32, smoothstep } from '../core/math';
@@ -118,6 +119,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
   scene.add(stars.pts);
   let starTime = 0;
   const chart = buildSkyChart(scene); // the 28 mansions and the Four Symbols, by night
+  const clouds = buildSkyClouds(scene); // and by day, drifting clouds
   const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xeef2ff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
   moon.scale.setScalar(90);
   scene.add(moon);
@@ -150,6 +152,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
 
     const daylight = smoothstep(-0.1, 0.22, sunDir.y);
     const dusk = Math.exp(-(((sunDir.y - 0.02) / 0.13) ** 2));
+    clouds.update(dt, daylight, dusk);
     lighting.daylight = daylight;
     lighting.night = 1 - daylight;
 

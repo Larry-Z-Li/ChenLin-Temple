@@ -43,6 +43,8 @@ export class BodhiBell {
   private viewPos = new THREE.Vector3();
   private viewQuat = new THREE.Quaternion();
   private shot: LanternShot | null = null;
+  /** Called once the whole sequence is over (the camera's home). */
+  private done: (() => void) | null = null;
   private shotQuat = new THREE.Quaternion();
   private shook = false;
   private apparition = new THREE.Group();
@@ -148,8 +150,9 @@ export class BodhiBell {
   }
 
   /** Ring it for this player (local only); `shot` is the lantern they just hung. */
-  ring(shot: LanternShot | null = null) {
-    if (this.t >= 0) return;
+  ring(shot: LanternShot | null = null, done?: () => void) {
+    if (this.t >= 0) return void done?.();
+    this.done = done ?? null;
     this.t = 0;
     this.rang = this.shook = false;
     this.shot = shot;
@@ -287,6 +290,9 @@ export class BodhiBell {
       this.bellPivot.rotation.z = 0;
       this.apparition.visible = false;
       this.shot = null;
+      const done = this.done;
+      this.done = null;
+      done?.();
     }
   }
 

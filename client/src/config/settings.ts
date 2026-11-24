@@ -20,6 +20,8 @@ export interface Settings {
   chantVolume: number;
   sfxVolume: number;
   beadRounds: number;
+  /** 功德: one for each full turn of a prayer wheel you set turning (kept on this device). */
+  merit: number;
 }
 
 const KEY = 'temple.settings.v1';
@@ -38,6 +40,7 @@ const DEFAULTS: Settings = {
   chantVolume: 0.8,
   sfxVolume: 0.6,
   beadRounds: 0,
+  merit: 0,
 };
 
 function load(): Settings {

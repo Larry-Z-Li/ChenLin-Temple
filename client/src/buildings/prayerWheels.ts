@@ -22,6 +22,10 @@ export interface Wheel {
   /** Accumulated rotations (decays when slow). Drives this wheel's own glow: the longer it turns, the brighter. */
   charge: number;
   emitAcc: number;
+  /** Who set it turning last ('self' for us): each full turn from now is their merit. */
+  spinner: string | null;
+  /** Turns made, counting up (a whole number passed = one turn for the spinner). */
+  turns: number;
 }
 
 function drumTexture() {
@@ -98,7 +102,7 @@ export class PrayerWheels {
         glow.position.copy(drum.position);
         ctx.scene.add(glow);
 
-        const wheel: Wheel = { id: `wheel-${row.id}-${i}`, x: row.x, z, drum, drumMat, glow, speed: 0, charge: 0, emitAcc: 0 };
+        const wheel: Wheel = { id: `wheel-${row.id}-${i}`, x: row.x, z, drum, drumMat, glow, speed: 0, charge: 0, emitAcc: 0, spinner: null, turns: 0 };
         this.wheels.set(wheel.id, wheel);
         ctx.interactions.add({
           id: wheel.id, x: row.x + sign * 0.95, z, radius: 0.8,
@@ -132,14 +136,19 @@ export class PrayerWheels {
     if (now - this.lastPush < WHEEL_PUSH_COOLDOWN_MS) return;
     this.lastPush = now;
     w.speed = Math.min(WHEEL_MAX, w.speed + WHEEL_PUSH);
+    w.spinner = 'self';
     this.onPush(w);
   }
 
-  /** Authoritative speed from the server (after anyone's push, or on join). */
-  setSpeed(id: string, speed: number, isJoin = false) {
+  /** A full turn of a wheel: one merit to whoever set it turning (their id, or 'self'). */
+  onTurn: (spinner: string, turns: number) => void = () => {};
+
+  /** Authoritative speed from the server (after anyone's push — `by` takes it over — or on join). */
+  setSpeed(id: string, speed: number, isJoin = false, by?: string) {
     const w = this.wheels.get(id);
     if (!w) return;
     w.speed = speed;
+    if (by !== undefined) w.spinner = by;
     if (isJoin) w.charge = Math.max(w.charge, Math.min(MAX_CHARGE, speed * 12));
   }
 
@@ -147,6 +156,10 @@ export class PrayerWheels {
     for (const w of this.wheels.values()) {
       if (w.speed > 0) {
         w.drum.rotation.y -= w.speed * Math.PI * 2 * dt; // clockwise seen from above
+        const before = Math.floor(w.turns);
+        w.turns += w.speed * dt;
+        const made = Math.floor(w.turns) - before;
+        if (made > 0 && w.spinner) this.onTurn(w.spinner, made);
         w.charge = Math.min(MAX_CHARGE, w.charge + w.speed * dt);
         w.speed = wheelSpeedAfter(w.speed, dt);
       }

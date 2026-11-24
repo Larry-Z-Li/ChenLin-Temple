@@ -47,12 +47,13 @@ export async function buildNineSyllables(scene: THREE.Scene, groundAt: (x: numbe
   await document.fonts.load('700 400px "Noto Serif TC"', Object.values(ON_HALL).join('') + MIDDLE).catch(() => null);
   // the middle syllable: a square carpet under the incense burner, the character in gold on deep red
   const rug = new THREE.Group();
-  rug.add(new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.03, 4.6).translate(0, 0.015, 0), new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.8 })));
-  rug.add(new THREE.Mesh(new THREE.BoxGeometry(4.25, 0.05, 4.25).translate(0, 0.025, 0), new THREE.MeshStandardMaterial({ color: 0x6e1410, roughness: 0.95 })));
-  const top = new THREE.Mesh(new THREE.PlaneGeometry(3.7, 3.7).rotateX(-Math.PI / 2).translate(0, 0.056, 0), new THREE.MeshStandardMaterial({ map: charTexture(MIDDLE), transparent: true, alphaTest: 0.2, roughness: 0.85 }));
+  rug.add(new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.03, 6.4).translate(0, 0.015, 0), new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.8 })));
+  rug.add(new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.05, 6.0).translate(0, 0.025, 0), new THREE.MeshStandardMaterial({ color: 0x6e1410, roughness: 0.95 })));
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 5.4).rotateX(-Math.PI / 2).translate(0, 0.056, 0), new THREE.MeshStandardMaterial({ map: charTexture(MIDDLE), transparent: true, alphaTest: 0.2, roughness: 0.85 }));
   rug.add(top);
   // on the court's paving (its slabs' top is 0.07 above the ground; see decor.ts); reads upright walking in from the south gate
-  rug.position.set(INCENSE_BURNER.x, groundAt(INCENSE_BURNER.x, INCENSE_BURNER.z) + 0.075, INCENSE_BURNER.z);
+  // a metre south of the burner, so the bigger carpet clears the altar's platform (the incense table stands on it)
+  rug.position.set(INCENSE_BURNER.x, groundAt(INCENSE_BURNER.x, INCENSE_BURNER.z + 1) + 0.075, INCENSE_BURNER.z + 1);
   scene.add(rug);
   for (const def of HALLS) {
     const ch = ON_HALL[def.id];

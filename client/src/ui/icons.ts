@@ -8,6 +8,8 @@ const PATHS: Record<string, string> = {
   beads: '<circle cx="12" cy="11" r="6.5" stroke-dasharray="2.2 2.3"/><circle cx="12" cy="20" r="1.6"/>',
   chant: '<path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/>',
   sutra: '<path d="M4 5c3-1 6-1 8 1v14c-2-2-5-2-8-1z"/><path d="M20 5c-3-1-6-1-8 1v14c2-2 5-2 8-1z"/>',
+  prostrate: '<circle cx="5" cy="17.5" r="2"/><path d="M7.5 16.5C10 11 15 9.5 18.5 12l1.5 8"/><path d="M18.5 12 14 20h6"/><path d="M2 21h20"/>', // a full prostration, brow to the floor
+  stand: '<circle cx="9" cy="4.5" r="2"/><path d="M9 7.5v7l-3 6M9 14.5l3 6M5 11l4-2.5 4 2.5"/><path d="M19 20V8M16 11l3-3 3 3"/>', // standing up
   cloud: '<path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 18z"/>',
 };
 

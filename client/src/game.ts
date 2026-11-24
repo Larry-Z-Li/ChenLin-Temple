@@ -228,14 +228,33 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   // Prayer wheels: tap E beside one to push it. Local pushes apply instantly; the server
   // echoes everyone's pushes with the authoritative speed.
   const wheels = new PrayerWheels(ctx, (w) => net.pushWheel(w.id));
-  net.on('push', (id, _by, speed) => wheels.setSpeed(id, speed));
+  net.on('push', (id, by, speed) => wheels.setSpeed(id, speed, false, by === net.id ? 'self' : by)); // whoever pushed last owns its turns
+  // 功德: 1 for every 5 turns of a wheel you set going; incense 10, a fruit offered 1, a deer fed 1,
+  // a great prostration (大禮拜) 10, hanging a lantern 100, praying for one 20
+  hud.setMerit(settings.merit);
+  const addMerit = (n: number) => {
+    settings.merit += n;
+    saveSettings();
+    hud.meritPop(n, settings.merit); // "+n" floats over to the 功德 drawer
+  };
+  let wheelTurns = 0;
+  wheels.onTurn = (spinner, turns) => {
+    if (spinner !== 'self') return;
+    wheelTurns += turns;
+    if (wheelTurns < 5) return;
+    const n = Math.floor(wheelTurns / 5);
+    wheelTurns -= n * 5;
+    addMerit(n);
+  };
   net.on('welcome', (msg) => {
     for (const id in msg.wheels) wheels.setSpeed(id, msg.wheels[id], true);
   });
 
   const seat: SeatSession = new SeatSession({ ctx, net, player, rig, hud, mala, sutra });
+  seat.onProstration = () => addMerit(10);
   sutra.onClose = () => seat.setFocus('sutra'); // the reader's ✕: put the sutra away (seated or standing; beads stay)
   const offerings = new Offerings(ctx, net, hud, orchard, player);
+  offerings.onOffered = (kind) => addMerit(kind === 'incense' ? 10 : 1); // a fruit: 1 each
   const cloud = new CloudRide(ctx, player, rig, hud);
   bigMap.onTravel = (spot) => {
     if (insideHall()) return hud.toast(t('travel.inside'));
@@ -243,6 +262,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     cloud.flyTo(spot.arrive);
   };
   const wildlife = new Wildlife(ctx, net, offerings, player, () => remotes.positions()); // registers the cat before the instruments pick it up
+  wildlife.onFed = () => addMerit(1);
   const instruments = new Instruments(ctx, net, player);
   // A lantern wall (光明燈) in every hall (not the open shrines).
   const blessing = new LanternBlessing(ctx, net, player, hud);
@@ -257,7 +277,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   };
   const hallWishes = lanternWalls.find((w) => w.hallId === 'baosheng')!;
   const bodhiBell = staticBuild(() => new BodhiBell(ctx));
-  for (const w of lanternWalls) w.onHung = (shot) => bodhiBell.ring(shot);
+  for (const w of lanternWalls) w.onHung = (shot) => bodhiBell.ring(shot, () => addMerit(100)); // the +100 once the bell's sequence is over
+  blessing.onBlessed = () => addMerit(20);
   buildNightLights(); // every lamp is registered by now
   buildFloodlights(ctx);
   // Thousands of small static meshes → a few hundred (draw calls are what phones struggle with).

@@ -9,6 +9,9 @@ import type { LocalPlayer } from '../player/localPlayer';
 import type { Hud } from '../ui/hud';
 import { CLOUD_TOP } from '../world/cloud';
 
+/** On localhost (testing), travel is instant. */
+const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+
 const FEET = 0.8 + CLOUD_TOP; // standing height on the cloud
 
 /**
@@ -48,6 +51,11 @@ export class CloudRide {
   /** Fly to a place. Returns false if you can't right now (seated, mid-ritual, already flying). */
   flyTo(dest: TravelSpot['arrive']) {
     if (this.riding || this.player.mode !== 'free') return false;
+    if (LOCAL) { // testing on localhost: straight there, no cloud
+      this.dest = dest;
+      this.arrive();
+      return true;
+    }
     const from = this.player.pos.clone();
     const g = this.ctx.ground;
     const to = new THREE.Vector3(dest.x, g.heightAt(dest.x, dest.z) + FEET, dest.z);

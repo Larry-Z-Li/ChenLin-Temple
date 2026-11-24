@@ -271,6 +271,8 @@ function glowSprite() {
 
 /** Deer (feed them apples), the cat on the steps, butterflies by day and fireflies by night. */
 export class Wildlife {
+  /** You fed a deer (功德). */
+  onFed: () => void = () => {};
   private deer: Deer[] = [];
 
   constructor(private ctx: WorldContext, private net: NetClient, private offerings: Offerings, private player: LocalPlayer, private others: () => THREE.Vector3[]) {
@@ -327,7 +329,10 @@ export class Wildlife {
       d.happy = 0;
       const p = d.root.position;
       heartBurst(p.x + Math.sin(d.root.rotation.y) * 0.5, p.y + 1.4, p.z + Math.cos(d.root.rotation.y) * 0.5, 7);
-      if (by === net.id) this.offerings.removeFruit(fruit);
+      if (by === net.id) {
+        this.offerings.removeFruit(fruit);
+        this.onFed();
+      }
     });
     ctx.updaters.push((dt) => {
       updateHearts(dt);

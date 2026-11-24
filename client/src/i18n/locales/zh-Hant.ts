@@ -72,7 +72,7 @@ const zhHant: Record<I18nKey, string> = {
   'wish.hang': '掛上',
   'wish.cancel': '取消',
   'wish.close': '關閉',
-  'wish.hung': '您的燈已掛上，將在此亮六個月。',
+  'wish.hung': '您的燈已點亮，將在此亮六個月。',
   'wish.slow': '請稍候一分鐘再掛下一盞。',
   'wish.empty': '請為您的燈寫上標題。',
   'lantern.gridTitle': '光明燈・{wall}・已點 {n}/{max}',

@@ -55,6 +55,12 @@ kbd { display: inline-grid; place-items: center; min-width: 1.7em; height: 1.7em
 .seat-btn { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; cursor: pointer; white-space: nowrap; }
 .seat-btn:hover { border-color: var(--panel-border); }
 .seat-btn.active { background: rgba(217, 164, 65, 0.22); border-color: var(--accent); }
+.seat-btn .ico { display: none; }
+/* touch: no keys to press, so an icon over a small label, like the dock */
+body.touch .seat-btn { flex-direction: column; gap: 3px; min-width: 56px; padding: 7px 6px 5px; font: 500 11px var(--sans); }
+body.touch .seat-btn kbd { display: none; }
+body.touch .seat-btn .ico { display: block; width: 20px; height: 20px; }
+body.touch .seatbar { gap: 4px; padding: 6px; border-radius: 22px; }
 
 .toasts { position: absolute; top: 110px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; pointer-events: none; }
 .toast { padding: 8px 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--panel-border); transition: opacity 0.6s; }
@@ -204,7 +210,9 @@ html[lang='en'] .entry-hall { letter-spacing: 0.02em; white-space: nowrap; overf
 @media (orientation: portrait) and (max-width: 640px) { body.touch .merit { top: 84px; bottom: auto; } }
 @media (orientation: landscape) and (max-height: 540px) { body.touch .merit { top: 50%; bottom: auto; transform: translateY(-50%); } }
 body.touch .quick-actions { bottom: 160px; }
-body.touch .inventory { bottom: 212px; left: 24px; }
+/* upright phone: the E prompt sits above the dock (not tucked under it), on one line */
+body.touch .prompt { bottom: 234px; max-width: calc(100vw - 32px); white-space: nowrap; font-size: 14px; padding: 8px 14px; }
+body.touch .inventory { bottom: 286px; left: 24px; } /* above the prompt */
 body.touch .chant-panel { bottom: 252px; left: 24px; }
 body.touch .seatbar { bottom: 16px; }
 /* Phones on their side: the screen is short, so the bottom bar sits at the bottom edge (right of the joystick). */
@@ -224,7 +232,6 @@ body.touch .minimap-btn { display: grid; place-items: center; position: fixed; r
 
 @media (max-width: 640px) {
   .minimap { width: 120px; height: 120px; }
-  .seat-btn span { display: none; }
   .topbar .row { flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 62vw; }
   .icon-btn { min-width: 34px; height: 34px; padding: 0 8px; font-size: 14px; }
   .brand .title { font-size: 16px; }
@@ -297,3 +304,9 @@ body.beads-sutra .info { left: 16px; transform: none; max-width: max(180px, calc
 .joy-knob { background: rgba(255, 255, 255, 0.78); }
 @media (max-width: 640px) { .quick-actions .icon-btn { min-width: 56px; padding: 7px 6px 5px; font-size: 11px; } }
 
+
+/* 功德 earned: "+n" pops beside the drawer and slides into it, which glows as it lands */
+.merit-pop { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; font: 700 32px var(--serif); color: #ffe7a3; text-shadow: 0 0 14px rgba(255, 196, 90, 0.85), 0 2px 6px rgba(0, 0, 0, 0.5); white-space: nowrap; }
+body:not(.touch) .merit-pop { font-size: 40px; } /* bigger on a computer */
+.merit.bump { animation: merit-bump 0.6s ease-out; }
+@keyframes merit-bump { 0% { box-shadow: 0 0 0 rgba(255, 210, 120, 0); } 30% { box-shadow: 0 0 22px rgba(255, 210, 120, 0.75); } 100% { box-shadow: 0 0 0 rgba(255, 210, 120, 0); } }

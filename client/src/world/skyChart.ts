@@ -125,31 +125,38 @@ function drawSymbols(g: CanvasRenderingContext2D, images: HTMLImageElement[]) {
  * Stars as small soft round points that twinkle (each at its own pace), instead of square dots or painted
  * blobs. `size` in CSS pixels; `amp` how deep the twinkle dips (0 none … 1 out).
  */
-export function twinkleStars(pos: number[], tint: number[], size: number[], amp: number) {
+export function twinkleStars(pos: number[], tint: number[], size: number[], amp: number, glisten = 0) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('tint', new THREE.Float32BufferAttribute(tint, 3));
   geo.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
   geo.setAttribute('phase', new THREE.Float32BufferAttribute(size.map(() => Math.random()), 1));
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uPx: { value: Math.min(2, window.devicePixelRatio || 1) }, uAmp: { value: amp } },
+    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uPx: { value: Math.min(2, window.devicePixelRatio || 1) }, uAmp: { value: amp }, uGlint: { value: glisten } },
     vertexShader: /* glsl */ `
       attribute vec3 tint; attribute float size, phase;
-      uniform float uTime, uOpacity, uPx, uAmp;
-      varying vec3 vTint; varying float vA;
+      uniform float uTime, uOpacity, uPx, uAmp, uGlint;
+      varying vec3 vTint; varying float vA, vG;
       void main() {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         float sp = 1.2 + fract(phase * 7.13) * 2.4;
         float tw = (0.5 + 0.5 * sin(uTime * sp + phase * 6.283)) * (0.55 + 0.45 * sin(uTime * 0.63 + phase * 17.0));
-        vA = uOpacity * (1.0 - uAmp * tw);
+        // now and then a glint: a short, sharp brightening, each star at its own moments
+        float g = uGlint * pow(max(0.0, sin(uTime * (0.45 + fract(phase * 3.7) * 0.45) + phase * 40.0)), 14.0);
+        vG = g;
+        vA = uOpacity * (1.0 - uAmp * tw) * (1.0 + g * 0.8);
         vTint = tint;
-        gl_PointSize = size * uPx;
+        gl_PointSize = size * uPx * (1.0 + g * 2.0); // room for the sparkle's arms
       }`,
     fragmentShader: /* glsl */ `
-      varying vec3 vTint; varying float vA;
+      varying vec3 vTint; varying float vA, vG;
       void main() {
-        float d = length(gl_PointCoord - 0.5) * 2.0;
+        vec2 c = (gl_PointCoord - 0.5) * 2.0;
+        float d = length(c) * (1.0 + vG * 2.0); // the core keeps its size as the point grows for a glint
         float a = pow(max(0.0, 1.0 - d), 2.2); // a bright core, a quick soft edge
+        // the glint: four thin arms (a little cross sparkle)
+        float arms = max(0.0, 1.0 - abs(c.x) * 16.0) * pow(1.0 - abs(c.y), 1.5) + max(0.0, 1.0 - abs(c.y) * 16.0) * pow(1.0 - abs(c.x), 1.5);
+        a += arms * vG * 0.6;
         gl_FragColor = vec4(vTint, a * vA);
         #include <colorspace_fragment>
       }`,
@@ -195,7 +202,7 @@ export function buildSkyChart(scene: THREE.Scene) {
       tint.push(b, b * 0.9, b * 0.7);
       size.push(5.5 + Math.random() * 2);
     }
-  const mansionStars = twinkleStars(sPos, tint, size, 0.3);
+  const mansionStars = twinkleStars(sPos, tint, size, 0.3, 1); // these glisten
   scene.add(mansionStars.pts);
   const mat = new THREE.MeshBasicMaterial({ map, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.BackSide });
   const mesh = new THREE.Mesh(geo, mat);

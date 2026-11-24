@@ -50,6 +50,8 @@ export class LanternBlessing {
   onHeld: (id: string) => void = () => {};
   /** The count went up (refresh an open panel). */
   onCount: (id: string, prayers: number) => void = () => {};
+  /** You finished praying for a lantern (功德). */
+  onBlessed: () => void = () => {};
 
   constructor(private ctx: WorldContext, private net: NetClient, private player: LocalPlayer, private hud: Hud) {
     for (const kind of ['lantern', 'chalice'] as const) {
@@ -228,6 +230,7 @@ export class LanternBlessing {
         if (k >= 1) {
           this.net.bless(j.id, true);
           this.hud.toast(t('lantern.blessed'));
+          this.onBlessed();
           this.finish();
         }
         break;

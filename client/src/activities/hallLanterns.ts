@@ -20,7 +20,8 @@ import { chaliceGeometries, lanternGeometries, lanternHex, markHung, showWishFor
 const GRID = 7; // 7 × 7 per side
 const COL = 0.95, ROW = 0.8, SCALE = 0.9;
 /** Mock: this hall's walls are butter lamps on shelves instead of hanging lanterns (same grid, same wishes). */
-const CHALICE_HALL = 'baosheng';
+/** Butter lamps on shelves in every hall (false: the paper lanterns on hooks). */
+const CHALICES = true;
 /** How far below a lantern's hook a lamp's shelf sits (the lamps fill the same band of wall). */
 const SHELF_DROP = 0.7;
 const PER_WALL = GRID * GRID; // slots 0–48 the left wall (west), 49–97 the right
@@ -57,6 +58,9 @@ export class HallLanterns {
   private shakes = new Map<number, number>();
   private glow: Lamp[];
   private walls: { at: THREE.Vector3; view: THREE.Vector3 }[] = [];
+  /** How wide a wall's framing must be, and how far back the camera can go and stay in the room. */
+  private wallSpan = 0;
+  private viewMax = 7.4;
   /** Lantern size (smaller in lower halls, where the rows are closer). */
   private scale = SCALE;
   private root: THREE.Group;
@@ -67,8 +71,9 @@ export class HallLanterns {
 
   constructor(ctx: WorldContext, private net: NetClient, private hud: Hud, private player: LocalPlayer, ui: HTMLElement, public myName: string, readonly hallId: string, private blessing: LanternBlessing) {
     const hall = HALLS.find((x) => x.id === hallId)!;
-    this.chalices = hallId === CHALICE_HALL;
+    this.chalices = CHALICES;
     const F = PLATFORM_H, hw = hall.width / 2, wall = -hall.depth / 2 + 0.2; // inner face of the back wall
+    this.viewMax = hall.depth - 1.5;
     const cx = (2 + hw) / 2; // middle of each wall stretch beside the middle 4 m
     // Built in the hall's own space (as if it faced south), then turned with the hall; W() gives world positions.
     const root = (this.root = new THREE.Group());
@@ -110,6 +115,7 @@ export class HallLanterns {
       // The camera's framing of this whole wall, from the room.
       const cy = rail0 + ((GRID - 1) * row) / 2 + 0.2;
       this.walls.push({ at: W(gx, cy, wall), view: W(gx, cy - 0.3, wall + 7.4) });
+      this.wallSpan = w + (this.chalices ? 1.8 : 0.8); // the shelves and their ladder (or the rails), with a margin
       for (let r = 0; r < GRID; r++)
         for (let c = 0; c < GRID; c++) this.hooks.push(new THREE.Vector3(gx + (c - (GRID - 1) / 2) * COL, rail0 + (GRID - 1 - r) * row - (this.chalices ? SHELF_DROP : 0), wall + (this.chalices ? 0.25 : 0.36)));
     }
@@ -136,7 +142,7 @@ export class HallLanterns {
     // ---- Writing tables in the back corners; table and wall both open that wall's grid ----
     [-1, 1].forEach((s, side) => {
       const tx = s * (hw - 1.4), tz = wall + 1.5;
-      writingTable(ctx, root, tx, F, tz, W);
+      writingTable(ctx, root, tx, F, tz, W, this.chalices);
       rug(root, tx, F, tz + 1.05, 1.6, 1.1); // to stand on while you write
       const ti = W(tx, 0, tz + 0.9), wi = W(s * cx, 0, wall + 1.5);
       for (const [key, p, r] of [['table', ti, 1.2], ['wall', wi, 2.1]] as const)
@@ -173,7 +179,9 @@ export class HallLanterns {
       if (!mine(w)) return;
       this.add(w);
       this.refresh();
-      if (this.pending !== null && w.title === this.pending && w.name === this.myName) {
+      const yours = this.pending !== null && w.title === this.pending && w.name === this.myName;
+      if (this.chalices && !yours) this.shakes.set(w.slot, performance.now()); // lit: it swirls (yours when the camera gets there)
+      if (yours) {
         this.pending = null;
         this.hud.toast(t('wish.hung'));
         this.close(); // hung: back to the hall
@@ -191,20 +199,29 @@ export class HallLanterns {
       this.hud.toast(t(reason === 'full' ? 'hallWish.full' : reason === 'empty' ? 'wish.empty' : (`wish.${reason}` as const)));
     });
 
-    // Gentle sway (lit lanterns only).
+    // Gentle sway (lit lanterns only); every frame while one is shaking or swirling.
     let acc = 0;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(this.scale, this.scale, this.scale), flame = new THREE.Vector3();
+    const sw = { tilt: 0, dir: 0, spin: 0 }, lean = new THREE.Quaternion(), axis = new THREE.Vector3(), rim = new THREE.Vector3(), at = new THREE.Vector3();
     ctx.updaters.push((dt, time) => {
-      if ((acc += dt) < 0.05 || !this.bySlot.size) return;
+      if (!this.bySlot.size || ((acc += dt) < 0.05 && !this.shakes.size)) return;
       acc = 0;
       for (const w of this.bySlot.values()) {
         if (this.blessing.holder(w.id)) continue; // off the wall
-        if (this.chalices) { // a lamp stays put; its flame flickers
-          q.setFromEuler(e.set(0, w.slot, 0));
-          m.compose(this.hooks[w.slot], q, sc);
+        if (this.chalices) { // a lamp stays put (once it has swirled); its flame flickers
+          at.copy(this.hooks[w.slot]);
+          if (this.swirlAt(w.slot, sw)) { // leaning toward `dir`, rolling round on its base's rim
+            q.setFromEuler(e.set(0, w.slot + sw.spin, 0));
+            lean.setFromAxisAngle(axis.set(Math.sin(sw.dir), 0, -Math.cos(sw.dir)), sw.tilt);
+            q.premultiply(lean);
+            rim.set(Math.cos(sw.dir), 0, Math.sin(sw.dir)).multiplyScalar(0.162 * this.scale);
+            at.add(rim); // the rim touching the shelf stays put
+            at.sub(rim.applyQuaternion(lean));
+          } else q.setFromEuler(e.set(0, w.slot, 0));
+          m.compose(at, q, sc);
           this.trims.setMatrixAt(w.slot, m);
           const f = 1 + Math.sin(time * 9 + w.slot * 2.3) * 0.08 + Math.sin(time * 23 + w.slot) * 0.05;
-          m.compose(this.hooks[w.slot], q, flame.set(this.scale * f, this.scale, this.scale * f));
+          m.compose(at, q, flame.set(this.scale * f, this.scale, this.scale * f));
           this.bodies.setMatrixAt(w.slot, m);
           continue;
         }
@@ -248,7 +265,26 @@ export class HallLanterns {
   /** The camera's view of the whole wall your lantern is on (from the room), and how to shake it. */
   private shotFor(slot: number): LanternShot {
     const w = this.walls[wallOf(slot)];
-    return { at: w.at.clone(), view: w.view.clone(), shake: () => this.shakes.set(slot, performance.now()) };
+    // a tall, narrow screen (a phone held upright) sees less across: back off until the whole wall fits (60° lens)
+    const d = Math.min(this.viewMax, Math.max(7.4, this.wallSpan / (2 * Math.tan(Math.PI / 6) * (innerWidth / innerHeight))));
+    const view = w.view.clone().sub(w.at).multiplyScalar(d / 7.4).add(w.at);
+    return { at: w.at.clone(), view, shake: () => this.shakes.set(slot, performance.now()) };
+  }
+
+  /**
+   * A just-lit butter lamp spins down like Euler's disk: rolling round on the rim of its base, its lean dying away
+   * as the roll gets faster and faster, until it settles flat with a whirr. false once it's still.
+   */
+  private swirlAt(slot: number, out: { tilt: number; dir: number; spin: number }) {
+    const start = this.shakes.get(slot);
+    if (start === undefined) return false;
+    const T = 2.8, left = 1 - (performance.now() - start) / 1000 / T;
+    if (left <= 0) return this.shakes.delete(slot), false;
+    const r = Math.sqrt(left);
+    out.tilt = 0.24 * r; // the lean falls away …
+    out.dir = 2 * 7 * T * (1 - r); // … as it rolls round ever faster (rate ∝ 1/√time left)
+    out.spin = -out.dir * 0.06; // the lamp itself only turns slowly, the other way
+    return true;
   }
 
   /** Extra swing of a lantern that was just shaken (a few quick, dying wobbles). */
@@ -413,17 +449,23 @@ function signTexture() {
   });
 }
 
-/** A small writing table: an unlit paper lantern, a coil of red string, scissors, a pencil and paper slips. */
-function writingTable(ctx: WorldContext, parent: THREE.Object3D, x: number, F: number, z: number, W: (x: number, y: number, z: number) => THREE.Vector3) {
+/** A small writing table: an unlit butter lamp (or paper lantern), a coil of red string, scissors, a pencil and paper slips. */
+function writingTable(ctx: WorldContext, parent: THREE.Object3D, x: number, F: number, z: number, W: (x: number, y: number, z: number) => THREE.Vector3, chalice: boolean) {
   const wood = mat(0x5a2b1a, { roughness: 0.55 });
   const top = F + 0.8;
   const g = new THREE.Group();
   g.add(box(1.1, 0.06, 0.62, wood, x, top - 0.06, z));
   for (const [dx, dz] of [[-0.48, -0.24], [0.48, -0.24], [-0.48, 0.24], [0.48, 0.24]]) g.add(box(0.06, 0.74, 0.06, wood, x + dx, F, z + dz));
+  if (chalice) { // a butter lamp, unlit like the ones on the shelves waiting for a wish
+    const lamp = new THREE.Mesh(chaliceGeometries().trim, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }));
+    lamp.scale.setScalar(0.75);
+    lamp.position.set(x - 0.34, top, z - 0.1);
+    g.add(lamp);
+  }
   // paper lantern on a little stand, unlit like the ones on the wall waiting for a wish
   const paper = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8).scale(1, 1.15, 1), mat(DARK.getHex(), { roughness: 0.7 }));
   paper.position.set(x - 0.34, top + 0.17, z - 0.1);
-  g.add(paper, cylinder(0.07, 0.07, 0.03, mat(THEME.goldLeaf, { metalness: 0.6, roughness: 0.4 }), x - 0.34, top, z - 0.1, 10));
+  if (!chalice) g.add(paper, cylinder(0.07, 0.07, 0.03, mat(THEME.goldLeaf, { metalness: 0.6, roughness: 0.4 }), x - 0.34, top, z - 0.1, 10));
   // coil of red string
   const coil = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.012, 6, 18).rotateX(Math.PI / 2), mat(0xc0221a, { roughness: 0.8 }));
   coil.position.set(x - 0.05, top + 0.012, z + 0.15);

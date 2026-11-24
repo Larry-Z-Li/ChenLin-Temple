@@ -69,6 +69,9 @@ export class Offerings {
   private sLife: Float32Array;
   private sNext = 0;
 
+  /** You just made an offering (功德). */
+  onOffered: (kind: 'fruit' | 'incense') => void = () => {};
+
   constructor(private ctx: WorldContext, private net: NetClient, private hud: Hud, private orchard: Orchard, private player: LocalPlayer) {
     for (const tree of orchard.trees) for (const s of tree.spots) this.spots.set(s.id, s);
 
@@ -130,7 +133,11 @@ export class Offerings {
         if (i >= 0) this.inventory.splice(i, 1);
         this.hud.setInventory(this.inventory);
         this.hud.toast(t('offer.fruitDone', { fruit: fruitName(o.fruit) }));
-      } else this.hud.toast(t('offer.incenseDone'));
+        this.onOffered('fruit');
+      } else {
+        this.hud.toast(t('offer.incenseDone'));
+        this.onOffered('incense');
+      }
     });
     net.on('offerDenied', (reason) => this.hud.toast(t(reason === 'noFruit' ? 'offer.noFruit' : 'offer.full')));
     net.on('newDay', () => this.clearOfferings());
