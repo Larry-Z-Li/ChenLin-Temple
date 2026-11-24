@@ -216,7 +216,7 @@ const ring = (cx: number, cz: number, r: number, angles: number[]): BenchDef[] =
   angles.map((a) => ({ x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r, face: Math.atan2(-Math.cos(a), -Math.sin(a)) }));
 
 export const BENCHES: BenchDef[] = [
-  { x: -7.4, z: 117 + DZ, face: E }, { x: 7.4, z: 117 + DZ, face: W }, // arrival
+  { x: 7.4, z: 117 + DZ, face: W }, // arrival (the left one gave way to the stele)
   { x: 25, z: 93 + DZ, face: W }, { x: 25, z: 101 + DZ, face: W }, // plaza (east side; the wish lanterns fill the west)
   { x: BODHI_TREE.x + 4, z: BODHI_TREE.z, face: W }, { x: BODHI_TREE.x - 4, z: BODHI_TREE.z, face: E }, // Bodhi tree
   ...ring(POND.x, POND.z, POND.radius + 3.5, [0.75, 2.3, 5.5]), // release pond

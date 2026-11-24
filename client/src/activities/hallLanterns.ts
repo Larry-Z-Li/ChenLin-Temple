@@ -22,8 +22,8 @@ const GRID = 7; // 7 × 7 per side
 const COL = 0.95, ROW = 0.8, SCALE = 0.9;
 const PER_WALL = GRID * GRID; // slots 0–48 the left wall (west), 49–97 the right
 const wallOf = (slot: number) => (slot < PER_WALL ? 0 : 1);
-/** An unclaimed lantern: dark red, unlit. */
-const DARK = new THREE.Color(0x4a1612);
+/** An unclaimed lantern, unlit: a deep maroon. Kept very dark, as the lanterns' shared material also glows in its colour. */
+const DARK = new THREE.Color(0x24090a);
 /** Where people stand to bless, either side of the incense stand (metres from the middle). */
 const SPOT_X = [-2.2, 2.2, -3.6, 3.6, -5, 5];
 

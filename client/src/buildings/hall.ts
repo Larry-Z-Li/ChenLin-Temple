@@ -415,6 +415,7 @@ function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: numb
   // per side of the centre aisle: as many as fit with the outer cushion a metre clear of the wall
   const cols = wide ? 6 : Math.max(2, Math.min(4, Math.floor((def.width / 2 - 1.1 - aisleGuess - 1.0) / sxGuess) + 1));
   const rows = Math.ceil(def.seats / (cols * 2));
+  const seats = rows * cols * 2; // `def.seats` rounded up to whole rows, so no row is left half-filled
   const sx = wide ? 2.2 : 2.0;
   const aisle = wide ? 2.0 : 1.6; // half-width of the centre aisle
   const sideAisle = wide ? 1.6 : 0; // extra gap after the third column
@@ -424,15 +425,15 @@ function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: numb
   const body = new THREE.InstancedMesh(
     new THREE.LatheGeometry(CUSHION_PROFILE.map(([r, y]) => new THREE.Vector2(r, y)), 28),
     mat(THEME.cushion, { roughness: 0.95 }),
-    def.seats,
+    seats,
   );
-  const top = new THREE.InstancedMesh(new THREE.TorusGeometry(0.3, 0.018, 6, 28).rotateX(Math.PI / 2), mat(THEME.cushionTop, { roughness: 0.7 }), def.seats);
+  const top = new THREE.InstancedMesh(new THREE.TorusGeometry(0.3, 0.018, 6, 28).rotateX(Math.PI / 2), mat(THEME.cushionTop, { roughness: 0.7 }), seats);
   const m = new THREE.Matrix4();
   const y = F + 0.056; // on the rug
   let i = 0;
-  for (let r = 0; r < rows && i < def.seats; r++)
-    for (let side = -1; side <= 1 && i < def.seats; side += 2)
-      for (let c = 0; c < cols && i < def.seats; c++, i++) {
+  for (let r = 0; r < rows; r++)
+    for (let side = -1; side <= 1; side += 2)
+      for (let c = 0; c < cols; c++, i++) {
         const x = hx + side * xs[c], z = startZ + r * sz;
         body.setMatrixAt(i, m.makeTranslation(x, y, z));
         top.setMatrixAt(i, m.makeTranslation(x, y + 0.222, z));
