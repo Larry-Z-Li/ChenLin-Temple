@@ -121,6 +121,8 @@ interface Client {
   id: string;
   ws: WebSocket;
   info: PlayerInfo | null;
+  /** Has sent where they are: only then do others see them (not at the default spot in the south hall). */
+  placed?: boolean;
   tr: Transform;
   dirty: boolean;
   seat: string | null;
@@ -307,7 +309,7 @@ function handle(c: Client, msg: ClientMsg) {
       color: typeof msg.color === 'string' && COLOR_RE.test(msg.color) ? msg.color : '#c0392b',
     };
     const others = [...clients.values()]
-      .filter((o) => o.info && o.id !== c.id)
+      .filter((o) => o.info && o.placed && o.id !== c.id)
       .map((o) => ({ ...o.info!, tr: o.tr }));
     const now = Date.now();
     const pickedAgo: Record<string, number> = {};
@@ -324,8 +326,7 @@ function handle(c: Client, msg: ClientMsg) {
       wishes: [...wishes.values()].map(pub),
       blessings: Object.fromEntries([...blessings].map(([id, b]) => [id, { by: b.by, spot: b.spot }])),
     });
-    broadcast({ t: 'join', player: { ...c.info, tr: c.tr } }, c.id);
-    return;
+    return; // others hear of them with their first position (see 'move')
   }
 
   switch (msg.t) {
@@ -333,6 +334,10 @@ function handle(c: Client, msg: ClientMsg) {
       if (isTransform(msg.tr)) {
         c.tr = msg.tr;
         c.dirty = true;
+        if (!c.placed) {
+          c.placed = true;
+          broadcast({ t: 'join', player: { ...c.info, tr: c.tr } }, c.id);
+        }
       }
       break;
     case 'seat': {
@@ -541,7 +546,7 @@ wss.on('connection', (ws, req) => {
     else connsByIp.delete(c.ip);
     releaseSeat(c);
     clients.delete(c.id);
-    if (c.info) broadcast({ t: 'leave', id: c.id });
+    if (c.info && c.placed) broadcast({ t: 'leave', id: c.id });
   });
 });
 
@@ -550,7 +555,7 @@ setInterval(() => {
   const tr: Record<string, Transform> = {};
   let any = false;
   for (const c of clients.values()) {
-    if (c.info && c.dirty) {
+    if (c.info && c.placed && c.dirty) {
       tr[c.id] = c.tr;
       c.dirty = false;
       any = true;

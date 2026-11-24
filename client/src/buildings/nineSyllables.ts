@@ -2,16 +2,22 @@ import * as THREE from 'three';
 import { HALLS, INCENSE_BURNER, PLATFORM_H, hallYaw } from '../config/layout';
 
 /**
- * The nine syllables (九字) written big in gold leaf on the front slope of the gate halls,
- * laid out like the 3×3 square on the map (south at the top): 臨 兵 鬪 / 在 前 者 / 列 陣 皆, with 前 in the
- * middle on a carpet under the great incense burner in the stupa court. Each roof character follows the
- * roof's curve so it never sinks into the tiles.
+ * The nine syllables (九字) written big in gold leaf on the front slope of the gate halls, one to each
+ * gate, with 皆 in the middle on a carpet under the great incense burner in the stupa court. Each roof
+ * character follows the roof's curve so it never sinks into the tiles.
  */
 const ON_HALL: Record<string, string> = {
-  wenshu: '臨', guoxue: '兵', dizang: '鬪', // the map's top row (south)
-  dongmi: '在', zangmi: '者', // either side of the stupa (前)
-  caishen: '列', yangsheng: '陣', guanyin: '皆', // the bottom row (north)
+  wenshu: '者', // 杜門
+  guoxue: '前', // 景門
+  dizang: '兵', // 死門
+  zangmi: '列', // 驚門
+  dongmi: '鬪', // 傷門
+  caishen: '在', // 生門
+  yangsheng: '臨', // 休門
+  guanyin: '陣', // 開門
 };
+/** The middle of the nine: the stupa court, on the carpet under the incense burner. */
+const MIDDLE = '皆';
 
 /** A character in gold leaf with a dark edge, on a transparent ground. */
 function charTexture(ch: string) {
@@ -38,12 +44,12 @@ function charTexture(ch: string) {
 }
 
 export async function buildNineSyllables(scene: THREE.Scene, groundAt: (x: number, z: number) => number) {
-  await document.fonts.load('700 400px "Noto Serif TC"', Object.values(ON_HALL).join('') + '前').catch(() => null);
-  // 前: a square carpet under the incense burner, the character in gold on deep red
+  await document.fonts.load('700 400px "Noto Serif TC"', Object.values(ON_HALL).join('') + MIDDLE).catch(() => null);
+  // the middle syllable: a square carpet under the incense burner, the character in gold on deep red
   const rug = new THREE.Group();
   rug.add(new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.03, 4.6).translate(0, 0.015, 0), new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.8 })));
   rug.add(new THREE.Mesh(new THREE.BoxGeometry(4.25, 0.05, 4.25).translate(0, 0.025, 0), new THREE.MeshStandardMaterial({ color: 0x6e1410, roughness: 0.95 })));
-  const top = new THREE.Mesh(new THREE.PlaneGeometry(3.7, 3.7).rotateX(-Math.PI / 2).translate(0, 0.056, 0), new THREE.MeshStandardMaterial({ map: charTexture('前'), transparent: true, alphaTest: 0.2, roughness: 0.85 }));
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(3.7, 3.7).rotateX(-Math.PI / 2).translate(0, 0.056, 0), new THREE.MeshStandardMaterial({ map: charTexture(MIDDLE), transparent: true, alphaTest: 0.2, roughness: 0.85 }));
   rug.add(top);
   // on the court's paving (its slabs' top is 0.07 above the ground; see decor.ts); reads upright walking in from the south gate
   rug.position.set(INCENSE_BURNER.x, groundAt(INCENSE_BURNER.x, INCENSE_BURNER.z) + 0.075, INCENSE_BURNER.z);

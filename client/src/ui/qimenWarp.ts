@@ -1,10 +1,11 @@
 /**
  * The 佛家奇門 transition: the start page darkens and you rush down a tunnel of octagonal rings carrying
  * the nine syllables (九字: 臨兵鬪者皆陣列在前) — eight round each ring, clockwise from the top left as in
- * the 3×3 square, and 前 in each one's middle, travelling and turning with it. At the end you go through into white
+ * the 3×3 square on the temple, and 皆 in each one's middle, travelling and turning with it. At the end you go through into white
  * (then on to qimen.one). Mocks: /transition-mocks.html (B).
  */
-const RING = '臨兵鬪者皆陣列在', MIDDLE = '前';
+// the 3×3 as on the temple (者 前 兵 / 列 皆 鬪 / 在 臨 陣): round it clockwise from the top left, 皆 in the middle
+const RING = '者前兵鬪陣臨在列', MIDDLE = '皆';
 const SERIF = '"Noto Serif TC", "Songti TC", serif';
 const DURATION = 3.4; // seconds (the first second a slow fade into the tunnel)
 

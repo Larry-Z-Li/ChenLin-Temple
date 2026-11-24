@@ -207,7 +207,7 @@ const zhHant: Record<I18nKey, string> = {
   'deity.ksitigarbha': '地藏王菩薩',
   'deity.maitreya': '彌勒菩薩',
   'hall.guanyin': '開門事業苑',
-  'hall.yangsheng': '休門人員苑',
+  'hall.yangsheng': '休門幸福苑',
   'hall.caishen': '生門財富苑',
   'hall.zangmi': '藏密苑',
   'hall.dongmi': '東密苑',

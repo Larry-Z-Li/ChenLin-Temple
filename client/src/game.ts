@@ -418,10 +418,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       sendAcc = 0;
       const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0) | (cloud.riding ? FLAG_CLOUD : 0) | blessing.flags;
       const tr = player.transform(flags), key = tr.join(',');
-      if (key !== lastSent) {
-        net.sendMove(tr);
-        lastSent = key;
-      }
+      if (key !== lastSent && net.sendMove(tr)) lastSent = key; // (not before the server's welcome: it would be lost)
     }
     mapAcc += dt;
     if (mapAcc > 0.1) {
@@ -435,6 +432,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   });
 
   /** Go online (others start seeing you) — only once you're standing at the gate. */
+  net.on('welcome', () => (lastSent = '')); // (re)connected: tell everyone where we are at once
   function join() {
     if (!joinAs) return;
     net.connect(joinAs.name, joinAs.color);

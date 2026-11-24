@@ -142,8 +142,9 @@ export class NetClient {
     return false;
   }
 
+  /** False when not online yet (or any more): the caller should try again. */
   sendMove(tr: Transform) {
-    this.send({ t: 'move', tr });
+    return this.send({ t: 'move', tr });
   }
 
   requestSeat(seat: string | null, previous: string | null) {
