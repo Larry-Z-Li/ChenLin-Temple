@@ -161,7 +161,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   player.pos.y = ctx.ground.heightAt(player.pos.x, player.pos.z);
   scene.add(player.avatar.root);
   const rig = new CameraRig(camera, renderer.domElement);
-  const remotes = new RemotePlayers(scene);
+  const remotes = new RemotePlayers(scene, (x, z) => ctx.ground.heightAt(x, z));
 
   const ambient = new Ambient();
   const chants = new ChantPlayer();
@@ -199,13 +199,23 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   onLocaleChange(() => hud.refreshText());
   // Start page: how many are in the temple right now (you only join once you land at the gate).
   const inIntro = () => document.body.classList.contains('intro');
+  let headcount: { present: number; max: number } | null = null;
+  const headcountListeners = new Set<(present: number, max: number) => void>();
   const pollHeadcount = () =>
     fetch('/api/status')
       .then((r) => r.json())
-      .then((s: { present: number }) => inIntro() && hud.setStatus('online', s.present))
+      .then((s: { present: number; max?: number }) => {
+        if (!inIntro()) return;
+        hud.setStatus('online', s.present);
+        headcount = { present: s.present, max: s.max ?? Infinity };
+        headcountListeners.forEach((fn) => fn(headcount!.present, headcount!.max));
+      })
       .catch(() => {});
   void pollHeadcount();
-  const headcountTimer = setInterval(() => (inIntro() ? void pollHeadcount() : clearInterval(headcountTimer)), 15000);
+  const headcountTimer = setInterval(() => (inIntro() ? void pollHeadcount() : clearInterval(headcountTimer)), 10000);
+  // Someone took the last place as we landed: practise alone for now (the client keeps retrying), and say so once.
+  let toldFull = false;
+  net.on('full', () => (toldFull ? undefined : ((toldFull = true), hud.toast(t('net.full')))));
   void ambient.init().then(() => hud.renderMusic(ambient.available));
   void chants.init();
   void soundscape.init();
@@ -439,6 +449,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, hallWishes, lights, bodhiBell, renderer, setDebugHours, intro, hud, bigMap, travelSpots: TRAVEL_SPOTS, lanternBlessing: blessing };
 
   return {
+    /** The start page's headcount, now and as it changes (with the temple's limit). */
+    onHeadcount(fn: (present: number, max: number) => void) {
+      headcountListeners.add(fn);
+      if (headcount) fn(headcount.present, headcount.max);
+    },
     /** The entry screen's robe picker: recolour the pacing monk. */
     preview: (color: string) => player.avatar.setColor(color),
     /** The click that enters: ready the first chant (六字大明咒) to play when you land (see `landed`). */

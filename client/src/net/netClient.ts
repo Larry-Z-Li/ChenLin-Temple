@@ -34,6 +34,8 @@ export interface NetEvents {
   offered: (hall: string, offering: Offering, by: string) => void;
   offerDenied: (reason: 'noFruit' | 'full') => void;
   newDay: () => void;
+  /** The temple is at its limit: we stay offline (and keep retrying until there's room). */
+  full: () => void;
 }
 
 /**
@@ -128,7 +130,7 @@ export class NetClient {
       case 'offered': return this.emit('offered', msg.hall, msg.offering, msg.by);
       case 'offerDenied': return this.emit('offerDenied', msg.reason);
       case 'newDay': return this.emit('newDay');
-      case 'full': console.warn('[net] server full'); break;
+      case 'full': this.emit('full'); break;
     }
   }
 

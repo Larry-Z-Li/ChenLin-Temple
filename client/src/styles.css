@@ -129,6 +129,7 @@ html[lang='en'] .entry-hall { letter-spacing: 0.02em; } /* the wide spacing suit
 html[lang='en'] .entry-go { letter-spacing: 0.06em; }
 .entry-hall:hover { background: rgba(243, 220, 170, 0.16); }
 .entry-hall:disabled { opacity: 0.45; cursor: progress; }
+.entry-full { font: 600 13px var(--sans); letter-spacing: 0.08em; color: #ffd9a8; background: rgba(120, 30, 20, 0.55); border: 1px solid rgba(255, 190, 140, 0.45); border-radius: 6px; padding: 8px 12px; width: max-content; max-width: 100%; box-sizing: border-box; }
 .entry-hint { font: 12px var(--sans); letter-spacing: 0.18em; color: rgba(246, 239, 224, 0.7); }
 /* Portrait phones: the panel sits at the bottom so the monk shows above it. */
 @media (orientation: portrait) and (max-width: 640px) {

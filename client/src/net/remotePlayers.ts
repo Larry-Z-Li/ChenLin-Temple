@@ -16,7 +16,9 @@ interface Remote {
 export class RemotePlayers {
   readonly map = new Map<string, Remote>();
 
-  constructor(private scene: THREE.Scene) {}
+  /** `groundAt`: our own ground and floors; nobody is drawn sunk below them (another player's game may be
+   * a different version, with a hall or path where ours has none). */
+  constructor(private scene: THREE.Scene, private groundAt: (x: number, z: number) => number = () => -Infinity) {}
 
   get count() {
     return this.map.size;
@@ -57,11 +59,11 @@ export class RemotePlayers {
     for (const [id, r] of this.map) {
       const p = r.avatar.root.position, [x, y, z, yaw, a] = r.target;
       const dist = Math.hypot(x - p.x, z - p.z);
-      if (dist > 25) p.set(x, y, z); // teleport (e.g. just sat down far away)
+      if (dist > 25) p.set(x, Math.max(y, this.groundAt(x, z)), z); // teleport (e.g. just sat down far away)
       else {
         const nx = damp(p.x, x, 9, dt), nz = damp(p.z, z, 9, dt);
         r.speed = damp(r.speed, Math.hypot(nx - p.x, nz - p.z) / Math.max(dt, 1e-4), 6, dt);
-        p.set(nx, damp(p.y, y, 12, dt), nz);
+        p.set(nx, Math.max(damp(p.y, y, 12, dt), this.groundAt(nx, nz)), nz);
       }
       r.yaw = dampAngle(r.yaw, yaw, 10, dt);
       r.avatar.root.rotation.y = r.yaw;

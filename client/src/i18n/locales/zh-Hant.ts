@@ -16,6 +16,8 @@ const zhHant: Record<I18nKey, string> = {
   'entry.hallGuanyin': '開門院',
   'entry.hallGuoxue': '景門院',
   'entry.hint': '建議配戴耳機。',
+  'entry.full': '寺院目前人數已滿，請稍後再來。',
+  'net.full': '寺院人數已滿，暫時獨自修行；有空位時會自動加入大家。',
 
   'hud.online': '{n} 人在此',
   'hud.offline': '離線：獨自修行',

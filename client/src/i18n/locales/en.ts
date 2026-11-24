@@ -14,6 +14,8 @@ const en = {
   'entry.hallGuanyin': 'Career Court',
   'entry.hallGuoxue': 'Wenchang Court',
   'entry.hint': 'Headphones recommended.',
+  'entry.full': 'The temple is full right now. Please try again in a little while.',
+  'net.full': 'The temple is full, so you’re practising alone for now. You’ll join the others as soon as there’s room.',
 
   'hud.online': '{n} present',
   'hud.offline': 'Offline: practising alone',

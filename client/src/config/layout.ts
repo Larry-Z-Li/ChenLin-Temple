@@ -418,7 +418,9 @@ export const FOOTPATHS: [number, number][][] = [
   // the outer loop, door to door
   [[hallDoor('guanyin')[0], hallDoor('guanyin')[1]], [hallDoor('guanyin')[0], NORTH_Z], [-hallDoor('guanyin')[0], NORTH_Z], [hallDoor('caishen')[0], hallDoor('caishen')[1]]],
   [[hallDoor('dizang')[0], hallDoor('dizang')[1]], [hallDoor('dizang')[0], SOUTH_Z], [-hallDoor('dizang')[0], SOUTH_Z], [hallDoor('wenshu')[0], hallDoor('wenshu')[1]]],
-  ...both([[-LOOP_X, NORTH_Z], [-LOOP_X, 100], [-27, 128]]), // the loop's sides, on down to the plaza's corners
+  // the loop's sides, on down to the plaza's corners (points along the straight so the smooth curve through
+  // them stays straight beside the halls: with only the ends it bowed ~3 m out, into their floors)
+  ...both([[-LOOP_X, NORTH_Z], [-LOOP_X, 10], [-LOOP_X, 50], [-LOOP_X, 92], [-LOOP_X, 100], [-27, 128]]),
   ...both([[hallDoor('zangmi')[0], 30], hallDoor('zangmi')]), // the side halls' doors, straight up from the path below them (z = 30)
   [[0, NORTH_Z], hallDoor('yangsheng')], [[0, SOUTH_Z], hallDoor('guoxue')],
   // diagonals from the stupa court's ring walk

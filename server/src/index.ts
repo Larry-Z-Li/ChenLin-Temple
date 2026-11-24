@@ -91,7 +91,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url?.startsWith('/api/remove-wish')) return removeWishByHand(req, res);
   if (req.url === '/api/status') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ present: [...clients.values()].filter((c) => c.info).length }));
+    res.end(JSON.stringify({ present: [...clients.values()].filter((c) => c.info).length, max: MAX_PLAYERS }));
     return;
   }
   if (!fs.existsSync(STATIC_DIR)) {

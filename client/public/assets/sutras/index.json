@@ -1,5 +1,18 @@
 {
   "items": [
-    { "id": "example", "group": "example", "lang": "en", "title": { "en": "Example text (replace me)", "zh-Hant": "範例文本（請替換）" }, "file": "example.en.md" }
+    {"id": "qianxing", "group": "qianxing", "lang": "zh-Hant", "title": {"en": "Preliminaries: Refuge and Bodhicitta", "zh-Hant": "前行皈依發菩提心儀軌"}, "file": "qianxing.zh-Hant.md"},
+    {"id": "qinxing", "group": "qinxing", "lang": "zh-Hant", "title": {"en": "Daily Practice: A Simple Sequence", "zh-Hant": "勤行入門簡修次第"}, "file": "qinxing.zh-Hant.md"},
+    {"id": "heart", "group": "heart", "lang": "zh-Hant", "title": {"en": "Heart Sutra", "zh-Hant": "般若波羅蜜多心經"}, "file": "heart.zh-Hant.md"},
+    {"id": "marici-practice", "group": "marici-practice", "lang": "zh-Hant", "title": {"en": "Practice of Marīcī", "zh-Hant": "摩利支天聚光天母修法"}, "file": "marici-practice.zh-Hant.md"},
+    {"id": "marici", "group": "marici", "lang": "zh-Hant", "title": {"en": "Sutra of Marīcī", "zh-Hant": "佛說摩利支天經"}, "file": "marici.zh-Hant.md"},
+    {"id": "mahakala-practice", "group": "mahakala-practice", "lang": "zh-Hant", "title": {"en": "Practice of Mahākāla for Fortune", "zh-Hant": "大黑天財神修法"}, "file": "mahakala-practice.zh-Hant.md"},
+    {"id": "mahakala", "group": "mahakala", "lang": "zh-Hant", "title": {"en": "Mahākāla's Dhāraṇī of Great Fortune", "zh-Hant": "佛說摩訶迦羅大黑天神大福德圓滿陀羅尼經"}, "file": "mahakala.zh-Hant.md"},
+    {"id": "pumen", "group": "pumen", "lang": "zh-Hant", "title": {"en": "Universal Gate Chapter (Verses)", "zh-Hant": "觀世音菩薩普門品"}, "file": "pumen.zh-Hant.md"},
+    {"id": "dabei-liuzi", "group": "dabei-liuzi", "lang": "zh-Hant", "title": {"en": "Prayer of the Six-Syllable Mantra of Great Compassion", "zh-Hant": "大悲六字真言急速加持祈請頌"}, "file": "dabei-liuzi.zh-Hant.md"},
+    {"id": "sanshiwufo", "group": "sanshiwufo", "lang": "zh-Hant", "title": {"en": "Confession before the Thirty-Five Buddhas", "zh-Hant": "三十五佛懺悔文"}, "file": "sanshiwufo.zh-Hant.md"},
+    {"id": "xukongzang", "group": "xukongzang", "lang": "zh-Hant", "title": {"en": "Ākāśagarbha Dhāraṇī for Perfect Memory", "zh-Hant": "虛空藏菩薩能滿諸願最勝心陀羅尼求聞持法"}, "file": "xukongzang.zh-Hant.md"},
+    {"id": "puxian", "group": "puxian", "lang": "zh-Hant", "title": {"en": "Vows of Samantabhadra (Dedication)", "zh-Hant": "普賢行願品（回向）"}, "file": "puxian.zh-Hant.md"},
+    {"id": "dizang", "group": "dizang", "lang": "zh-Hant", "title": {"en": "Kṣitigarbha Long Mantra Practice", "zh-Hant": "地藏長咒修法儀軌"}, "file": "dizang.zh-Hant.md"},
+    {"id": "zhaofu", "group": "zhaofu", "lang": "zh-Hant", "title": {"en": "Summoning Good Fortune: The Wondrous Hook", "zh-Hant": "招福儀軌·天物妙鉤"}, "file": "zhaofu.zh-Hant.md"}
   ]
 }

@@ -43,6 +43,15 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void, 
   });
   // One 4-column grid: the two gold buttons each span 2 cols so their edges match the halls.
   const cta = h('div', { class: 'entry-cta' }, enter, foQimen, ...hallBtns);
+  // When the temple is at its limit: the way in greys out (佛家奇門 goes elsewhere, so it stays).
+  const fullNote = h('div', { class: 'entry-full hidden', role: 'status', i18n: 'entry.full' });
+  let loaded = false, full = false;
+  const sync = () => {
+    const off = !loaded || full;
+    enter.disabled = off;
+    hallBtns.forEach((b) => (b.disabled = off));
+    fullNote.classList.toggle('hidden', !full);
+  };
   const panel = h(
     'div',
     { class: 'entry-panel' },
@@ -53,6 +62,7 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void, 
     h('label', { class: 'entry-field' }, h('span', { i18n: 'entry.name' }), name),
     h('div', { class: 'entry-field' }, h('span', { i18n: 'entry.robe' }), swatches),
     cta,
+    fullNote,
     h('div', { class: 'entry-hint', i18n: 'entry.hint' }),
   );
   const overlay = h('div', { class: 'entry' }, panel);
@@ -60,7 +70,7 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void, 
 
   let ready = false;
   const go = (hall?: string) => {
-    if (!ready) return;
+    if (!ready || full) return;
     unlockAudio();
     onGo?.();
     settings.name = sanitizeName(name.value || name.placeholder);
@@ -85,8 +95,13 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void, 
     done,
     ready() {
       ready = true;
-      enter.disabled = false;
-      hallBtns.forEach((b) => (b.disabled = false));
+      loaded = true;
+      sync();
+    },
+    /** The headcount reached the limit (or came back under it). */
+    setFull(v: boolean) {
+      full = v;
+      sync();
     },
   };
 }

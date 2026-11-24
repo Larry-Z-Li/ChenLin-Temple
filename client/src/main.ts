@@ -19,6 +19,7 @@ const entry = showEntry(ui, (color) => game?.preview(color), () => game?.startCh
 const { startGame } = await import('./game');
 progress(0.55);
 game = await startGame(app, ui);
+game.onHeadcount((present, max) => entry.setFull(present >= max)); // full: the way in greys out
 progress(1);
 setTimeout(() => {
   loader?.classList.add('done'); // the name fades, then the white
