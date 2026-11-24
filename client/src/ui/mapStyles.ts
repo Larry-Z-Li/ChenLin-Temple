@@ -213,13 +213,24 @@ export function drawStyledMap(g: CanvasRenderingContext2D, S: number, style: Map
 }
 
 /** A place name: calligraphy with a red seal (ink), gold (lacquer), a little wooden plaque (garden; `lit` when hovered). */
+/** A long name on two lines: a gate hall's gate over its name (生門 / 財富苑), English at its last space. */
+function labelLines(text: string) {
+  const gate = /^(.門)(.{3,})$/.exec(text);
+  if (gate) return [gate[1], gate[2]];
+  const sp = text.lastIndexOf(' ');
+  return sp > 0 && text.length > 10 ? [text.slice(0, sp), text.slice(sp + 1)] : [text];
+}
+
 export function drawLabel(g: CanvasRenderingContext2D, S: number, style: MapStyle, key: I18nKey, x: number, z: number, big = false, lit = false) {
   const L = LOOKS[style], { k, X, Y } = mapProjector(S);
-  const px = X(x), py = Y(z), text = t(key), size = Math.round((big ? 6.6 : 5.6) * k);
-  g.font = `600 ${size}px "Noto Serif TC", "Songti TC", serif`;
+  const px = X(x), py = Y(z), lines = labelLines(t(key)), size = Math.round((big ? 5.4 : 4.7) * k), lh = size * 1.12;
+  const font = (n: number) => `600 ${Math.round(n)}px "Noto Serif TC", "Songti TC", serif`;
+  // a first line over a second is a little smaller (the gate over the hall's name)
+  const sizeOf = (i: number) => (lines.length > 1 && i === 0 ? size * 0.82 : size);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  const w = g.measureText(text).width;
+  const w = Math.max(...lines.map((l, i) => ((g.font = font(sizeOf(i))), g.measureText(l).width)));
+  const top = py - ((lines.length - 1) * lh) / 2; // the first line's middle
   if (style === 'garden') {
     if (lit) {
       g.shadowColor = 'rgba(255,214,110,0.95)';
@@ -229,17 +240,21 @@ export function drawLabel(g: CanvasRenderingContext2D, S: number, style: MapStyl
     g.strokeStyle = lit ? '#c98a16' : 'rgba(138,106,74,0.9)';
     g.lineWidth = (lit ? 1.2 : 0.6) * k;
     g.beginPath();
-    g.roundRect(px - w / 2 - 3 * k, py - size * 0.62, w + 6 * k, size * 1.24, 2.5 * k);
+    g.roundRect(px - w / 2 - 2.6 * k, top - size * 0.6, w + 5.2 * k, size * 1.2 + (lines.length - 1) * lh, 2.5 * k);
     g.fill();
     g.shadowBlur = 0;
     g.stroke();
-  } else {
-    g.strokeStyle = L.textEdge;
-    g.lineWidth = 2.6 * k;
-    g.strokeText(text, px, py);
   }
-  g.fillStyle = L.text;
-  g.fillText(text, px, py);
+  lines.forEach((l, i) => {
+    g.font = font(sizeOf(i));
+    if (style !== 'garden') {
+      g.strokeStyle = L.textEdge;
+      g.lineWidth = 2.6 * k;
+      g.strokeText(l, px, top + i * lh);
+    }
+    g.fillStyle = L.text;
+    g.fillText(l, px, top + i * lh);
+  });
   if (style === 'ink' && big) {
     g.fillStyle = L.seal;
     g.fillRect(px + w / 2 + 1.5 * k, py - 2.2 * k, 3.6 * k, 4.4 * k);

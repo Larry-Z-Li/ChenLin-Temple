@@ -19,7 +19,7 @@ export interface BlessRoute {
 }
 
 type Phase = 'wait' | 'down' | 'walk' | 'bow' | 'dim' | 'back' | 'up';
-const DOWN = 1.3, BOW = 2.2, BOWS = 3, DIM = 1.0, UP = 1.1, SPEED = 3.2;
+const DOWN = 1.3, BOW = 3.6, BOWS = 3, DIM = 1.0, UP = 1.1, SPEED = 3.2;
 /** How brightly the lantern glows at the height of the prayer (× its usual glow). */
 export const BLESS_GLOW = 20;
 

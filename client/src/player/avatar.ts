@@ -47,6 +47,11 @@ const P_DOWN: Pose = { ...STAND, hipY: 0.5, torso: 2.0, head: 0.35, lThigh: 0.3,
 /** Arms folded across the middle, hands tucked into the opposite sleeves, villager-style (the entry stroll). */
 const CLASP: Pose = { ...STAND, torso: 0.03, lArm: 0.42, rArm: 0.42, lArmZ: 0.6, rArmZ: -0.6, lFore: 1.15, rFore: 1.15, head: 0.06 };
 
+/** Carrying a lantern before you in both hands, hands together at its ring — walking, standing, and bowing with it. */
+const CARRY_ARMS = { lArm: 1.0, rArm: 1.0, lArmZ: 0.42, rArmZ: -0.42, lFore: 0.8, rFore: 0.8 };
+const CARRY: Pose = { ...STAND, ...CARRY_ARMS, head: 0.12 };
+const CARRY_BOW: Pose = { ...STAND, ...CARRY_ARMS, torso: 0.55, head: 0.25 };
+
 export const POSES: Record<Anim, Pose> = {
   idle: STAND,
   walk: STAND,
@@ -84,7 +89,7 @@ const SKIN = 0xd8a982;
 
 /** How big a carried lantern is by default (world scale): a wall lantern's size, so it doesn't change in your hands. */
 export const LANTERN_HELD = 0.9;
-const heldScale = new THREE.Vector3();
+const heldScale = new THREE.Vector3(), qHand = new THREE.Quaternion(), qRoot = new THREE.Quaternion();
 
 export class Avatar {
   readonly root = new THREE.Group();
@@ -240,7 +245,7 @@ export class Avatar {
   }
 
   /**
-   * A lantern carried from the right hand (blessing a wish), glowing `glow` times its usual brightness
+   * A lantern carried before you in both hands (blessing a wish), glowing `glow` times its usual brightness
    * (1–20), `size` its world scale (the wall lantern's); null puts it away.
    */
   holdLantern(color: number | null, glow = 1, size = LANTERN_HELD) {
@@ -278,7 +283,8 @@ export class Avatar {
   }
 
   update(dt: number, speed = 0) {
-    const target = this.clasp && (this.anim === 'walk' || this.anim === 'idle') ? CLASP : POSES[this.anim];
+    const carrying = !!this.lantern?.g.visible, moving = this.anim === 'walk' || this.anim === 'idle' || this.anim === 'run';
+    const target = carrying && moving ? CARRY : carrying && this.anim === 'bow' ? CARRY_BOW : this.clasp && moving && this.anim !== 'run' ? CLASP : POSES[this.anim];
     const p = this.pose;
     const rate = 8;
     for (const k in target) (p as unknown as Record<string, number>)[k] = damp((p as unknown as Record<string, number>)[k], (target as unknown as Record<string, number>)[k], rate, dt);
@@ -304,8 +310,8 @@ export class Avatar {
     j.rThigh.rotation.z = p.rThighZ;
     j.lShin.rotation.z = p.lShinZ;
     j.rShin.rotation.z = p.rShinZ;
-    const armSwing = this.clasp ? 0 : swing * 0.6;
-    j.lHand.visible = j.rHand.visible = !this.clasp; // hands up the sleeves
+    const armSwing = this.clasp || carrying ? 0 : swing * 0.6;
+    j.lHand.visible = j.rHand.visible = !this.clasp || carrying; // hands up the sleeves (unless carrying)
     j.lArm.rotation.x = p.lArm - armSwing;
     j.rArm.rotation.x = p.rArm + armSwing;
     j.lArm.rotation.z = p.lArmZ;
@@ -314,6 +320,10 @@ export class Avatar {
     j.rFore.rotation.x = p.rFore;
     j.lHand.rotation.y = p.lPalm;
     j.rHand.rotation.y = p.rPalm;
+    if (carrying) { // the lantern hangs straight down from the hands, however the arms are bent
+      j.rHand.updateWorldMatrix(true, false);
+      this.lantern!.g.quaternion.copy(j.rHand.getWorldQuaternion(qHand).invert().multiply(this.root.getWorldQuaternion(qRoot)));
+    }
   }
 
   dispose() {

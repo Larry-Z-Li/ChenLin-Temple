@@ -54,8 +54,8 @@ export function furnishHall(ctx: WorldContext, g: THREE.Group, f: HallFrame, blo
     rug(items, hx + side * (x0 + x1) / 2, F, (block.z0 + block.z1) / 2, x1 - x0, block.z1 - block.z0 + 1.9);
   }
   const rz0 = tableZ + 0.6, rz1 = f.frontInner - 0.05;
-  items.add(box(1.7, 0.008, rz1 - rz0, mat(0xa8842c, { roughness: 0.8 }), hx, F + FLOOR_TOP, (rz0 + rz1) / 2, false));
-  items.add(box(1.4, 0.016, rz1 - rz0, mat(0x8e1f1a, { roughness: 0.95 }), hx, F + FLOOR_TOP, (rz0 + rz1) / 2, false));
+  items.add(box(1.7, 0.02, rz1 - rz0, mat(0xa8842c, { roughness: 0.8 }), hx, F + FLOOR_TOP, (rz0 + rz1) / 2, false));
+  items.add(box(1.4, 0.035, rz1 - rz0, mat(0x8e1f1a, { roughness: 0.95 }), hx, F + FLOOR_TOP, (rz0 + rz1) / 2, false));
 
   // ---- Hanging banners: a pair flanking the altar, more along the side aisles between the thangkas ----
   const bannerLen = Math.min(3.4, f.H * 0.43);
@@ -251,11 +251,12 @@ function rugTexture() {
 }
 
 export function rug(parent: THREE.Object3D, x: number, F: number, z: number, w: number, d: number) {
-  parent.add(box(w, 0.008, d, mat(0xa8842c, { roughness: 0.85 }), x, F + FLOOR_TOP, z, false));
+  // thick enough (2 cm, 3.5 cm) that the floor and the two layers never flicker into each other at a distance
+  parent.add(box(w, 0.02, d, mat(0xa8842c, { roughness: 0.85 }), x, F + FLOOR_TOP, z, false));
   const tex = rugTexture().clone();
   tex.repeat.set((w - 0.3) / 1.1, (d - 0.3) / 1.1);
   tex.needsUpdate = true;
-  parent.add(box(w - 0.3, 0.016, d - 0.3, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }), x, F + FLOOR_TOP, z, false));
+  parent.add(box(w - 0.3, 0.035, d - 0.3, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }), x, F + FLOOR_TOP, z, false));
 }
 
 /** Paint every vertex of a geometry one colour (for merged multi-colour meshes). */

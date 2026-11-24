@@ -42,7 +42,7 @@ All buildings and statues face south; players spawn in the south. The map is dra
                        S  (arrival, gate, map board)
                          PLAZA 廣場 (lantern canopy)
           Linggu ·          BAOSHENG 寶生苑            · Wenchang
-   spring 龍泉     DIZANG 地藏   GUOXUE 國學   WENSHU 文殊
+   spring 龍泉     DIZANG 地藏   GUOXUE 文昌   WENSHU 文殊
  W                 ZANGMI 藏密  ┌ 萬佛塔 ┐   DONGMI 東密      monks' quarters 僧舍 | orchard  E
    release pond 放生池  GUANYIN 觀音  YANGSHENG 養生  CAISHEN 財神
    abbot 住持 · Ruyi          CHENGJIU 成就苑          · Duobao

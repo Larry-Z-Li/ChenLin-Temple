@@ -35,8 +35,8 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) 
   // 佛家奇門: the 九字 tunnel, then on to qimen.one (no flight; it doesn't wait for the temple to load either).
   const foQimen = h('button', { class: 'entry-go' }, h('span', { i18n: 'entry.foQimen' }), h('span', { class: 'entry-arrow' }, '→')) as HTMLButtonElement;
   // Or fly straight to one of the gate halls instead of the front gate.
-  const hallBtns = ([['caishen', '生門院'], ['yangsheng', '休門院'], ['guanyin', '開門院'], ['guoxue', '景門院']] as const).map(([id, label]) => {
-    const b = h('button', { class: 'entry-hall', disabled: true }, label) as HTMLButtonElement;
+  const hallBtns = ([['caishen', 'entry.hallCaishen'], ['yangsheng', 'entry.hallYangsheng'], ['guanyin', 'entry.hallGuanyin'], ['guoxue', 'entry.hallGuoxue']] as const).map(([id, key]) => {
+    const b = h('button', { class: 'entry-hall', disabled: true, i18n: key }) as HTMLButtonElement;
     b.addEventListener('click', () => go(id));
     return b;
   });

@@ -315,7 +315,10 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
   const altarW = isShrine ? 3 : Math.max(5, n * 4.4);
   const altarD = isShrine ? 2 : 2.6;
   const altarH = isShrine ? 0.9 : 1.1;
-  const walkway = def.backDoor ? 3.2 : 0.8;
+  // A wide altar (two or three deities) would stand in front of the lantern grids on the back wall (see
+  // hallLanterns: each grid's inner edge is (2 + hw) / 2 − 3.2 from the middle), so it keeps further off.
+  const wideAltar = altarW / 2 > (2 + hw) / 2 - 3.2;
+  const walkway = def.backDoor ? 3.2 : wideAltar ? 2.6 : 0.8;
   const altarZ = back + T / 2 + walkway + altarD / 2 + (isShrine ? 0.6 : 0);
   g.add(box(altarW, altarH, altarD, mat(THEME.altar, { roughness: 0.55 }), hx, F, altarZ));
   g.add(box(altarW + 0.2, 0.1, altarD + 0.2, mat(THEME.altarTrim, { metalness: 0.7, roughness: 0.35 }), hx, F + altarH, altarZ));

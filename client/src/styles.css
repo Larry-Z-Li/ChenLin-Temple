@@ -120,6 +120,8 @@ body.intro .minimap, body.intro .minimap-btn, body.intro .joystick { display: no
 .entry-go:disabled { opacity: 0.55; cursor: progress; transform: none; }
 .entry-arrow { font-size: 20px; }
 .entry-hall { width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 6px; border: 1px solid rgba(243, 220, 170, 0.55); background: rgba(16, 20, 26, 0.35); color: #f3dcaa; font: 600 15px var(--display); letter-spacing: 0.12em; cursor: pointer; text-align: center; }
+html[lang='en'] .entry-hall { letter-spacing: 0.02em; } /* the wide spacing suits the characters, not English */
+html[lang='en'] .entry-go { letter-spacing: 0.06em; }
 .entry-hall:hover { background: rgba(243, 220, 170, 0.16); }
 .entry-hall:disabled { opacity: 0.45; cursor: progress; }
 .entry-hint { font: 12px var(--sans); letter-spacing: 0.18em; color: rgba(246, 239, 224, 0.7); }
