@@ -39,13 +39,17 @@ export class SutraReader {
   private header: HTMLElement;
   private fontSize = 19;
   private open = false;
+  /** The ✕ in the corner (set by the game: puts the sutra away as the 經文 button would). */
+  onClose: () => void = () => void this.show(false);
 
   constructor(parent: HTMLElement) {
     this.header = h('div', { class: 'panel-title' });
     this.body = h('div', { class: 'sutra-body' });
     const smaller = h('button', { class: 'icon-btn', i18nTitle: 'sutra.smaller', onclick: () => this.zoom(-2) }, 'A−');
     const larger = h('button', { class: 'icon-btn', i18nTitle: 'sutra.larger', onclick: () => this.zoom(2) }, 'A+');
-    this.el = h('aside', { class: 'panel sutra-panel hidden' }, h('div', { class: 'panel-head' }, this.header, h('div', { class: 'row' }, smaller, larger)), this.body);
+    // a close button of its own: on a phone the panel covers most of the screen (and there's no Esc key)
+    const close = h('button', { class: 'icon-btn', i18nTitle: 'common.close', onclick: () => this.onClose() }, '✕');
+    this.el = h('aside', { class: 'panel sutra-panel hidden' }, h('div', { class: 'panel-head' }, this.header, h('div', { class: 'row' }, smaller, larger, close)), this.body);
     parent.append(this.el);
   }
 

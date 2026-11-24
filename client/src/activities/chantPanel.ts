@@ -17,11 +17,12 @@ export class ChantPanel {
 
   constructor(parent: HTMLElement, private player: ChantPlayer) {
     this.list = h('ul', { class: 'list' });
-    this.playBtn = h('button', { class: 'icon-btn', i18nTitle: 'chant.play', onclick: () => player.toggle() }, '▶');
+    // say what they do: 「▶ 開始」/「❚❚ 停止」, 「↻ 循環」 (lit while on)
+    this.playBtn = h('button', { class: 'icon-btn chant-main', onclick: () => player.toggle() }) as HTMLButtonElement;
     this.loopBtn = h('button', { class: 'icon-btn', i18nTitle: 'chant.loop', onclick: () => {
       player.loop = !player.loop;
       this.render();
-    } }, '↻');
+    } }, `↻ ${t('chant.repeat')}`) as HTMLButtonElement;
     const vol = h('input', { type: 'range', min: '0', max: '1', step: '0.01', value: String(settings.chantVolume), i18nTitle: 'chant.volume' }) as HTMLInputElement;
     vol.addEventListener('input', () => player.setVolume(Number(vol.value)));
     // progress: where we are, a bar to drag, and the chant's length
@@ -39,7 +40,8 @@ export class ChantPanel {
     this.el = h(
       'aside',
       { class: 'panel chant-panel hidden' },
-      h('div', { class: 'panel-head' }, h('div', { class: 'panel-title', i18n: 'chant.title' })),
+      // a close button of its own, like the sutra reader's (on a phone there's no Esc key; the chant keeps playing)
+      h('div', { class: 'panel-head' }, h('div', { class: 'panel-title', i18n: 'chant.title' }), h('button', { class: 'icon-btn', i18nTitle: 'common.close', onclick: () => this.show(false) }, '✕')),
       this.list,
       h('div', { class: 'chant-progress' }, this.timeEl, this.seekBar, this.lengthEl),
       h(
@@ -49,8 +51,8 @@ export class ChantPanel {
         this.playBtn,
         h('button', { class: 'icon-btn', i18nTitle: 'chant.next', onclick: () => player.next() }, '⏭'),
         this.loopBtn,
-        vol,
       ),
+      h('label', { class: 'chant-volume' }, h('span', { 'aria-hidden': 'true' }, '🔈'), vol, h('span', { 'aria-hidden': 'true' }, '🔊')),
     );
     parent.append(this.el);
     player.onChange(() => this.render());
@@ -76,8 +78,8 @@ export class ChantPanel {
 
   private render() {
     const p = this.player;
-    this.playBtn.textContent = p.playing ? '❚❚' : '▶';
-    this.playBtn.title = t(p.playing ? 'chant.pause' : 'chant.play');
+    this.playBtn.textContent = p.playing ? `❚❚ ${t('chant.stop')}` : `▶ ${t('chant.start')}`;
+    this.loopBtn.textContent = `↻ ${t('chant.repeat')}`;
     this.loopBtn.classList.toggle('active', p.loop);
     if (!p.tracks.length) {
       this.list.replaceChildren(h('li', { class: 'muted' }, t('chant.empty')));

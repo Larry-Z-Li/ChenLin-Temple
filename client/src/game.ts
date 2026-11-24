@@ -234,6 +234,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   });
 
   const seat: SeatSession = new SeatSession({ ctx, net, player, rig, hud, mala, sutra });
+  sutra.onClose = () => seat.setFocus('sutra'); // the reader's ✕: put the sutra away (seated or standing; beads stay)
   const offerings = new Offerings(ctx, net, hud, orchard, player);
   const cloud = new CloudRide(ctx, player, rig, hud);
   bigMap.onTravel = (spot) => {

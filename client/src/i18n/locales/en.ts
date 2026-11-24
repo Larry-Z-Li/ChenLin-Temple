@@ -126,6 +126,9 @@ const en = {
   'chant.prev': 'Previous',
   'chant.loop': 'Repeat',
   'chant.volume': 'Volume',
+  'chant.start': 'Start',
+  'chant.stop': 'Stop',
+  'chant.repeat': 'Repeat',
 
   'hud.settings': 'Settings',
   'settings.graphics': 'Graphics',

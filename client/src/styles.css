@@ -89,6 +89,10 @@ body.reading .minimap { display: none; }
 .chant-progress input[type='range'] { flex: 1; min-width: 60px; accent-color: var(--accent); }
 /* a 梵唄 button while a chant plays */
 .chant-on { background: rgba(217, 164, 65, 0.3) !important; border-color: var(--accent) !important; box-shadow: 0 0 10px rgba(217, 164, 65, 0.45); }
+/* the 梵唄 panel: a labelled main button, and the volume on its own row */
+.transport .chant-main { flex: 1; font-weight: 600; }
+.chant-volume { display: flex; align-items: center; gap: 8px; padding: 0 12px 12px; font-size: 14px; }
+.chant-volume input[type='range'] { flex: 1; accent-color: var(--accent); }
 .transport { display: flex; gap: 6px; align-items: center; padding: 10px; border-top: 1px solid var(--panel-border); }
 .transport input[type='range'] { flex: 1; min-width: 60px; accent-color: var(--accent); }
 

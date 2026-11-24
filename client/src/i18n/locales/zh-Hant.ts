@@ -128,6 +128,9 @@ const zhHant: Record<I18nKey, string> = {
   'chant.prev': '上一首',
   'chant.loop': '重複播放',
   'chant.volume': '音量',
+  'chant.start': '開始',
+  'chant.stop': '停止',
+  'chant.repeat': '循環',
 
   'hud.settings': '設定',
   'settings.graphics': '畫質',
