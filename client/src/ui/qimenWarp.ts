@@ -76,7 +76,7 @@ export function drawQimenWarp(g: CanvasRenderingContext2D, w: number, h: number,
   }
 }
 
-/** Play the transition over everything; resolves once the screen is white (the overlay stays). */
+/** Play the transition over everything; resolves once the screen is white (the overlay stays until you come back). */
 export function playQimenWarp(): Promise<void> {
   const c = document.createElement('canvas');
   c.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:100;pointer-events:auto';
@@ -90,6 +90,8 @@ export function playQimenWarp(): Promise<void> {
   };
   fit();
   addEventListener('resize', fit);
+  // Back from qimen.one, the browser may restore this page as it was left (all white): clear it away
+  addEventListener('pageshow', () => (c.remove(), removeEventListener('resize', fit)), { once: true });
   // with reduced motion, just a short fade to white
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const t0 = performance.now(), length = calm ? 0.6 : DURATION;

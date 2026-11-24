@@ -77,6 +77,7 @@ export function showEntry(parent: HTMLElement, onRobe: (color: string) => void) 
     foQimen.disabled = true;
     void playQimenWarp().then(() => location.assign('https://qimen.one/'));
   });
+  addEventListener('pageshow', (e) => e.persisted && (foQimen.disabled = false)); // back again: the button works again
   name.addEventListener('keydown', (e) => e.key === 'Enter' && go());
   return {
     done,
