@@ -205,6 +205,7 @@ const zhHant: Record<I18nKey, string> = {
 
   'deity.manjushri': '文殊菩薩',
   'deity.avalokiteshvara': '觀世音菩薩',
+  'deity.cintamanicakra': '如意輪觀音',
   'deity.cundi': '準提菩薩',
   'deity.daikokuten': '大黑天',
   'deity.marici': '摩利支天',

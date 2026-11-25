@@ -203,6 +203,7 @@ const en = {
 
   'deity.manjushri': 'Mañjuśrī',
   'deity.avalokiteshvara': 'Avalokiteśvara',
+  'deity.cintamanicakra': 'Cintāmaṇicakra',
   'deity.cundi': 'Cundī',
   'deity.daikokuten': 'Daikokuten',
   'deity.marici': 'Marīcī',
