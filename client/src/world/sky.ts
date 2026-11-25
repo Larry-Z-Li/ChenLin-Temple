@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildSkyChart, twinkleStars } from './skyChart';
 import { buildSkyClouds } from './skyClouds';
+import { buildMilkyWay } from './milkyWay';
 import { DEFAULT_TEMPLE_TZ } from '../../../shared/protocol';
 import { settings } from '../config/settings';
 import { lerp, mulberry32, smoothstep } from '../core/math';
@@ -52,7 +53,7 @@ const C = (hex: number) => new THREE.Color(hex);
 const PALETTE = {
   day: { top: C(0x5d97d3), horizon: C(0xd7e6ee) },
   dusk: { top: C(0x4a5a8c), horizon: C(0xf0a070) },
-  night: { top: C(0x0a1330), horizon: C(0x22345a) },
+  night: { top: C(0x02050d), horizon: C(0x08111f) }, // a dark-site sky: near-black blue, no glow
 };
 
 export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
@@ -111,13 +112,14 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     v.normalize().multiplyScalar(1400);
     starPos.push(v.x, v.y, v.z);
     // mostly faint and small, a few brighter; a little blue or warm
-    const k = rng() ** 2.5, b = 0.18 + k * 0.5, warm = rng() - 0.5;
+    const k = rng() ** 2.5, b = 0.3 + k * 0.7, warm = rng() - 0.5;
     starCol.push(b * (1 + warm * 0.12), b, b * (1 - warm * 0.15));
-    starSize.push(1.6 + k * 2.2);
+    starSize.push(1.8 + k * 2.4);
   }
   const stars = twinkleStars(starPos, starCol, starSize, 0.45);
   scene.add(stars.pts);
   let starTime = 0;
+  const milky = buildMilkyWay(scene); // a dark-sky night: the Milky Way and a dense field of faint stars
   const chart = buildSkyChart(scene); // the 28 mansions and the Four Symbols, by night
   const clouds = buildSkyClouds(scene); // and by day, drifting clouds
   const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xeef2ff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
@@ -163,7 +165,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     const sunUp = smoothstep(-0.03, 0.08, sunDir.y);
     skyMat.uniforms.glowDir.value.copy(sunUp > 0.02 ? sunDir : moonDir);
     skyMat.uniforms.glowColor.value.set(sunUp > 0.02 ? 0xffebbf : 0xc8d4ff);
-    skyMat.uniforms.glowStrength.value = sunUp > 0.02 ? sunUp : 0.5 * lighting.night;
+    skyMat.uniforms.glowStrength.value = sunUp > 0.02 ? sunUp : 0.28 * lighting.night;
     fog.color.copy(horizon);
 
     hemi.color.copy(tmp.set(0x3a5488)).lerp(C(0xdcecff), daylight);
@@ -183,6 +185,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     scene.environmentIntensity = lerp(0.15, 0.55, daylight);
     starTime += dt;
     stars.update(smoothstep(0.35, 1, lighting.night), starTime);
+    milky.update(smoothstep(0.35, 1, lighting.night), starTime);
     chart.update(smoothstep(0.45, 1, lighting.night), starTime);
     (moon.material as THREE.SpriteMaterial).opacity = smoothstep(0.3, 1, lighting.night);
     moon.position.copy(moonDir).multiplyScalar(1300);

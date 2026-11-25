@@ -105,6 +105,9 @@ export class HallLanterns {
         }
         for (const e of [-1, 1]) root.add(box(0.1, GRID * row + 0.3, 0.48, red, gx + (e * w) / 2, rail0 - 0.9, wall + 0.24));
         root.add(ladder(gx + s * (w / 2 + 0.42), F, wall));
+        // solid: you can't walk into the shelves (or the ladder on the outer end)
+        const a = W(gx - w / 2 - (s < 0 ? 0.8 : 0.05), 0, wall), b = W(gx + w / 2 + (s > 0 ? 0.8 : 0.05), 0, wall + 0.62);
+        ctx.collisions.addBox(Math.min(a.x, b.x), Math.max(a.x, b.x), Math.min(a.z, b.z), Math.max(a.z, b.z));
       } else {
         for (let r = 0; r < GRID; r++) root.add(box(w, 0.07, 0.08, red, gx, rail0 + r * row - 0.035, wall + 0.06));
         for (const e of [-1, 1]) root.add(box(0.12, GRID * row + 0.3, 0.12, red, gx + (e * w) / 2, rail0 - 0.9, wall + 0.06));
@@ -183,8 +186,7 @@ export class HallLanterns {
       if (this.chalices && !yours) this.shakes.set(w.slot, performance.now()); // lit: it swirls (yours when the camera gets there)
       if (yours) {
         this.pending = null;
-        this.hud.toast(t('wish.hung'));
-        this.close(); // hung: back to the hall
+        this.close(); // hung: back to the hall (the "six months" note comes after the bell)
         markHung();
         this.onHung(this.shotFor(w.slot));
       }
@@ -371,22 +373,37 @@ export class HallLanterns {
         h('span', { class: 'lg-name' }, w ? w.name : '–'),
       ) as HTMLButtonElement;
       if (w) cell.style.setProperty('--lc', `#${lanternHex(w.color).toString(16).padStart(6, '0')}`);
-      cell.addEventListener('click', () => (w ? this.openWish(w.id) : this.claim(side, slot)));
+      cell.addEventListener('click', () => (w ? this.openWish(w.id) : this.claim(side, slot, note)));
       return cell;
     });
+    // just lit one: how long until the next, in the menu itself (counting down; flashes if you try a free place)
+    const note = h('div', { class: 'wish-note hidden' });
+    const tick = () => {
+      const s = wishWait();
+      note.classList.toggle('hidden', !s);
+      note.textContent = s ? t('wish.wait', { s }) : '';
+      if (s && note.isConnected) setTimeout(tick, 1000);
+    };
     this.panel.replaceChildren(
       h('div', { class: 'wish-card lantern-card' },
         h('div', { class: 'wish-heading' }, t('lantern.gridTitle', { wall: t(side ? 'lantern.right' : 'lantern.left'), n: this.onWall(side).length, max: PER_WALL })),
         h('div', { class: 'lantern-grid' }, ...cells),
+        note,
         h('div', { class: 'wish-actions' }, h('button', { class: 'pill-btn', i18n: 'wish.close', onclick: () => this.close() })),
       ),
     );
     this.panel.classList.remove('hidden');
+    tick();
   }
 
   /** A free hook: write a wish and light its lantern. */
-  private claim(side: number, slot: number) {
-    if (wishWait()) return this.hud.toast(t('wish.wait', { s: wishWait() }));
+  private claim(side: number, slot: number, note?: HTMLElement) {
+    if (wishWait()) {
+      if (!note) return this.hud.toast(t('wish.wait', { s: wishWait() }));
+      note.classList.remove('flash');
+      void note.offsetWidth; // restart the flash
+      return note.classList.add('flash');
+    }
     this.view = null;
     showWishForm(this.panel, this.hud, 'hallWish.heading', (title, text, color) => {
       this.pending = title;

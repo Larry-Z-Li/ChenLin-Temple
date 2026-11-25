@@ -196,9 +196,9 @@ html[lang='en'] .entry-hall { letter-spacing: 0.02em; white-space: nowrap; overf
 .joy-knob { width: 52px; height: 52px; border-radius: 50%; background: rgba(217, 164, 65, 0.75); pointer-events: none; }
 /* 功德: a drawer against the screen's left edge (lower left; on phones under the name in portrait, mid-left in landscape).
    Folded, only its edge tab shows (the ›); it slides out to open and back to fold. */
-.merit { position: absolute; left: 0; bottom: 16px; width: 176px; border-radius: 0 14px 14px 0; border: 1px solid var(--panel-border); border-left: 0; background: var(--panel); backdrop-filter: blur(8px); color: var(--ink); overflow: hidden; transition: translate 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.merit { position: fixed; z-index: 31; left: 0; bottom: 16px; width: 176px; border-radius: 0 14px 14px 0; border: 1px solid var(--panel-border); border-left: 0; background: var(--panel); backdrop-filter: blur(8px); color: var(--ink); overflow: hidden; transition: translate 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .merit:not(.open) { translate: calc(-100% + 44px) 0; }
-.merit.away { display: none; }
+body.intro .merit { display: none; }
 .merit-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 12px 16px 12px 14px; border: 0; background: transparent; color: var(--accent); font: 600 15px var(--serif); letter-spacing: 0.12em; cursor: pointer; }
 .merit-caret { flex: none; width: 10px; height: 10px; border-right: 2.5px solid currentColor; border-bottom: 2.5px solid currentColor; transform: rotate(135deg); transition: transform 0.38s; } /* ‹ open: push it back */
 .merit:not(.open) .merit-caret { transform: rotate(-45deg); } /* › folded: pull it out */
@@ -266,6 +266,9 @@ body.beads-sutra .info { left: 16px; transform: none; max-width: max(180px, calc
 .lg-cell:hover { border-color: var(--accent); }
 .lg-cell.claimed { background: color-mix(in srgb, var(--lc) 30%, rgba(30, 20, 16, 0.85)); border-color: color-mix(in srgb, var(--lc) 70%, transparent); color: var(--ink); box-shadow: 0 0 10px color-mix(in srgb, var(--lc) 35%, transparent); }
 .lg-cell.away { opacity: 0.45; }
+.wish-note { text-align: center; font-size: 13px; color: var(--accent); padding: 6px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
+.wish-note.flash { animation: wish-note-flash 0.5s ease-out; }
+@keyframes wish-note-flash { 0%, 40% { background: rgba(255, 210, 120, 0.35); } 100% { background: rgba(255, 255, 255, 0.06); } }
 .lg-num { font: 600 13px var(--serif); }
 .lg-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 .wishlist-card { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); grid-template-rows: auto 1fr auto; }
@@ -306,7 +309,7 @@ body.beads-sutra .info { left: 16px; transform: none; max-width: max(180px, calc
 
 
 /* 功德 earned: "+n" pops beside the drawer and slides into it, which glows as it lands */
-.merit-pop { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; font: 700 32px var(--serif); color: #ffe7a3; text-shadow: 0 0 14px rgba(255, 196, 90, 0.85), 0 2px 6px rgba(0, 0, 0, 0.5); white-space: nowrap; }
+.merit-pop { position: fixed; left: 0; top: 0; z-index: 32; pointer-events: none; font: 700 32px var(--serif); color: #ffe7a3; text-shadow: 0 0 14px rgba(255, 196, 90, 0.85), 0 2px 6px rgba(0, 0, 0, 0.5); white-space: nowrap; }
 body:not(.touch) .merit-pop { font-size: 40px; } /* bigger on a computer */
 .merit.bump { animation: merit-bump 0.6s ease-out; }
 @keyframes merit-bump { 0% { box-shadow: 0 0 0 rgba(255, 210, 120, 0); } 30% { box-shadow: 0 0 22px rgba(255, 210, 120, 0.75); } 100% { box-shadow: 0 0 0 rgba(255, 210, 120, 0); } }

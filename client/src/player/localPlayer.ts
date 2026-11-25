@@ -137,9 +137,10 @@ export class LocalPlayer {
 
   /** Steer the character directly (the entry screen's pacing monk). */
   puppet(dt: number, x: number, y: number, z: number, yaw: number, walking: boolean) {
+    // (the legs keep pace with how fast he really moves)
+    this.speed = walking && dt > 0 ? damp(this.speed, Math.hypot(x - this.pos.x, z - this.pos.z) / dt, 6, dt) : 0;
     this.pos.set(x, y, z);
     this.yaw = yaw;
-    this.speed = walking ? 1.2 : 0;
     this.avatar.anim = walking ? 'walk' : 'idle';
     this.sync(dt);
   }

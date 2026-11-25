@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cave Fall Mock</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #bcd7e8; font: 13px system-ui, sans-serif; color: #2c3a44; }
+      canvas { display: block; width: 100vw; height: 100vh; cursor: grab; }
+      .label { position: fixed; left: 12px; top: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.75); pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <div class="label">洞瀑 · Cave fall (mock) — drag to look round</div>
+    <script type="module" src="/src/dev/cavefallMock.ts"></script>
+  </body>
+</html>

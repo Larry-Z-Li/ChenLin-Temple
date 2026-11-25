@@ -4,3 +4,7 @@ dist/
 *.log
 .env
 tour-out*/
+
+# a study text with names in it: kept local, never published
+client/public/assets/sutras/faben.pdf
+client/public/assets/models/*.zip

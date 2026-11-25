@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Waterfall Mocks</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #bcd7e8; font: 13px system-ui, sans-serif; color: #2c3a44; }
+      canvas { display: block; width: 100vw; height: 100vh; cursor: zoom-in; }
+      body.open canvas { cursor: grab; }
+      .label { position: fixed; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.75); pointer-events: none; }
+      .label.hidden { display: none; }
+      .hint { position: fixed; right: 12px; bottom: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.6); pointer-events: none; }
+      /* grid lines between the four views */
+      body:not(.open)::before, body:not(.open)::after { content: ''; position: fixed; background: rgba(255, 255, 255, 0.8); pointer-events: none; }
+      body:not(.open)::before { left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; }
+      body:not(.open)::after { top: 50%; left: 0; right: 0; height: 2px; margin-top: -1px; }
+    </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <div class="label">A · 簾 Curtain</div>
+    <div class="label">B · 三疊 Three tiers</div>
+    <div class="label">C · 絲 Veil strands</div>
+    <div class="label">D · 飛瀑 Arc plunge</div>
+    <div class="hint">click a view to look round it · click or Esc to go back</div>
+    <script type="module" src="/src/dev/waterfallMocks.ts"></script>
+  </body>
+</html>

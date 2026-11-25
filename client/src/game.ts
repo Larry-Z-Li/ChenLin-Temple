@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, SNAPSHOT_HZ } from '../../shared/protocol';
+import { FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, FLAG_TRAIL_SHIFT, SNAPSHOT_HZ } from '../../shared/protocol';
+import { Circumambulation } from './activities/circumambulation';
+import { LightTrail } from './world/lightTrail';
 import { ChantPanel } from './activities/chantPanel';
 import { Mala } from './activities/beads';
 import { CloudRide } from './activities/cloudRide';
@@ -238,6 +240,13 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     hud.meritPop(n, settings.merit); // "+n" floats over to the 功德 drawer
   };
   let wheelTurns = 0;
+  // 繞塔: each clockwise lap of the stupa inside its walls, 10; from the first lap on, a trail of light
+  const circ = new Circumambulation();
+  circ.onLap = (n) => {
+    addMerit(20);
+    hud.toast(t('circ.lap', { n }));
+  };
+  const myTrail = new LightTrail(scene);
   wheels.onTurn = (spinner, turns) => {
     if (spinner !== 'self') return;
     wheelTurns += turns;
@@ -254,7 +263,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   seat.onProstration = () => addMerit(10);
   sutra.onClose = () => seat.setFocus('sutra'); // the reader's ✕: put the sutra away (seated or standing; beads stay)
   const offerings = new Offerings(ctx, net, hud, orchard, player);
-  offerings.onOffered = (kind) => addMerit(kind === 'incense' ? 10 : 1); // a fruit: 1 each
+  offerings.onOffered = (kind) => addMerit(kind === 'incense' ? 5 : 1); // a fruit: 1 each
   const cloud = new CloudRide(ctx, player, rig, hud);
   bigMap.onTravel = (spot) => {
     if (insideHall()) return hud.toast(t('travel.inside'));
@@ -277,7 +286,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   };
   const hallWishes = lanternWalls.find((w) => w.hallId === 'baosheng')!;
   const bodhiBell = staticBuild(() => new BodhiBell(ctx));
-  for (const w of lanternWalls) w.onHung = (shot) => bodhiBell.ring(shot, () => addMerit(100)); // the +100 once the bell's sequence is over
+  for (const w of lanternWalls) w.onHung = (shot) =>
+      bodhiBell.ring(shot, () => { // once the bell's sequence is over: the note, and the +100
+        hud.toast(t('wish.hung'));
+        addMerit(100);
+      });
   blessing.onBlessed = () => addMerit(20);
   buildNightLights(); // every lamp is registered by now
   buildFloodlights(ctx);
@@ -432,7 +445,10 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     mala.update(dt);
     ambient.update(dt);
     chants.update(dt);
-    soundscape.update(dt, player.pos, rig.yaw, player.mode === 'free' ? player.speed : 0);
+    soundscape.update(dt, player.pos, rig.yaw, player.mode === 'free' ? player.avatar.steps : -1);
+    if (player.mode === 'free' && !cloud.riding) circ.update(dt, player.pos.x, player.pos.z);
+    myTrail.update(dt, player.pos, circ.strength);
+    player.avatar.setGlow(myTrail.glow * 0.8);
 
     rig.update(dt, player.pos, seat.seated ? 1.0 : 1.55, ctx.cameraBlockers, ctx.ground);
     bodhiBell.applyCamera(camera);
@@ -442,7 +458,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     sendAcc += dt;
     if (sendAcc >= 1 / SNAPSHOT_HZ) {
       sendAcc = 0;
-      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0) | (cloud.riding ? FLAG_CLOUD : 0) | blessing.flags;
+      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0) | (cloud.riding ? FLAG_CLOUD : 0) | blessing.flags | (circ.strength << FLAG_TRAIL_SHIFT);
       const tr = player.transform(flags), key = tr.join(',');
       if (key !== lastSent && net.sendMove(tr)) lastSent = key; // (not before the server's welcome: it would be lost)
     }
@@ -470,7 +486,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   // For poking at from the console, and for `npm run tour` (scripts/tour.mjs).
   // 九字: on the gate halls' roofs, and 前 under the great incense burner
   void buildNineSyllables(scene, (x, z) => ctx.ground.heightAt(x, z));
-  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, hallWishes, lights, bodhiBell, renderer, setDebugHours, intro, hud, bigMap, travelSpots: TRAVEL_SPOTS, lanternBlessing: blessing };
+  (window as unknown as Record<string, unknown>).temple = { scene, player, ctx, net, seat, rig, wheels, chants, remotes, offerings, mala, cloud, instruments, wildlife, hallWishes, lights, bodhiBell, renderer, setDebugHours, intro, hud, bigMap, travelSpots: TRAVEL_SPOTS, lanternBlessing: blessing, circ };
 
   return {
     /** The start page's headcount, now and as it changes (with the temple's limit). */

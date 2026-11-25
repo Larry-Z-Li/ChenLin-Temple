@@ -33,6 +33,7 @@ export const FLAG_INCENSE_LIT = 4; // …and it is lit
 export const FLAG_CLOUD = 8; // riding a cloud
 export const FLAG_LANTERN = 16; // carrying a lantern to bless it…
 export const FLAG_GLOW_SHIFT = 5; // …and how brightly it glows: 2 bits (0–3) from here
+export const FLAG_TRAIL_SHIFT = 7; // the trail of light from walking round the stupa: 3 bits (0–4) from here
 /** Places before a hall's altar where people bless lanterns (more than this share). */
 export const BLESS_SPOTS = 6;
 
@@ -210,6 +211,6 @@ export function isTransform(v: unknown): v is Transform {
     v[4] < ANIMS.length &&
     Number.isInteger(v[5]) &&
     v[5] >= 0 &&
-    v[5] < 256
+    v[5] < 1024
   );
 }

@@ -144,7 +144,7 @@ export function buildVegetation(ctx: WorldContext) {
   };
 
   // Forest ring at the foot of the mountains, thinning up the slopes.
-  for (let i = 0; i < 2200; i++) {
+  for (let i = 0; i < 3000; i++) {
     const a = rng() * Math.PI * 2;
     const r = BASIN.radius - 18 + Math.pow(rng(), 1.4) * 170;
     const x = BASIN.x + Math.sin(a) * r, z = BASIN.z + Math.cos(a) * r;
@@ -159,7 +159,7 @@ export function buildVegetation(ctx: WorldContext) {
   }
 
   // Scattered meadow trees and bushes inside the valley.
-  for (let i = 0; i < 620; i++) {
+  for (let i = 0; i < 950; i++) {
     const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * (BASIN.radius - 12);
     const x = BASIN.x + Math.sin(a) * r, z = BASIN.z + Math.cos(a) * r;
     if (isReserved(x, z, 4) || inStreamVista(x, z)) continue;
@@ -336,7 +336,7 @@ function buildFlowers(ctx: WorldContext, rng: Rng) {
   });
 
   // Leafy tufts under flowers + loose grass clumps everywhere
-  for (let i = 0; i < 5000; i++) {
+  for (let i = 0; i < 7500; i++) {
     const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * (BASIN.radius + 10);
     const x = BASIN.x + Math.sin(a) * r, z = BASIN.z + Math.cos(a) * r;
     if (isReserved(x, z, 0.3, false)) continue;

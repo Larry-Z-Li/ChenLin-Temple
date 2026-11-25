@@ -120,6 +120,7 @@ const en = {
 
   'chant.title': 'Chants',
   'merit.title': 'Merit',
+  'circ.lap': 'Round the stupa: {n}',
   'merit.rank': 'Rank',
   'merit.novice': 'Novice',
   'merit.merit': 'Merit',

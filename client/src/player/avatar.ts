@@ -87,9 +87,43 @@ export const POSES: Record<Anim, Pose> = {
 
 const SKIN = 0xd8a982;
 
+/**
+ * Wide pleated trouser legs (hakama): a flared tube hanging from the joint (along −Y), its radius stepping out at
+ * each knife pleat. Side by side, standing, the two read as one pleated skirt; they still walk, sit and kneel.
+ */
+function pleatedLeg(top: number, bottom: number, len: number, pleats: number) {
+  const g = new THREE.CylinderGeometry(top, bottom, len, pleats * 4, 2).translate(0, -len / 2, 0);
+  const p = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i), a = Math.atan2(z, x), down = -p.getY(i) / len;
+    const k = 1 + ((((a / (Math.PI * 2)) * pleats) % 1 + 1) % 1) * (0.03 + 0.06 * down);
+    p.setXYZ(i, x * k, p.getY(i), z * k);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** The koromo's outline: [radius, height above the hips]. The body is this, turned, and flattened to 0.74 front to back. */
+const ROBE: [number, number][] = [[0.001, 0.66], [0.07, 0.645], [0.19, 0.58], [0.235, 0.5], [0.225, 0.3], [0.225, 0.08], [0.235, -0.04]];
+/** How far the robe's front stands out (+) at (x, y). */
+function chestZ(x: number, y: number) {
+  let r = ROBE[ROBE.length - 1][0];
+  for (let i = 1; i < ROBE.length; i++) {
+    const [r0, y0] = ROBE[i - 1], [r1, y1] = ROBE[i];
+    if (y <= y0 && y >= y1) {
+      r = r0 + ((r1 - r0) * (y0 - y)) / (y0 - y1);
+      break;
+    }
+  }
+  return 0.74 * Math.sqrt(Math.max(0, r * r - x * x));
+}
+
 /** How big a carried lantern is by default (world scale): a wall lantern's size, so it doesn't change in your hands. */
 export const LANTERN_HELD = 0.9;
 const heldScale = new THREE.Vector3(), qHand = new THREE.Quaternion(), qRoot = new THREE.Quaternion();
+
+/** The colour someone glows after walking round the stupa (see setGlow). */
+const GLOW = new THREE.Color(1, 0.78, 0.45);
 
 export class Avatar {
   readonly root = new THREE.Group();
@@ -106,6 +140,8 @@ export class Avatar {
   private phones: THREE.Group | null = null;
   private cloud: THREE.Mesh | null = null;
   anim: Anim = 'idle';
+  /** Footfalls so far: the footstep sound plays on each one, so sound and feet keep time. */
+  steps = 0;
   /** Walk/stand with hands tucked in the sleeves and no arm swing (local only — the entry stroll). */
   clasp = false;
 
@@ -137,15 +173,40 @@ export class Avatar {
     this.root.add(this.hips);
     this.hips.add(this.torso);
 
-    // Torso (robe) — origin at hips, shoulders at ~0.55
-    this.torso.add(mk(new THREE.CylinderGeometry(0.17, 0.22, 0.62, 12).translate(0, 0.31, 0), robe));
-    this.torso.add(mk(new THREE.SphereGeometry(0.2, 12, 8).scale(1, 0.55, 0.8).translate(0, 0.56, 0), robe));
-    // Sash (kasaya band) wrapping diagonally from the left shoulder to the right hip, front and back.
-    // An open ring, stretched so that once tilted it hugs the round torso instead of cutting through it.
-    const tilt = 0.6;
-    const sash = mk(new THREE.CylinderGeometry(0.218, 0.218, 0.12, 24, 1, true).scale(1 / Math.cos(tilt), 1, 1).rotateZ(tilt).translate(0, 0.33, 0), under);
-    (sash.material as THREE.Material).side = THREE.DoubleSide;
-    this.torso.add(sash);
+    // Torso: a koromo — broad, soft shoulders, a little flattened front to back. Origin at the hips, shoulders at ~0.55.
+    const body = new THREE.LatheGeometry([...ROBE].reverse().map(([r, y]) => new THREE.Vector2(r, y)), 20).scale(1, 1, 0.74); // bottom → top, so its faces point out
+    this.torso.add(mk(body, robe));
+    // a dark band at the waist, where the hakama is tied over the robe
+    this.torso.add(mk(new THREE.CylinderGeometry(0.242, 0.244, 0.07, 20).scale(1, 1, 0.76).translate(0, -0.02, 0), new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.9 })));
+    // collar (the front is −Z): a white under-collar edging the robe's collar band, crossed left over right on the chest
+    const white = new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.7 });
+    // each band a ribbon lying on the chest (it follows the robe's curve), from beside the neck down to where they cross
+    const ribbon = (x0: number, y0: number, x1: number, y1: number, w: number, off: number, m: THREE.Material) => {
+      const N = 8, pos: number[] = [], idx: number[] = [];
+      const len = Math.hypot(x1 - x0, y1 - y0), nx = (-(y1 - y0) / len) * (w / 2), ny = ((x1 - x0) / len) * (w / 2);
+      for (let i = 0; i <= N; i++) {
+        const x = x0 + ((x1 - x0) * i) / N, y = y0 + ((y1 - y0) * i) / N;
+        for (const e of [-1, 1]) pos.push(x + e * nx, y + e * ny, -chestZ(x + e * nx, y + e * ny) - off);
+        if (i) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      if ((g.attributes.normal as THREE.BufferAttribute).getZ(0) > 0) g.setIndex(idx.reverse()), g.computeVertexNormals(); // face out (−Z)
+      this.torso.add(mk(g, m));
+    };
+    // A V from the sides of the neck to where the collars cross (low on the chest). The wearer's right collar tucks
+    // under there; the left one, on top, carries on down toward the right hip. The white under-collar edges the V.
+    const [cx, cy] = [0, 0.4];
+    for (const side of [-1, 1]) {
+      const [x0, y0] = [side * 0.077, 0.63], l = Math.hypot(cx - x0, cy - y0);
+      const ix = (-(y0 - cy) / l) * side * 0.033, iy = (Math.abs(cx - x0) / l) * 0.033; // toward the opening of the V
+      ribbon(x0 + ix, y0 + iy, cx + ix, cy + iy, 0.03, 0.008, white);
+      const on = side < 0, k = on ? 1.87 : 1.04; // the left goes on past the crossing; the right just reaches it
+      ribbon(x0, y0, x0 + (cx - x0) * k, y0 + (cy - y0) * k, 0.07, on ? 0.018 : 0.014, robe);
+    }
+    this.torso.add(mk(new THREE.TorusGeometry(0.078, 0.02, 6, 16, Math.PI).rotateX(-Math.PI / 2).rotateY(Math.PI).scale(1, 1, 0.8).translate(0, 0.625, 0.01), white)); // round the back of the neck
 
     this.head.position.set(0, 0.62, 0);
     this.head.add(mk(new THREE.CylinderGeometry(0.05, 0.06, 0.08, 8).translate(0, 0.04, 0), skin));
@@ -154,10 +215,11 @@ export class Avatar {
 
     const lThigh = joint(-0.1, 0, 0), rThigh = joint(0.1, 0, 0);
     const lShin = joint(0, -0.45, 0), rShin = joint(0, -0.45, 0);
-    lThigh.add(limb(0.47, 0.085, robe), lShin);
-    rThigh.add(limb(0.47, 0.085, robe), rShin);
-    lShin.add(limb(0.45, 0.07, robe));
-    rShin.add(limb(0.45, 0.07, robe));
+    // hakama: wide pleated legs to the ankle, in a darker shade of the robe
+    lThigh.add(mk(pleatedLeg(0.125, 0.15, 0.5, 6).translate(0, 0.04, 0), under), lShin);
+    rThigh.add(mk(pleatedLeg(0.125, 0.15, 0.5, 6).translate(0, 0.04, 0), under), rShin);
+    lShin.add(mk(pleatedLeg(0.15, 0.18, 0.45, 6), under));
+    rShin.add(mk(pleatedLeg(0.15, 0.18, 0.45, 6), under));
     const foot = () => mk(new THREE.BoxGeometry(0.09, 0.06, 0.2).translate(0, -0.45, -0.05), new THREE.MeshStandardMaterial({ color: 0x2a2018 }));
     lShin.add(foot());
     rShin.add(foot());
@@ -165,10 +227,12 @@ export class Avatar {
 
     const lArm = joint(-0.23, 0.52, 0), rArm = joint(0.23, 0.52, 0);
     const lFore = joint(0, -0.29, 0), rFore = joint(0, -0.29, 0);
-    lArm.add(limb(0.31, 0.06, robe), lFore);
-    rArm.add(limb(0.31, 0.06, robe), rFore);
-    lFore.add(limb(0.27, 0.05, robe));
-    rFore.add(limb(0.27, 0.05, robe));
+    // loose robe sleeves, widening a little toward the cuff
+    lArm.add(limb(0.31, 0.085, robe), lFore);
+    rArm.add(limb(0.31, 0.085, robe), rFore);
+    const sleeve = () => mk(new THREE.CylinderGeometry(0.075, 0.1, 0.27, 12).translate(0, -0.135, 0), robe);
+    lFore.add(sleeve());
+    rFore.add(sleeve());
     // Flat hands with a lighter palm, so turning the palms up/down reads clearly.
     const palm = new THREE.MeshStandardMaterial({ color: 0xffe6d4, roughness: 0.75 });
     const handGeo = new THREE.BoxGeometry(0.035, 0.1, 0.075).translate(0, -0.05, 0);
@@ -194,6 +258,21 @@ export class Avatar {
     this.tag.position.y = 2.05;
     this.tag.renderOrder = 10;
     this.root.add(this.tag);
+  }
+
+  private glowMats: THREE.MeshStandardMaterial[] | null = null;
+  private glowNow = 0;
+  /** Lit from within (after walking round the stupa): robe, skin and all glow in their own colours, 0 … ~0.6. */
+  setGlow(v: number) {
+    if (Math.abs(v - this.glowNow) < 0.005) return;
+    this.glowNow = v;
+    if (!this.glowMats) {
+      const set = new Set<THREE.MeshStandardMaterial>();
+      this.root.traverse((o) => { const m = (o as THREE.Mesh).material; if (m instanceof THREE.MeshStandardMaterial && !m.vertexColors) set.add(m); });
+      this.glowMats = [...set];
+      for (const m of this.glowMats) m.emissive.copy(m.color).lerp(GLOW, 0.15); // each its own colour, a touch warmer: brighter, not white
+    }
+    for (const m of this.glowMats) m.emissiveIntensity = v;
   }
 
   /** Headphones on while the person is listening to chants (built on first use). */
@@ -299,8 +378,11 @@ export class Avatar {
     // Procedural gait layered on top of the base pose.
     let swing = 0, bob = 0;
     if (this.anim === 'walk' || this.anim === 'run') {
-      this.phase += dt * (this.anim === "run" ? 11 : 8) * Math.min(1.4, Math.max(0.6, speed / 3.8));
-      const amp = this.anim === 'run' ? 0.75 : 0.5;
+      // Legs ~0.9 m long swinging ±amp cover 2·0.9·sin(amp) a step; take steps at exactly the rate you move, so the
+      // feet don't skate, and count each footfall (legs widest apart, body lowest) for the footstep sound.
+      const amp = this.anim === 'run' ? 0.85 : 0.62, stepLen = 1.8 * Math.sin(amp), before = this.phase;
+      this.phase += (dt * Math.PI * Math.max(0.6, speed)) / stepLen;
+      if (Math.floor(this.phase / Math.PI - 0.5) > Math.floor(before / Math.PI - 0.5)) this.steps++;
       swing = Math.sin(this.phase) * amp;
       bob = Math.abs(Math.cos(this.phase)) * 0.035;
     } else this.phase = 0;

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Koromo Mock</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #e9e4da; font: 13px system-ui, sans-serif; color: #3a3128; }
+      canvas { display: block; width: 100vw; height: 100vh; }
+      .labels { position: fixed; left: 0; right: 0; bottom: 14px; display: flex; justify-content: center; gap: 4vw; pointer-events: none; }
+      .labels span { padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.7); }
+    </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <div class="labels"><span>叉手 shashu</span><span>合掌 gassho</span><span>垂手 arms down</span><span>現在 current</span></div>
+    <script type="module" src="/src/dev/koromoMock.ts"></script>
+  </body>
+</html>

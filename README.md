@@ -94,3 +94,7 @@ Default is Traditional Chinese (`zh-Hant`), with English selectable. Every UI st
 
 - Real statues, thangkas, chants and recorded ambience (see docs/ASSETS.md)
 - Group practice sessions, a personal practice log, server persistence, sharding past ~150 people
+
+## Credits
+
+- Night sky Milky Way: [ESO/S. Brunier](https://www.eso.org/public/images/eso0932a/), licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

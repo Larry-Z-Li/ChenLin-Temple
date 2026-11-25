@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HALLS, INCENSE_BURNER, PLATFORM_H, hallYaw } from '../config/layout';
+import { COURT_CARPET, HALLS, PLATFORM_H, hallYaw } from '../config/layout';
 
 /**
  * The nine syllables (九字) written big in gold leaf on the front slope of the gate halls, one to each
@@ -45,15 +45,15 @@ function charTexture(ch: string) {
 
 export async function buildNineSyllables(scene: THREE.Scene, groundAt: (x: number, z: number) => number) {
   await document.fonts.load('700 400px "Noto Serif TC"', Object.values(ON_HALL).join('') + MIDDLE).catch(() => null);
-  // the middle syllable: a square carpet under the incense burner, the character in gold on deep red
+  // the middle syllable: a big square carpet on the walk between the south gate and the incense burner, the character in gold on deep red
   const rug = new THREE.Group();
   rug.add(new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.03, 6.4).translate(0, 0.015, 0), new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.8 })));
   rug.add(new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.05, 6.0).translate(0, 0.025, 0), new THREE.MeshStandardMaterial({ color: 0x6e1410, roughness: 0.95 })));
   const top = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 5.4).rotateX(-Math.PI / 2).translate(0, 0.056, 0), new THREE.MeshStandardMaterial({ map: charTexture(MIDDLE), transparent: true, alphaTest: 0.2, roughness: 0.85 }));
   rug.add(top);
   // on the court's paving (its slabs' top is 0.07 above the ground; see decor.ts); reads upright walking in from the south gate
-  // a metre south of the burner, so the bigger carpet clears the altar's platform (the incense table stands on it)
-  rug.position.set(INCENSE_BURNER.x, groundAt(INCENSE_BURNER.x, INCENSE_BURNER.z + 1) + 0.075, INCENSE_BURNER.z + 1);
+  rug.scale.set(COURT_CARPET.scale, 1, COURT_CARPET.scale);
+  rug.position.set(COURT_CARPET.x, groundAt(COURT_CARPET.x, COURT_CARPET.z) + 0.075, COURT_CARPET.z);
   scene.add(rug);
   for (const def of HALLS) {
     const ch = ON_HALL[def.id];

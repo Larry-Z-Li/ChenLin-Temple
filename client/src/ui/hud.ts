@@ -168,8 +168,7 @@ export class Hud {
       act('cloud', 'hud.fastTravel', () => cb.onFastTravel()),
     );
 
-    // 功德: rank and merit (nothing earns it yet). Folded to start with on a portrait phone; while any other menu
-    // is open it goes away altogether (it can't be opened over them), coming back as it was.
+    // 功德: rank and merit. Folded to start with on a portrait phone; it stays in view (above them) while other menus are open.
     let meritOpen = !(isTouchDevice && matchMedia('(orientation: portrait)').matches);
     this.meritN = h('b', {}, '0');
     this.merit = h(
@@ -185,18 +184,9 @@ export class Hud {
         h('div', { class: 'merit-row' }, h('span', { i18n: 'merit.merit' }), this.meritN),
       ),
     );
-    const othersOpen = () => !!parent.querySelector('.panel:not(.hidden), .wish-overlay:not(.hidden), .bigmap:not(.hidden)');
-    new MutationObserver(() => {
-      this.merit.classList.toggle('away', othersOpen());
-      if (!othersOpen() && this.meritWaiting.length) { // a menu just closed: the merit earned behind it pops now
-        const [n, total] = [this.meritWaiting.reduce((a, b) => a + b[0], 0), this.meritWaiting[this.meritWaiting.length - 1][1]];
-        this.meritWaiting = [];
-        this.meritPop(n, total);
-      }
-    }).observe(parent, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
 
-    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, quick, this.merit, this.toasts, this.help, this.settingsPanel);
-    parent.append(this.root);
+    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, quick, this.toasts, this.help, this.settingsPanel);
+    parent.append(this.root, this.merit); // the drawer outside the HUD layer, so it can sit over the menus' backdrops
     this.renderMusic();
     this.renderFps();
     this.renderGraphics();
@@ -230,8 +220,6 @@ export class Hud {
 
   private merit!: HTMLElement;
   private meritN!: HTMLElement;
-  /** Merit earned while the drawer was hidden behind a menu: [n, total] each. */
-  private meritWaiting: [number, number][] = [];
   /** The merit shown. */
   setMerit(n: number) {
     this.meritN.textContent = String(n);
@@ -240,23 +228,23 @@ export class Hud {
   /** "+n" pops up just beside the 功德 drawer, then slides into it and fades; the total there updates as it lands. */
   meritPop(n: number, total: number) {
     const r = this.merit.getBoundingClientRect();
-    if (!r.width || this.merit.classList.contains('away')) return void this.meritWaiting.push([n, total]); // behind a menu: pops when it closes
+    if (!r.width) return this.setMerit(total); // not on screen (the opening flight): just count it
     const open = this.merit.classList.contains('open');
     const edge = Math.max(0, r.right); // folded: only its tab shows at the screen's edge
     const n_ = this.meritN.getBoundingClientRect();
     const y = open ? n_.top + n_.height / 2 : r.top + 22;
     const pop = h('div', { class: 'merit-pop' }, `+${n}`);
-    this.root.append(pop);
+    this.merit.after(pop);
     const x1 = open ? n_.left + n_.width / 2 : edge - 22, x0 = edge + 40 + pop.offsetWidth / 2; // a little clear of the drawer
     const at = (x: number, y: number, s: number) => `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${s})`;
     const a = pop.animate(
       [
-        { transform: at(x0 + 6, y, 0.5), opacity: 0 },
-        { transform: at(x0, y - 4, 1.15), opacity: 1, offset: 0.18 },
-        { transform: at(x0, y - 8, 1), opacity: 1, offset: 0.55, easing: 'cubic-bezier(0.5, 0, 0.9, 0.5)' },
+        { transform: at(x0 + 6, y - 6, 0.5), opacity: 0 },
+        { transform: at(x0, y - 34, 1.15), opacity: 1, offset: 0.12 },
+        { transform: at(x0, y - 44, 1), opacity: 1, offset: 0.72, easing: 'cubic-bezier(0.5, 0, 0.9, 0.5)' },
         { transform: at(x1, y, 0.6), opacity: 0 },
       ],
-      { duration: 1300, fill: 'forwards' },
+      { duration: 2400, fill: 'forwards' },
     );
     a.onfinish = () => {
       pop.remove();

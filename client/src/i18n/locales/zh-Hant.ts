@@ -122,6 +122,7 @@ const zhHant: Record<I18nKey, string> = {
 
   'chant.title': '梵唄',
   'merit.title': '功德',
+  'circ.lap': '繞塔 {n} 圈',
   'merit.rank': '階位',
   'merit.novice': '初學',
   'merit.merit': '功德',

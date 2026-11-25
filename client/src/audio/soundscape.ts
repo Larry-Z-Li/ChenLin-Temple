@@ -32,7 +32,7 @@ export class Soundscape {
   private fx!: GainNode;
   private wind?: { gain: GainNode; filter: BiquadFilterNode };
   private burst!: AudioBuffer;
-  private stride = 0;
+  private footfalls = -1;
   private time = 0;
   private falls?: { gain: GainNode; pan: StereoPannerNode };
   private stream?: { gain: GainNode; pan: StereoPannerNode };
@@ -270,8 +270,8 @@ export class Soundscape {
     [0, 7, 14].forEach((s) => this.tone(82, ac.currentTime + s, 11, 0.5, pan, [[1, 1], [2.01, 0.5], [2.76, 0.35], [5.4, 0.15], [8.9, 0.06]]));
   }
 
-  /** `speed`: how fast the listener is walking (m/s), for footsteps. */
-  update(dt: number, listener: THREE.Vector3, camYaw: number, speed = 0) {
+  /** `footfalls`: the listener's footfall count (a step sounds each time it goes up), or −1 when not walking. */
+  update(dt: number, listener: THREE.Vector3, camYaw: number, footfalls = -1) {
     if (!this.started) return;
     const ac = audioCtx(), now = ac.currentTime;
     this.time += dt;
@@ -279,15 +279,9 @@ export class Soundscape {
     this.master.gain.setTargetAtTime(this.level, now, 0.1);
     this.fx.gain.setTargetAtTime(settings.sfxVolume, now, 0.1);
 
-    // Footsteps: one per stride (effects volume, independent of the ambience toggle).
-    if (speed > 0.4) {
-      this.stride += speed * dt;
-      const strideLen = speed > 4.9 ? 1.25 : 0.95;
-      if (this.stride >= strideLen) {
-        this.stride -= strideLen;
-        this.step(this.surfaceAt(listener));
-      }
-    } else this.stride = 0.5;
+    // Footsteps: one as each foot comes down (effects volume, independent of the ambience toggle).
+    if (footfalls > this.footfalls && this.footfalls >= 0) this.step(this.surfaceAt(listener));
+    this.footfalls = footfalls;
 
     // Indoors (inside a hall's walls) the outdoors is muffled.
     const indoors = HALLS.some((h) => h.kind === 'hall' && Math.abs(listener.x - h.x) < hallHalf(h)[0] && Math.abs(listener.z - h.z) < hallHalf(h)[1]);

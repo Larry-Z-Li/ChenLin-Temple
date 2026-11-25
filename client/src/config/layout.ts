@@ -17,7 +17,7 @@ import type { DeityId } from './deities';
 import type { CatCoat, CatPose } from '../world/cat';
 
 /** How far apart everything is spaced, around the great stupa. */
-export const SPREAD = 1.5;
+export const SPREAD = 1.87;
 const MID = { x: 0, z: 9 };
 
 export interface Rect {
@@ -41,9 +41,9 @@ const moved = (r: Rect): Rect => {
 /** The plaza, its gate and the arrival area move south together. */
 const DZ = spreadPoint(0, 97)[1] - 97;
 
-export const BASIN = { x: 0, z: -8, radius: 182 }; // flat valley floor (circle)
-export const PLAY_RADIUS = 194; // soft boundary, measured from BASIN center
-export const TERRAIN_SIZE = 860;
+export const BASIN = { x: 0, z: -8, radius: 225 }; // flat valley floor (circle)
+export const PLAY_RADIUS = 237; // soft boundary, measured from BASIN center
+export const TERRAIN_SIZE = 1080;
 
 export const SPAWN = { x: 0, z: 114.5 + DZ, yaw: 0 }; // yaw 0 = facing north
 
@@ -115,8 +115,13 @@ const hall = (id: string) => HALLS.find((h) => h.id === id)!;
 /** The hall with the lantern wall (光明燈): the first one in from the plaza. */
 const STAIRS = 1.6 + 2.1; // porch + steps beyond the walls
 
-/** The walled court around the great stupa (gates in the middle of each side). */
-export const STUPA_COURT = { x: MID.x, z: MID.z, half: 21, gate: 6 };
+/** The walled court around the great stupa (gates in the middle of each side). Its walls stand 22.5 m from the stupa's base. */
+export const STUPA_COURT = { x: MID.x, z: MID.z, half: 34.5, gate: 6 };
+const CH = STUPA_COURT.half;
+/** The paved walk round the court: how far out it reaches east/west, and its north and south edges. */
+const RING_X = CH + 7.5, RING_N = MID.z - CH - 4, RING_S = MID.z + CH + 4.5;
+/** x of the east/west gate halls' centres (the outer loop is laid 15.25 m inside it). */
+const HALL_X = spreadPoint(39.5, 0)[0];
 /** 萬佛塔: the great stupa on its stepped platform; Vairocana's altar stands at its south face. */
 export const GREAT_STUPA = { x: MID.x, z: MID.z, base: 24, height: 26 };
 
@@ -125,21 +130,21 @@ export const PLAZA = { x: 0, z: 97 + DZ, halfW: 27, halfD: 13 };
 
 /** Stone-paved ground: the plaza, the stupa court, the walk around it, and straight walks to the doors. */
 /** The outer gravel loop's east/west line; the straight walks out of the court's side gates end on it. */
-const SIDE_WALK_X = 44;
+const SIDE_WALK_X = HALL_X - 15.25;
 export const PAVED: Rect[] = [
   { minX: -8, maxX: 8, minZ: 110 + DZ, maxZ: 119 + DZ }, // where you arrive, outside the gate
   { minX: -27, maxX: 27, minZ: 84 + DZ, maxZ: 110 + DZ }, // the plaza 廣場
-  { minX: -21, maxX: 21, minZ: -12, maxZ: 30 }, // the stupa court
-  { minX: -28.5, maxX: 28.5, minZ: -16, maxZ: -12 }, // ring walk: north
-  { minX: -28.5, maxX: 28.5, minZ: 30, maxZ: 34.5 }, // ring walk: south
-  { minX: -28.5, maxX: -21, minZ: -16, maxZ: 34.5 }, // ring walk: west
-  { minX: 21, maxX: 28.5, minZ: -16, maxZ: 34.5 }, // ring walk: east
+  { minX: -CH, maxX: CH, minZ: MID.z - CH, maxZ: MID.z + CH }, // the stupa court
+  { minX: -RING_X, maxX: RING_X, minZ: RING_N, maxZ: MID.z - CH }, // ring walk: north
+  { minX: -RING_X, maxX: RING_X, minZ: MID.z + CH, maxZ: RING_S }, // ring walk: south
+  { minX: -RING_X, maxX: -CH, minZ: RING_N, maxZ: RING_S }, // ring walk: west
+  { minX: CH, maxX: RING_X, minZ: RING_N, maxZ: RING_S }, // ring walk: east
   // straight walks
-  { minX: -3, maxX: 3, minZ: hall('yangsheng').z + hall('yangsheng').depth / 2 + STAIRS, maxZ: -16 }, // ring → Yangsheng's door
+  { minX: -3, maxX: 3, minZ: hall('yangsheng').z + hall('yangsheng').depth / 2 + STAIRS, maxZ: RING_N }, // ring → Yangsheng's door
   { minX: -3, maxX: 3, minZ: hall('chengjiu').z + hall('chengjiu').depth / 2 + STAIRS, maxZ: hall('yangsheng').z - hall('yangsheng').depth / 2 - STAIRS }, // Yangsheng's back door → Chengjiu
-  { minX: -SIDE_WALK_X, maxX: -28.5, minZ: 6.5, maxZ: 11.5 }, // west gate → the outer loop (on round to Zangmi's door)
-  { minX: 28.5, maxX: SIDE_WALK_X, minZ: 6.5, maxZ: 11.5 }, // east gate → the outer loop (on round to Dongmi's door)
-  { minX: -3, maxX: 3, minZ: 34.5, maxZ: hall('guoxue').z - hall('guoxue').depth / 2 - STAIRS }, // ring → Guoxue's back door
+  { minX: -SIDE_WALK_X, maxX: -RING_X, minZ: 6.5, maxZ: 11.5 }, // west gate → the outer loop (on round to Zangmi's door)
+  { minX: RING_X, maxX: SIDE_WALK_X, minZ: 6.5, maxZ: 11.5 }, // east gate → the outer loop (on round to Dongmi's door)
+  { minX: -3, maxX: 3, minZ: RING_S, maxZ: hall('guoxue').z - hall('guoxue').depth / 2 - STAIRS }, // ring → Guoxue's back door
   { minX: -3, maxX: 3, minZ: hall('guoxue').z + hall('guoxue').depth / 2 + STAIRS, maxZ: hall('baosheng').z - hall('baosheng').depth / 2 - STAIRS }, // Guoxue → Baosheng's back door
   { minX: -3, maxX: 3, minZ: hall('baosheng').z + hall('baosheng').depth / 2 + STAIRS, maxZ: 84 + DZ }, // Baosheng → the plaza
 ];
@@ -157,11 +162,18 @@ export const BODHI_TREE = at(58, 51.3);
 export const BODHI_BELL = { ...at(-62.5, 23), yaw: 0 };
 
 /** Waterfall in the western mountains, facing east toward the temple. */
-export const WATERFALL = { x: -200, z: 12, width: 10, height: 48 };
+export const WATERFALL = { x: -(BASIN.radius + 18), z: 12, width: 10, height: 48 };
 
 /** Stream from the foot of the falls down to the release pond (x, z), first point at the falls. */
+const STREAM_FROM = [WATERFALL.x + 2, WATERFALL.z], STREAM_TO = [POND.x - POND.radius + 1.5, POND.z];
+/** The stream's shape was drawn from (-198, 12) to (-117.5, -40.5); this stretches/turns it to run from the falls to the pond. */
+const streamMap = (() => {
+  const o: [number, number] = [-198, 12], vo: [number, number] = [80.5, -52.5], vn = [STREAM_TO[0] - STREAM_FROM[0], STREAM_TO[1] - STREAM_FROM[1]];
+  const m = Math.hypot(vn[0], vn[1]) / Math.hypot(vo[0], vo[1]), a = Math.atan2(vn[1], vn[0]) - Math.atan2(vo[1], vo[0]), c = Math.cos(a) * m, s = Math.sin(a) * m;
+  return ([x, z]: [number, number]): [number, number] => [STREAM_FROM[0] + (x - o[0]) * c - (z - o[1]) * s, STREAM_FROM[1] + (x - o[0]) * s + (z - o[1]) * c];
+})();
 export const STREAM: [number, number][] = [
-  [-198, 12], [-184, 5], [-170, -4], [-156, -14], [-143, -24], [-132, -31], [-124, -35.5], [POND.x - POND.radius + 1.5, POND.z],
+  ...([[-198, 12], [-184, 5], [-170, -4], [-156, -14], [-143, -24], [-132, -31], [-124, -35.5]] as [number, number][]).map(streamMap), [STREAM_TO[0], STREAM_TO[1]],
 ];
 
 /**
@@ -192,10 +204,10 @@ export interface WheelRowDef {
 
 /** Prayer-wheel galleries inside the stupa court's east and west walls, for walking round the stupa. */
 export const WHEEL_ROWS: WheelRowDef[] = [
-  { id: 'nw', x: -18.3, zStart: -9, count: 9, spacing: 1.3, side: 'east' },
-  { id: 'sw', x: -18.3, zStart: 16.6, count: 9, spacing: 1.3, side: 'east' },
-  { id: 'ne', x: 18.3, zStart: -9, count: 9, spacing: 1.3, side: 'west' },
-  { id: 'se', x: 18.3, zStart: 16.6, count: 9, spacing: 1.3, side: 'west' },
+  { id: 'nw', x: -(CH - 2.7), zStart: MID.z - (CH - 3), count: 19, spacing: 1.3, side: 'east' },
+  { id: 'sw', x: -(CH - 2.7), zStart: MID.z + 7.6, count: 19, spacing: 1.3, side: 'east' },
+  { id: 'ne', x: CH - 2.7, zStart: MID.z - (CH - 3), count: 19, spacing: 1.3, side: 'west' },
+  { id: 'se', x: CH - 2.7, zStart: MID.z + 7.6, count: 19, spacing: 1.3, side: 'west' },
 ];
 
 /** 櫻花樹林: cherry trees all round the wish garden. */
@@ -231,7 +243,7 @@ export const BENCHES: BenchDef[] = [
  * valley centre (0 = south, −π/2 = west); each stupa sits on a local knoll near that bearing,
  * with irregular spacing so it reads as natural rather than planned.
  */
-export const STUPA_RIDGE = { count: 15, bearingFrom: -2.35, bearingTo: -0.75, rMin: 222, rMax: 300, seed: 108 };
+export const STUPA_RIDGE = { count: 15, bearingFrom: -2.35, bearingTo: -0.75, rMin: 278, rMax: 375, seed: 108 };
 
 /** A prayer-flag anchor: (x, z) and height above the ground there; `pole` puts a wooden pole under it. */
 export interface FlagAnchor { x: number; z: number; h: number; pole?: boolean }
@@ -243,7 +255,7 @@ const stupaTop: FlagAnchor = { x: GREAT_STUPA.x, z: GREAT_STUPA.z, h: 23 };
 /** Strings of prayer flags (the ridge strings between stupas are added automatically). */
 export const FLAG_LINES: [FlagAnchor, FlagAnchor][] = [
   // from the great stupa's spire down to the corners of its court
-  ...[pole(-19.3, -10.3), pole(19.3, -10.3), pole(-19.3, 28.3), pole(19.3, 28.3)].map((p) => [stupaTop, p] as [FlagAnchor, FlagAnchor]),
+  ...[pole(-(CH - 1.7), MID.z - (CH - 1.7)), pole(CH - 1.7, MID.z - (CH - 1.7)), pole(-(CH - 1.7), MID.z + CH - 1.7), pole(CH - 1.7, MID.z + CH - 1.7)].map((p) => [stupaTop, p] as [FlagAnchor, FlagAnchor]),
   // across the plaza by the gate
   [pole(-12, 108.5 + DZ, 4.8), pole(12, 108.5 + DZ, 4.8)],
   // a ring around the release pond
@@ -256,7 +268,7 @@ export const FLAG_LINES: [FlagAnchor, FlagAnchor][] = [
 ];
 
 /** Arched stone bridge over the falls stream. */
-export const BRIDGE = { x: -163, z0: -15, z1: -3, width: 2.6, rise: 1.15 };
+export const BRIDGE = (() => { const [x, z] = streamMap([-163, -9]); return { x, z0: z - 6, z1: z + 6, width: 2.6, rise: 1.15 }; })();
 
 /** 枯山水: a dry garden of raked sand and rocks on the plaza's west (left) side, viewed from its stone kerb. */
 export const SAND_GARDEN = {
@@ -281,14 +293,16 @@ export const STONE_LANTERNS: [number, number][] = [
   // frame mirrored on the plaza's east side, round its rows of trees
   ...([[SAND_GARDEN.minX - 1, SAND_GARDEN.minZ - 1], [SAND_GARDEN.maxX + 1, SAND_GARDEN.minZ - 1], [SAND_GARDEN.minX - 1, SAND_GARDEN.maxZ + 1], [SAND_GARDEN.maxX + 1, SAND_GARDEN.maxZ + 1],
     [SAND_GARDEN.minX - 1, (SAND_GARDEN.minZ + SAND_GARDEN.maxZ) / 2], [SAND_GARDEN.maxX + 1, (SAND_GARDEN.minZ + SAND_GARDEN.maxZ) / 2]] as [number, number][]).flatMap(([x, z]): [number, number][] => [[x, z], [-x, z]]),
-  [-4.2, -13.5], [4.2, -13.5], [-4.2, 31.6], [4.2, 31.6], [-22.6, 4.8], [-22.6, 13.2], [22.6, 4.8], [22.6, 13.2], // the court's gates
+  [-4.2, MID.z - CH - 1.5], [4.2, MID.z - CH - 1.5], [-4.2, MID.z + CH + 1.6], [4.2, MID.z + CH + 1.6], [-(CH + 1.6), 4.8], [-(CH + 1.6), 13.2], [CH + 1.6, 4.8], [CH + 1.6, 13.2], // the court's gates
   [-9.5, 106 + DZ], [9.5, 106 + DZ], // plaza, by the gate
   [DRAGON_POOL.x - 6.5, DRAGON_POOL.z + 6], [DRAGON_POOL.x + 6.5, DRAGON_POOL.z + 6], // dragon pool
   [BRIDGE.x - 1.7, BRIDGE.z0 - 1.4], [BRIDGE.x + 1.7, BRIDGE.z1 + 1.4], // ends of the stone bridge
 ];
 
-/** Large bronze incense burner (香爐) just inside the court's south gate, with its incense table. */
-export const INCENSE_BURNER = { x: 0, z: 25.2, tableZ: 27.2, standZ: 28.2 };
+/** Large bronze incense burner (香爐) a few steps south of the stupa's altar, with its incense table on its south side. */
+export const INCENSE_BURNER = { x: 0, z: MID.z + 17.5, tableZ: MID.z + 19.5, standZ: MID.z + 20.5 };
+/** The middle syllable's carpet: halfway from the burner to the court's south gate. */
+export const COURT_CARPET = { x: 0, z: MID.z + (20.5 + CH) / 2 + 0.5, scale: 1.5 };
 
 /** Stone tablet (石碑) where you arrive, left of the gate. */
 export const STELE = { x: -6.5, z: 116.5 + DZ };
@@ -308,9 +322,9 @@ const sideDoorX = SIDE_WALK_X;
 export const PATH_LIGHT_RUNS: { from: [number, number]; to: [number, number]; step: number }[] = [
   { from: [-8.4, 112 + DZ], to: [-8.4, 118 + DZ], step: 6 }, { from: [8.4, 112 + DZ], to: [8.4, 118 + DZ], step: 6 },
   // along the straight walks to the four facing doors
-  { from: [-4.2, -18], to: [-4.2, doorZ('yangsheng') + 0.7], step: 5 }, { from: [4.2, -18], to: [4.2, doorZ('yangsheng') + 0.7], step: 5 },
-  { from: [-31, 4.8], to: [-sideDoorX + 1.3, 4.8], step: 5 }, { from: [31, 4.8], to: [sideDoorX - 1.3, 4.8], step: 5 },
-  { from: [-31, 13.2], to: [-sideDoorX + 1.3, 13.2], step: 5 }, { from: [31, 13.2], to: [sideDoorX - 1.3, 13.2], step: 5 },
+  { from: [-4.2, RING_N - 2], to: [-4.2, doorZ('yangsheng') + 0.7], step: 5 }, { from: [4.2, RING_N - 2], to: [4.2, doorZ('yangsheng') + 0.7], step: 5 },
+  { from: [-RING_X - 2.5, 4.8], to: [-sideDoorX + 1.3, 4.8], step: 5 }, { from: [RING_X + 2.5, 4.8], to: [sideDoorX - 1.3, 4.8], step: 5 },
+  { from: [-RING_X - 2.5, 13.2], to: [-sideDoorX + 1.3, 13.2], step: 5 }, { from: [RING_X + 2.5, 13.2], to: [sideDoorX - 1.3, 13.2], step: 5 },
   // the orchard at night: one in the middle of each square of four trees, and a row along its entrance side
   ...[0.5, 1.5, 2.5].map((k) => ({ from: [ORCHARD.minX + k * ORCHARD.spacing, ORCHARD.minZ + ORCHARD.spacing / 2] as [number, number], to: [ORCHARD.minX + k * ORCHARD.spacing, ORCHARD.maxZ - ORCHARD.spacing / 2] as [number, number], step: ORCHARD.spacing })),
   { from: [ORCHARD.minX - 2.2, ORCHARD.minZ], to: [ORCHARD.minX - 2.2, ORCHARD.maxZ], step: ORCHARD.spacing },
@@ -404,43 +418,51 @@ const snapEnds = (path: [number, number][]) => {
  * cherry grove, a pair down to the plaza's corners, and spurs out to the corner pagodas, the bridges,
  * the pond, the bell, the spring and the monks' and abbot's quarters. World coordinates.
  */
-const LOOP_X = SIDE_WALK_X, NORTH_Z = -29, SOUTH_Z = 79.5;
-/** Just outside the corner halls' outer eaves (x ±71.3 walls + 2.4 eaves). */
-const CORNER_X = 76.5;
+const LOOP_X = SIDE_WALK_X;
+/** Just outside the corner halls' outer eaves (walls at ±(HALL_X + 12) plus 2.4 of eaves). */
+const CORNER_X = HALL_X + 17.25;
+/** Raw points on the outer paths were drawn on the 1.5× plan: this puts them where that spot is at the current spread. */
+const respread = (x: number, z: number): [number, number] => spreadPoint(MID.x + (x - MID.x) / 1.5, MID.z + (z - MID.z) / 1.5);
 const mirror = (p: [number, number][]) => p.map(([x, z]) => [-x, z] as [number, number]);
 const both = (p: [number, number][]) => [p, mirror(p)];
 const hallDoor = (id: string): [number, number] => {
   const h = hall(id), [ex] = hallHalf(h);
   return h.facing === 'east' ? [h.x + ex + STAIRS, h.z] : h.facing === 'west' ? [h.x - ex - STAIRS, h.z] : [h.x, h.z + h.depth / 2 + STAIRS];
 };
+const NORTH_Z = hallDoor('guanyin')[1] + 2.8, SOUTH_Z = hallDoor('dizang')[1] + 3.3;
 const bridgeEnd = (i: number, side: -1 | 1): [number, number] => [FOOT_BRIDGES[i].x + (side * FOOT_BRIDGES[i].length) / 2, FOOT_BRIDGES[i].z];
+const nearP = (p: { x: number; z: number }, dx: number, dz: number): [number, number] => [p.x + dx, p.z + dz];
+const pagoda = (id: string) => PAGODAS.find((p) => p.id === id)!;
+/** Where the ring walk's south-west diagonal meets the loop. */
+const SOUTH_JOIN = RING_S + (LOOP_X - RING_X);
+const CJ = hall('chengjiu').z;
 export const FOOTPATHS: [number, number][][] = [
   // the outer loop, door to door
   [[hallDoor('guanyin')[0], hallDoor('guanyin')[1]], [hallDoor('guanyin')[0], NORTH_Z], [-hallDoor('guanyin')[0], NORTH_Z], [hallDoor('caishen')[0], hallDoor('caishen')[1]]],
   [[hallDoor('dizang')[0], hallDoor('dizang')[1]], [hallDoor('dizang')[0], SOUTH_Z], [-hallDoor('dizang')[0], SOUTH_Z], [hallDoor('wenshu')[0], hallDoor('wenshu')[1]]],
   // the loop's sides, on down to the plaza's corners (points along the straight so the smooth curve through
   // them stays straight beside the halls: with only the ends it bowed ~3 m out, into their floors)
-  ...both([[-LOOP_X, NORTH_Z], [-LOOP_X, 10], [-LOOP_X, 50], [-LOOP_X, 92], [-LOOP_X, 100], [-27, 128]]),
+  ...both([[-LOOP_X, NORTH_Z], [-LOOP_X, -20], [-LOOP_X, 10], [-LOOP_X, 37], [-LOOP_X, SOUTH_JOIN], [-LOOP_X, SOUTH_Z - 4], [-LOOP_X, SOUTH_Z + 12.5], [-LOOP_X, SOUTH_Z + 20.5], [-27, 84 + DZ]]),
   ...both([[hallDoor('zangmi')[0], 30], hallDoor('zangmi')]), // the side halls' doors, straight up from the path below them (z = 30)
   [[0, NORTH_Z], hallDoor('yangsheng')], [[0, SOUTH_Z], hallDoor('guoxue')],
   // diagonals from the stupa court's ring walk
-  ...both([[-28.5, -16], [-LOOP_X, NORTH_Z]]),
-  ...both([[-28.5, 34.5], [-LOOP_X, 50]]),
+  ...both([[-RING_X, RING_N], [-LOOP_X, NORTH_Z]]),
+  ...both([[-RING_X, RING_S], [-LOOP_X, SOUTH_JOIN]]),
   // round Chengjiu: to its door, and on to the dragon pool and the cherry grove
-  ...both([[-22, NORTH_Z], [-22, -70], [-6, -74]]),
-  ...both([[-22, -70], [-24, -110], [-12, -128]]),
+  ...both([[-22, NORTH_Z], [-22, (NORTH_Z + CJ + 21.5) / 2], [-22, CJ + 21.5], [-6, CJ + 17.5]]),
+  ...both([[-22, CJ + 21.5], [-24, CJ - 18.5], [-12, DRAGON_POOL.z - 3.5]]),
   // north-west: the pond, the abbot, Ruyi pagoda · north-east: Duobao pagoda
   // (along the loop past the hall's corner first: cutting across, they ran over its front porch)
-  [[-LOOP_X - 15.3, NORTH_Z], [-CORNER_X, NORTH_Z], [-CORNER_X, -36], [POND_PAVILION.walkX1, POND.z]],
-  [[-CORNER_X, -36], [-90, -70], [-96, -88], [-120, -84], [-128, -82.5]],
-  [[LOOP_X + 15.3, NORTH_Z], [CORNER_X, NORTH_Z], [CORNER_X, -36], [82.5, -70]],
+  [[-HALL_X, NORTH_Z], [-CORNER_X, NORTH_Z], [-CORNER_X, POND.z + 4.5], [POND_PAVILION.walkX1, POND.z]],
+  [[-CORNER_X, POND.z + 4.5], respread(-90, -70), respread(-96, -88), respread(-120, -84), nearP(pagoda('ruyi'), 7, 0)],
+  [[HALL_X, NORTH_Z], [CORNER_X, NORTH_Z], [CORNER_X, POND.z + 4.5], nearP(pagoda('duobao'), 0, 6.5)],
   // west: the great bell and the west bridge · east: the monks' courtyard and the orchard bridge
-  [[-LOOP_X, 30], [-90, 30], [-104, 44], bridgeEnd(0, 1)],
-  [[LOOP_X, -12], [80, -12], bridgeEnd(2, -1)],
-  [[LOOP_X, 30], [80, 30], [84, 18]], // (mirrors the way to the bell)
+  [[-LOOP_X, 30], respread(-90, 30), respread(-104, 44), bridgeEnd(0, 1)],
+  [[LOOP_X, bridgeEnd(2, -1)[1] - 1], [(LOOP_X + bridgeEnd(2, -1)[0]) / 2, bridgeEnd(2, -1)[1]], bridgeEnd(2, -1)],
+  [[LOOP_X, 30], respread(80, 30), [DORM.minX, (DORM.minZ + DORM.maxZ) / 2 + 1.5]], // (mirrors the way to the bell)
   // south-west: the spring, Linggu pagoda, the bridge · south-east: the Bodhi tree, Wenchang pagoda, the bridge
-  [[-59.3, SOUTH_Z], [-76, 85], [-81.5, 92.5]], [[-76, 85], [-90, 106], bridgeEnd(1, 1)], [[-68, 82], [-73.5, 80]],
-  [[59.3, SOUTH_Z], [76, 85], [81.5, 87]], [[76, 85], [90, 100], bridgeEnd(3, -1)], [[76, 85], [82, 77.5]],
+  [[-HALL_X, SOUTH_Z], respread(-76, 85), nearP(pagoda('linggu'), 5.5, -5)], [respread(-76, 85), respread(-90, 106), bridgeEnd(1, 1)], [[(-HALL_X + respread(-76, 85)[0]) / 2, (SOUTH_Z + respread(-76, 85)[1]) / 2], nearP(DRAGON_SPRING, 1.5, 0.5)],
+  [[HALL_X, SOUTH_Z], respread(76, 85), nearP(pagoda('wenchang'), -5.5, -1.5)], [respread(76, 85), respread(90, 100), bridgeEnd(3, -1)], [respread(76, 85), nearP(pagoda('wenchang'), -5, -11)],
 ].map((p) => snapEnds(p.map(([x, z]) => [x, z] as [number, number])));
 
 /** Picnic tables with benches (you can sit at them). yaw turns the table. */

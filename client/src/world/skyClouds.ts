@@ -49,12 +49,12 @@ export function buildSkyClouds(scene: THREE.Scene) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * R; // spread evenly over the disc
     return { sprite, mat, x: Math.cos(a) * r, z: Math.sin(a) * r, y: 150 + rnd() * 130, opacity: 0.2 + rnd() * 0.3, speed: 2.5 + rnd() * 3 };
   });
-  const warm = new THREE.Color(1, 0.82, 0.68), white = new THREE.Color(1, 1, 1), moonlit = new THREE.Color(0.32, 0.36, 0.5), tint = new THREE.Color();
+  const warm = new THREE.Color(1, 0.82, 0.68), white = new THREE.Color(1, 1, 1), moonlit = new THREE.Color(0.12, 0.15, 0.24), tint = new THREE.Color();
   return {
     /** `day` 0 (night: moonlit, fainter) … 1 (day); `dusk` 0 … 1 near sunrise and sunset (warms them). */
     update(dt: number, day: number, dusk: number) {
       tint.copy(moonlit).lerp(white, day).lerp(warm, dusk * 0.8);
-      const fade = day + (1 - day) * 0.55; // fainter by night
+      const fade = day + (1 - day) * 0.4; // fainter by night
       for (const c of clouds) {
         c.x += WIND.x * c.speed * dt; // drifting on the wind
         c.z += WIND.y * c.speed * dt;
