@@ -219,7 +219,7 @@ function ribbonMaterial(time: { value: number }, light: { value: number }) {
         float edge = min(x, 1.0 - x) / mix(0.06, 0.14, falling) - rag * 0.7 * falling + 0.1;
         float a = mix(0.82, 0.42 + streak * 0.55, falling) + lip * 0.3 + foot * 0.4;
         a = clamp(a, 0.0, 0.97) * clamp(edge, 0.0, 1.0) * smoothstep(0.0, 1.5, vUv.y);
-        gl_FragColor = vec4(col * uLight, a);
+        gl_FragColor = vec4(col * uLight * mix(vec3(0.62, 0.74, 1.0), vec3(1.0), smoothstep(0.34, 0.9, uLight)), a); // (moonlit blue by night)
         #include <fog_fragment>
       }`,
   });
@@ -472,7 +472,7 @@ export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; plac
         uniform float uLight; varying float vA;
         void main() {
           float a = smoothstep(0.5, 0.1, length(gl_PointCoord - 0.5)) * vA;
-          gl_FragColor = vec4(vec3(0.95, 0.98, 1.0) * uLight, a);
+          gl_FragColor = vec4(vec3(0.95, 0.98, 1.0) * uLight * mix(vec3(0.62, 0.74, 1.0), vec3(1.0), smoothstep(0.34, 0.9, uLight)), a);
           #include <fog_fragment>
         }`,
     }));

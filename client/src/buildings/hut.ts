@@ -238,6 +238,7 @@ function buildTableHut(ctx: WorldContext) {
   // Plinth (skirted down to the lowest ground), step in front
   g.add(box(4.8, PLH + (hi - lo), 5.2, stone, 0, -(hi - lo), 0.2));
   g.add(box(2.4, PLH * 0.5, 0.5, stone, 0, 0, 3.05));
+  g.add(box(3.8, 0.03, 3.8, mat(0x8a5a36, { roughness: 0.85 }), 0, PLH, 0)); // timber floor (the picnic tables' deck wood tone)
   // Walls: back and sides (white over a wood band, dark cap), lattice windows on the sides
   const wall = mat(THEME.wall, { roughness: 0.9 });
   g.add(box(4, Hh, 0.2, wall, 0, PLH, -half + 0.1), box(4.06, 0.6, 0.26, wood, 0, PLH, -half + 0.1));

@@ -67,5 +67,5 @@ export function buildModelGallery(ctx: WorldContext, models: Record<string, stri
     ctx.collisions.addCircle(G.x + x, G.z + z, 1.2);
   });
   ctx.scene.add(group);
-  return { x: G.x - W / 2 + 3, y: G.y, z: G.z, yaw: Math.PI / 2 }; // at one end, looking down the aisle
+  return { x: G.x - W / 2 + 3, y: G.y, z: G.z, yaw: -Math.PI / 2 }; // at one end, looking down the aisle (+x)
 }

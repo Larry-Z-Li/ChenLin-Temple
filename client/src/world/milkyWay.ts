@@ -43,8 +43,8 @@ export function buildMilkyWay(scene: THREE.Scene) {
         vec2 off = d.xz / max(length(d.xz), 1e-5) * rho;
         float lat = 0.785 + off.y;
         vec2 puv = vec2((d.y > 0.0 ? 0.0556 : 0.222) + off.x / cos(lat) / 6.2831853, 0.5 + lat / 3.14159265);
-        vec3 patch = textureGrad(uMap, puv, dFdx(puv), dFdy(puv)).rgb;
-        c = mix(c, patch, smoothstep(0.86, 0.93, abs(d.y))) * uColor;
+        vec3 capC = textureGrad(uMap, puv, dFdx(puv), dFdy(puv)).rgb;
+        c = mix(c, capC, smoothstep(0.86, 0.93, abs(d.y))) * uColor;
         gl_FragColor = vec4(c, 1.0);
         #include <colorspace_fragment>
       }`,

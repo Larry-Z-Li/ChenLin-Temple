@@ -34,6 +34,6 @@ export function buildCaveFallsWorld(ctx: WorldContext) {
     if (!falls) return;
     const f = ctx.scene.fog as THREE.Fog | THREE.FogExp2 | null;
     if (f) fog.copy(f.color);
-    falls.update(time, 0.08 + 0.92 * lighting.daylight, fog); // the water isn't lit by the scene: dim it by night
+    falls.update(time, 0.34 + 0.66 * lighting.daylight, fog); // the water isn't lit by the scene: dim it by night (white water still catches the moon)
   });
 }
