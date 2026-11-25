@@ -202,7 +202,7 @@ export function buildFloodlights(ctx: WorldContext) {
     corners(h.x, h.z, ex + 2.3, ez + 2.3);
   }
   const s = GREAT_STUPA, sy = ctx.ground.heightAt(s.x, s.z);
-  addFlood({ x: s.x, z: s.z, hx: s.base / 2 + 1, hz: s.base / 2 + 1, base: sy, top: sy + s.height + 1, strength: 0.45, color: 0xfff0dc });
+  addFlood({ x: s.x, z: s.z, hx: s.base / 2 + 1, hz: s.base / 2 + 1, base: sy, top: sy + s.height + 1, strength: 0.2, color: 0xfff0dc }); // soft: the stupa has its own uplights
   for (let k = 0; k < 8; k++) fixtures.push([s.x + Math.cos((k * Math.PI) / 4 + 0.39) * (s.base / 2 + 0.6), s.z + Math.sin((k * Math.PI) / 4 + 0.39) * (s.base / 2 + 0.6)]);
   for (const p of PAGODAS) {
     const py = ctx.ground.heightAt(p.x, p.z), r = p.stories ? 5.5 : 7;
@@ -222,18 +222,7 @@ export function buildFloodlights(ctx: WorldContext) {
   addFlood({ x: g.x, z: g.z, hx: g.width / 2 + 1.5, hz: 2.2, base: 0, top: g.height + 1.5, strength: 0.6, color: 0xffd6a0 });
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) fixtures.push([g.x + sx * (g.width / 2 - 0.6), g.z + sz * 1.6]);
 
-  // The projectors: small dark housings with a glowing lens facing up at their building.
-  const body = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.22, 0.3).translate(0, 0.11, 0), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.4 }), fixtures.length);
-  const lensMat = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xffe2b0, emissiveIntensity: 0.2 });
-  nightGlow.track((n) => (lensMat.emissiveIntensity = 0.2 + 2.5 * n));
-  const lens = new THREE.InstancedMesh(new THREE.CircleGeometry(0.1, 12).rotateX(-Math.PI / 2).translate(0, 0.225, 0), lensMat, fixtures.length);
-  const m = new THREE.Matrix4();
-  fixtures.forEach(([x, z], i) => {
-    m.makeTranslation(x, ctx.ground.heightAt(x, z), z);
-    body.setMatrixAt(i, m);
-    lens.setMatrixAt(i, m);
-  });
-  ctx.scene.add(body, lens);
+  void fixtures; // (no projector housings drawn: the light just washes up the walls)
 }
 
 // ---------------------------------------------------------------------------------------------

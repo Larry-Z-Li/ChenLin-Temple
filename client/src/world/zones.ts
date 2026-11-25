@@ -1,4 +1,5 @@
-import { hallHalf, ABBOT, BASIN, BENCHES, BODHI_BELL, BODHI_TREE, DORM, DRAGON_POOL, DRAGON_SPRING, FOOT_BRIDGES, FOOTPATHS, MAP_BOARD, PAGODAS, PICNIC_TABLES, POND_PAVILION, STUPA_COURT, SAND_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WATERFALL, WHEEL_ROWS, type Rect } from '../config/layout';
+import { hallHalf, ABBOT, BASIN, BENCHES, BODHI_BELL, BODHI_TREE, DORM, DRAGON_POOL, DRAGON_SPRING, FOOT_BRIDGES, FOOTPATHS, MAP_BOARD, PAGODAS, PICNIC_TABLES, POND_PAVILION, STUPA_COURT, SAND_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WHEEL_ROWS, caveFallsLocal, type Rect } from '../config/layout';
+import { occupied } from './caveFalls';
 import { smoothstep } from '../core/math';
 import { onRidgeTerrace } from './ridgeWalk';
 import { nearestOnStream, nearestRiver, nearStream } from './stream';
@@ -8,6 +9,12 @@ const POLES = FLAG_LINES.flat().filter((a) => a.pole);
 const inRect = (x: number, z: number, r: Rect, m: number) => x >= r.minX - m && x <= r.maxX + m && z >= r.minZ - m && z <= r.maxZ + m;
 
 /** True if (x,z) is reserved for buildings, paths, water etc. — keep vegetation out. */
+/** The cave waterfall's rock, pool and stairs (with a margin). */
+function caveFallsTaken(x: number, z: number, margin: number) {
+  const [lx, lz] = caveFallsLocal(x, z);
+  return Math.hypot(lx, lz + 20) < 60 && occupied(lx, lz, margin);
+}
+
 export function isReserved(x: number, z: number, margin = 1.5, includeOrchard = true) {
   if (onRidgeTerrace(x, z)) return true;
   for (const h of HALLS) {
@@ -17,6 +24,7 @@ export function isReserved(x: number, z: number, margin = 1.5, includeOrchard = 
   }
   for (const p of PAVED) if (inRect(x, z, p, margin)) return true;
   if (Math.hypot(x - POND.x, z - POND.z) < POND.radius + margin + 2) return true;
+  if (caveFallsTaken(x, z, margin)) return true;
   if (includeOrchard && inRect(x, z, ORCHARD, margin + 2)) return true;
   if (Math.hypot(x - BODHI_TREE.x, z - BODHI_TREE.z) < 6 + margin) return true;
   if (Math.hypot(x - BODHI_BELL.x, z - BODHI_BELL.z) < 4.5 + margin) return true;
@@ -49,7 +57,7 @@ export function isReserved(x: number, z: number, margin = 1.5, includeOrchard = 
 
 /** Keep trees out of the sightline from the temple to the waterfall: along the stream, widening toward the falls. */
 export function inStreamVista(x: number, z: number) {
-  if (Math.hypot(x - WATERFALL.x, z - WATERFALL.z) < 24) return true;
+  if (caveFallsTaken(x, z, 4)) return true; // the cave waterfall's rock and pool bring their own trees
   if (!nearStream(x, z)) return false;
   const q = nearestOnStream(x, z);
   return q.behind > -2 && q.d < 6 + 12 * (1 - smoothstep(10, 70, q.s));

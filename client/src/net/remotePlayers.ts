@@ -72,7 +72,9 @@ export class RemotePlayers {
       }
       r.yaw = dampAngle(r.yaw, yaw, 10, dt);
       r.avatar.root.rotation.y = r.yaw;
-      r.avatar.anim = ANIMS[a] ?? 'idle';
+      const anim = ANIMS[a] ?? 'idle';
+      // (walking but going nowhere, against something or with their tab asleep: they stand, not tread on the spot)
+      r.avatar.anim = (anim === 'walk' || anim === 'run') && r.speed < 0.3 ? 'idle' : anim;
       const flags = r.target[5];
       r.avatar.setListening((flags & FLAG_LISTENING) !== 0);
       r.avatar.setIncense(flags & FLAG_INCENSE ? (flags & FLAG_INCENSE_LIT ? 2 : 1) : 0);

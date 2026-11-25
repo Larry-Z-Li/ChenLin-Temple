@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ANIMS, type Anim, type Transform } from '../../../shared/protocol';
-import { BASIN, PLAY_RADIUS, SPAWN } from '../config/layout';
+import { BASIN, PLAY_RADIUS, SPAWN, caveFallsLocal } from '../config/layout';
+import { inCut } from '../world/caveFalls';
 import type { CollisionWorld } from '../core/collisions';
 import type { Ground } from '../core/ground';
 import type { Input } from '../core/input';
@@ -119,7 +120,7 @@ export class LocalPlayer {
     collisions.resolve(p, RADIUS);
     // Soft boundary around the valley
     const dx = p.x - BASIN.x, dz = p.z - BASIN.z, r = Math.hypot(dx, dz);
-    if (r > PLAY_RADIUS) {
+    if (r > PLAY_RADIUS && !inCut(...caveFallsLocal(p.x, p.z))) { // (the cave waterfall's floor reaches a little further)
       p.x = BASIN.x + (dx / r) * PLAY_RADIUS;
       p.z = BASIN.z + (dz / r) * PLAY_RADIUS;
     }
@@ -135,13 +136,12 @@ export class LocalPlayer {
     this.sync(dt);
   }
 
-  /** Steer the character directly (the entry screen's pacing monk). */
-  puppet(dt: number, x: number, y: number, z: number, yaw: number, walking: boolean) {
-    // (the legs keep pace with how fast he really moves)
-    this.speed = walking && dt > 0 ? damp(this.speed, Math.hypot(x - this.pos.x, z - this.pos.z) / dt, 6, dt) : 0;
+  /** Steer the character directly (the entry screen's pacing monk), moving at `speed` m/s (0: standing still). */
+  puppet(dt: number, x: number, y: number, z: number, yaw: number, speed: number) {
+    this.speed = speed; // the legs keep pace with it
     this.pos.set(x, y, z);
     this.yaw = yaw;
-    this.avatar.anim = walking ? 'walk' : 'idle';
+    this.avatar.anim = speed > 0 ? 'walk' : 'idle';
     this.sync(dt);
   }
 

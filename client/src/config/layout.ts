@@ -161,11 +161,27 @@ export const BODHI_TREE = at(58, 51.3);
 /** The great bell (梵鐘) in its frame on the west meadow, by the path to the west bridge; rung when a wish lantern is hung. */
 export const BODHI_BELL = { ...at(-62.5, 23), yaw: 0 };
 
-/** Waterfall in the western mountains, facing east toward the temple. */
-export const WATERFALL = { x: -(BASIN.radius + 18), z: 12, width: 10, height: 48 };
+/**
+ * 洞瀑: the cave waterfall at the valley's western edge, at the foot of the mountains, facing the temple (see
+ * world/caveFalls.ts). Its own frame: x across, z toward the temple, y up from its ground (y here).
+ */
+const CF_DIR = (() => { const dx = -243 - BASIN.x, dz = 12 - BASIN.z, l = Math.hypot(dx, dz); return [dx / l, dz / l]; })();
+export const CAVE_FALLS = { x: BASIN.x + CF_DIR[0] * 218, z: BASIN.z + CF_DIR[1] * 218, y: 0.2, yaw: Math.atan2(-CF_DIR[0], -CF_DIR[1]) };
+/** A point in the cave waterfall's own frame (x across, z toward the temple), in the world. */
+export function caveFallsAt(lx: number, lz: number): [number, number] {
+  const s = Math.sin(CAVE_FALLS.yaw), c = Math.cos(CAVE_FALLS.yaw);
+  return [CAVE_FALLS.x + lx * c + lz * s, CAVE_FALLS.z - lx * s + lz * c];
+}
+/** A world point in the cave waterfall's own frame. */
+export function caveFallsLocal(x: number, z: number): [number, number] {
+  const s = Math.sin(CAVE_FALLS.yaw), c = Math.cos(CAVE_FALLS.yaw), dx = x - CAVE_FALLS.x, dz = z - CAVE_FALLS.z;
+  return [dx * c - dz * s, dx * s + dz * c];
+}
+/** Where the water lands (the falls' foot, for its sound and to keep clear), in the world. */
+export const WATERFALL = (() => { const [x, z] = caveFallsAt(0.4, -9.5); return { x, z, width: 9, height: 48 }; })();
 
-/** Stream from the foot of the falls down to the release pond (x, z), first point at the falls. */
-const STREAM_FROM = [WATERFALL.x + 2, WATERFALL.z], STREAM_TO = [POND.x - POND.radius + 1.5, POND.z];
+/** Stream from the cave waterfall's pool (its outlet, in front) down to the release pond. */
+const STREAM_FROM = caveFallsAt(-0.8, 7.0), STREAM_TO = [POND.x - POND.radius + 1.5, POND.z];
 /** The stream's shape was drawn from (-198, 12) to (-117.5, -40.5); this stretches/turns it to run from the falls to the pond. */
 const streamMap = (() => {
   const o: [number, number] = [-198, 12], vo: [number, number] = [80.5, -52.5], vn = [STREAM_TO[0] - STREAM_FROM[0], STREAM_TO[1] - STREAM_FROM[1]];
@@ -177,18 +193,31 @@ export const STREAM: [number, number][] = [
 ];
 
 /**
- * All rivers, upstream first. The falls stream feeds the pond; the west river leaves the pond and runs
- * south past the Linggu pagoda; the east river comes down a north-east gorge, past the monks' quarters
- * and the orchard; they meet below the arrival plaza and leave through the southern gorge.
+ * All rivers, upstream first. All the valley's water comes from the cave waterfall: its stream feeds the release
+ * pond; the west river leaves the pond and runs south past the Linggu pagoda; the brook leaves it north, round the
+ * halls, to the dragon pool; the east river leaves that across the north meadow and runs south past the monks'
+ * quarters and the orchard; the two meet below the arrival plaza and leave through the southern gorge.
  */
 export interface RiverDef { id: string; points: [number, number][]; halfWidth: number; falls?: boolean }
+const DRAGON_POOL_X = 0, DRAGON_POOL_Z = spreadPoint(0, -80)[1]; // (the dragon pool's middle; DRAGON_POOL itself is declared further down)
 export const RIVERS: RiverDef[] = [
   { id: 'falls', points: STREAM, halfWidth: 1.5, falls: true },
   {
     id: 'west', halfWidth: 2.1,
     points: [[POND.x, POND.z + POND.radius - 1], ...([[-72, 5], [-76, 25], [-77, 45], [-72, 65], [-62, 85], [-46, 102], [-26, 116], [-8, 124], [0, 126], [3, 142], [1, 170], [0, 230]] as [number, number][]).map(([x, z]) => spreadPoint(x, z))],
   },
-  { id: 'east', halfWidth: 1.8, points: ([[112, -112], [96, -84], [88, -56], [83, -28], [82, 0], [82, 28], [78, 56], [64, 82], [44, 104], [22, 118], [8, 124], [0, 126]] as [number, number][]).map(([x, z]) => spreadPoint(x, z)) },
+  // the brook: out of the release pond's north side, under a footbridge, round the north of the halls and the abbot's, to the dragon pool
+  {
+    id: 'brook', halfWidth: 1.6,
+    points: [[POND.x + 2, POND.z - 11], [-120, -74], [-105.3, -77], [-92, -82], [-78, -98], [-64, -116], [-50, -134], [-37, -148], [-26, -155.6], [-14, DRAGON_POOL_Z], [DRAGON_POOL_X - 3.5, DRAGON_POOL_Z]],
+  },
+  // the east river: out of the dragon pool's east side under a footbridge, on across the north meadow, then south
+  // past the monks' quarters and the orchard
+  {
+    id: 'east', halfWidth: 1.8,
+    points: [[DRAGON_POOL_X + 3.5, DRAGON_POOL_Z], [14, DRAGON_POOL_Z], [28, DRAGON_POOL_Z - 4], [48, DRAGON_POOL_Z - 2], [70, DRAGON_POOL_Z + 8], [92, DRAGON_POOL_Z + 16], [114, DRAGON_POOL_Z + 14], [136, DRAGON_POOL_Z + 22], [157, DRAGON_POOL_Z + 20], [169, DRAGON_POOL_Z + 29],
+      ...([[88, -56], [83, -28], [82, 0], [82, 28], [78, 56], [64, 82], [44, 104], [22, 118], [8, 124], [0, 126]] as [number, number][]).map(([x, z]) => spreadPoint(x, z))],
+  },
 ];
 
 export interface WheelRowDef {
@@ -213,7 +242,7 @@ export const WHEEL_ROWS: WheelRowDef[] = [
 /** 櫻花樹林: cherry trees all round the wish garden. */
 export const CHERRY_GROVE = { ...at(0, -98), r: 27 };
 /** 泰山龍池: a small pool with a tall Taishan rock, behind Chengjiu Court. */
-export const DRAGON_POOL = { ...at(0, -80), r: 5 };
+export const DRAGON_POOL = { ...at(0, -80), r: 6 };
 /** 清澈龍泉: a stone spring basin in the south-west. */
 export const DRAGON_SPRING = at(-50, 56);
 
@@ -234,7 +263,7 @@ export const BENCHES: BenchDef[] = [
   { x: 25, z: 93 + DZ, face: W }, { x: 25, z: 101 + DZ, face: W }, // plaza (east side; the wish lanterns fill the west)
   { x: BODHI_TREE.x + 4, z: BODHI_TREE.z, face: W }, { x: BODHI_TREE.x - 4, z: BODHI_TREE.z, face: E }, // Bodhi tree
   ...ring(POND.x, POND.z, POND.radius + 3.5, [0.75, 2.3, 5.5]), // release pond
-  { x: DRAGON_POOL.x - 7, z: DRAGON_POOL.z, face: E }, { x: DRAGON_POOL.x + 7, z: DRAGON_POOL.z, face: W }, // dragon pool
+  { x: DRAGON_POOL.x - 7.5, z: DRAGON_POOL.z - 4.6, face: E }, { x: DRAGON_POOL.x + 7.5, z: DRAGON_POOL.z - 4.6, face: W }, // dragon pool (the brook and its outflow run in and out along its middle)
   { ...at(-10, -35), face: N }, // behind Yangsheng Court, facing Chengjiu
 ];
 
@@ -263,8 +292,8 @@ export const FLAG_LINES: [FlagAnchor, FlagAnchor][] = [
   // from the Bodhi tree's crown
   [{ x: BODHI_TREE.x, z: BODHI_TREE.z, h: 6.5 }, pole(BODHI_TREE.x - 7, BODHI_TREE.z + 7, 4.5)],
   [{ x: BODHI_TREE.x, z: BODHI_TREE.z, h: 6.5 }, pole(BODHI_TREE.x - 6, BODHI_TREE.z - 5.5, 4.5)],
-  // across the ravine below the waterfall
-  [pole(WATERFALL.x + 16, WATERFALL.z - 14, 6), pole(WATERFALL.x + 16, WATERFALL.z + 16, 6)],
+  // across the stream below the cave waterfall's pool
+  [pole(...caveFallsAt(-13, 17), 6), pole(...caveFallsAt(12, 17), 6)],
 ];
 
 /** Arched stone bridge over the falls stream. */
@@ -391,6 +420,9 @@ export const FOOT_BRIDGES: { x: number; z: number; axis: 'x' | 'z'; length: numb
   { ...at(-68.4, 72), axis: 'x', length: 9.5 }, // west river, by the Linggu pagoda
   { ...at(82.2, -4.25), axis: 'x', length: 9 }, // east river, to the orchard
   { ...at(72.6, 66), axis: 'x', length: 10 }, // east river, by the Wenchang pagoda
+  { x: -105.3, z: -77, axis: 'z', length: 8 }, // the brook, on the way to the abbot's and Ruyi pagoda
+  { x: -14, z: DRAGON_POOL_Z, axis: 'z', length: 7 }, // the brook, by the dragon pool
+  { x: 14, z: DRAGON_POOL_Z, axis: 'z', length: 7 }, // the dragon pool's outflow
 ];
 
 /** Path ends that should meet something exactly: bridge ends, the pond walkway, the wish garden's gate. */
@@ -450,11 +482,15 @@ export const FOOTPATHS: [number, number][][] = [
   ...both([[-RING_X, RING_S], [-LOOP_X, SOUTH_JOIN]]),
   // round Chengjiu: to its door, and on to the dragon pool and the cherry grove
   ...both([[-22, NORTH_Z], [-22, (NORTH_Z + CJ + 21.5) / 2], [-22, CJ + 21.5], [-6, CJ + 17.5]]),
-  ...both([[-22, CJ + 21.5], [-24, CJ - 18.5], [-12, DRAGON_POOL.z - 3.5]]),
+  // (split where the brook and its outflow cross it: a footbridge between the halves)
+  ...both([[-22, CJ + 21.5], [-24, CJ - 18.5], [-14, DRAGON_POOL.z + 3.5]]),
+  ...both([[-14, DRAGON_POOL.z - 3.5], [-11, DRAGON_POOL.z - 4.2], [-8.5, DRAGON_POOL.z - 4.6]]),
   // north-west: the pond, the abbot, Ruyi pagoda · north-east: Duobao pagoda
   // (along the loop past the hall's corner first: cutting across, they ran over its front porch)
   [[-HALL_X, NORTH_Z], [-CORNER_X, NORTH_Z], [-CORNER_X, POND.z + 4.5], [POND_PAVILION.walkX1, POND.z]],
-  [[-CORNER_X, POND.z + 4.5], respread(-90, -70), respread(-96, -88), respread(-120, -84), nearP(pagoda('ruyi'), 7, 0)],
+  // (split where the brook crosses it: a footbridge between the halves)
+  [[-CORNER_X, POND.z + 4.5], [FOOT_BRIDGES[4].x, FOOT_BRIDGES[4].z + FOOT_BRIDGES[4].length / 2]],
+  [[FOOT_BRIDGES[4].x, FOOT_BRIDGES[4].z - FOOT_BRIDGES[4].length / 2], respread(-90, -70), respread(-96, -88), respread(-120, -84), nearP(pagoda('ruyi'), 7, 0)],
   [[HALL_X, NORTH_Z], [CORNER_X, NORTH_Z], [CORNER_X, POND.z + 4.5], nearP(pagoda('duobao'), 0, 6.5)],
   // west: the great bell and the west bridge · east: the monks' courtyard and the orchard bridge
   [[-LOOP_X, 30], respread(-90, 30), respread(-104, 44), bridgeEnd(0, 1)],

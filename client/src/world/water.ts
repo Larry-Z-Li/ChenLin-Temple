@@ -1,13 +1,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BASIN, BRIDGE, FOOT_BRIDGES, PLAY_RADIUS, POND, RIVERS, STREAM, WATERFALL } from '../config/layout';
+import { BASIN, BRIDGE, FOOT_BRIDGES, PLAY_RADIUS, POND, RIVERS } from '../config/layout';
 import type { WorldContext } from '../core/context';
-import { mulberry32, noise2, range, smoothstep } from '../core/math';
-import { glowTexture } from '../core/textures';
+import { mulberry32, range, smoothstep } from '../core/math';
 import { colourGlowMaterial, haloPoints, nightGlow, whiteColors } from './nightGlow';
-import { lighting } from './sky';
 import { riverFrame, riverHalfWidth, riverLength } from './stream';
-import { coarseHeightAt, groundColour, POND_LEVEL, riverEndMeets, terrainHeight, waterLevel } from './terrain';
+import { MOUTH, MOUTH_STEP, POND_LEVEL, riverEndMeets, terrainHeight, waterLevel } from './terrain';
 
 const WATER_Y = POND_LEVEL;
 
@@ -142,140 +140,6 @@ function buildWaterLanterns(ctx: WorldContext, flowerGeo: THREE.BufferGeometry) 
   });
 }
 
-/** Falling water: value-noise streaks stretched downward and sliding down, foam at the lip and foot, ragged edges (fogged). */
-function fallingWater() {
-  return new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-    fog: true,
-    uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uTime: { value: 0 }, uTint: { value: new THREE.Color(1, 1, 1) } },
-    vertexShader: /* glsl */ `
-      #include <fog_pars_vertex>
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        gl_Position = projectionMatrix * mvPosition;
-        #include <fog_vertex>
-      }`,
-    fragmentShader: /* glsl */ `
-      #include <fog_pars_fragment>
-      uniform float uTime;
-      uniform vec3 uTint;
-      varying vec2 vUv;
-      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      float noise(vec2 p) {
-        vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-        return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
-      }
-      void main() {
-        float x = vUv.x, y = 1.0 - vUv.y;               // y: 0 at the lip … 1 at the foot
-        float fall = y * (0.35 + 0.65 * y);              // accelerating: the streaks stretch as they fall
-        float t = uTime * 0.5;
-        vec2 p = vec2(x * 9.0, fall * 5.0 - t);
-        float s = noise(p * vec2(1.0, 0.16)) * 0.55 + noise(p * vec2(2.7, 0.3) + 7.3) * 0.3 + noise(p * vec2(6.0, 0.7) + 1.7) * 0.15;
-        float streak = smoothstep(0.4, 0.82, s);
-        float foam = (1.0 - smoothstep(0.0, 0.06, y)) * 0.85 + smoothstep(0.88, 1.0, y);
-        float rag = noise(vec2(x * 9.0, fall * 5.0 - t * 1.2));
-        float edge = min(x, 1.0 - x) / 0.12 - rag * 0.7 + 0.15;
-        float a = clamp(edge, 0.0, 1.0) * clamp(0.4 + streak * 0.6 + foam, 0.0, 1.0) * 0.95;
-        gl_FragColor = vec4(mix(vec3(0.5, 0.68, 0.8), vec3(1.0), clamp(streak * 0.85 + foam, 0.0, 1.0)) * uTint, a);
-        #include <fog_fragment>
-      }`,
-  });
-}
-
-/** Waterfall on the western mountains, facing east toward the temple, feeding the stream. */
-export function buildWaterfall(ctx: WorldContext) {
-  const { x, z, width, height } = WATERFALL;
-  const baseY = terrainHeight(STREAM[0][0], STREAM[0][1]) - 0.6;
-
-  // Built facing +Z, then turned to face east (+X).
-  const g = new THREE.Group();
-  g.position.set(x, baseY, z);
-  g.rotation.y = Math.PI / 2;
-  ctx.scene.add(g);
-
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6f6c66, roughness: 1, flatShading: true });
-  const rng = mulberry32(31);
-  for (let i = 0; i < 14; i++) {
-    const s = range(rng, 8, 16);
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), rockMat);
-    const side = i % 2 ? 1 : -1;
-    rock.scale.set(s * range(rng, 0.6, 1.0), s * range(rng, 1.2, 2.2), s * 0.45);
-    // Flank the falls on both sides and sit behind the water, never in front of it.
-    rock.position.set(side * (width / 2 + s * 0.55 + range(rng, 0, 6)), range(rng, 0, height * 0.9), -s * 0.45 - range(rng, 1, 5));
-    rock.rotation.set(rng(), rng() * 6, rng());
-    g.add(rock);
-  }
-  const cliff = new THREE.Mesh(new THREE.BoxGeometry(width + 10, height + 8, 8, 4, 8, 2), rockMat);
-  cliff.position.set(0, height / 2, -4.5);
-  g.add(cliff);
-
-  // The fall: one wide sheet, bowed out in the middle and leaning out toward the foot, drawn by a shader — streaks
-  // that stretch as they fall, foam at the lip and the foot, ragged see-through edges.
-  const fallMat = fallingWater();
-  const sheet = new THREE.PlaneGeometry(width, height, 12, 24).translate(0, height / 2, 0);
-  const sp = sheet.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < sp.count; i++) sp.setZ(i, 0.6 * Math.cos((Math.PI * sp.getX(i)) / width) + 0.8 * (1 - sp.getY(i) / height));
-  const fall = new THREE.Mesh(sheet, fallMat);
-  fall.renderOrder = 2;
-  g.add(fall);
-  const dayWater = new THREE.Color(1, 1, 1), nightWater = new THREE.Color(0.32, 0.38, 0.5);
-  // Spray thrown up where it lands (heavier, as at the foot of a big plunge).
-  const N = 260, rng2 = mulberry32(47), spPos = new Float32Array(N * 3), spVel = new Float32Array(N * 3);
-  const reset = (i: number) => {
-    spPos.set([(rng2() - 0.5) * width, 0.6 + rng2() * 0.5, 1.6 + (rng2() - 0.3) * 1.5], i * 3);
-    spVel.set([(rng2() - 0.5) * 5, 2.5 + rng2() * 6.5, 0.6 + rng2() * 4], i * 3);
-  };
-  for (let i = 0; i < N; i++) reset(i), (spPos[i * 3 + 1] += rng2() * 3);
-  const sprayGeo = new THREE.BufferGeometry();
-  sprayGeo.setAttribute('position', new THREE.BufferAttribute(spPos, 3));
-  const sprayMat = new THREE.PointsMaterial({ map: glowTexture(), size: 0.85, color: 0xffffff, transparent: true, opacity: 0.45, depthWrite: false });
-  const spray = new THREE.Points(sprayGeo, sprayMat);
-  spray.renderOrder = 3;
-  spray.frustumCulled = false;
-  g.add(spray);
-
-  const pool = new THREE.Mesh(
-    new THREE.CircleGeometry(width * 0.75, 32).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0x3a7d86, roughness: 0.1, transparent: true, opacity: 0.9 }),
-  );
-  pool.position.set(0, 0.5, width * 0.45);
-  g.add(pool);
-
-  // mist rolling off the foot
-  const mists: THREE.Sprite[] = [];
-  for (let i = 0; i < 10; i++) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false }));
-    s.position.set((i / 9 - 0.5) * width * 1.4, 1.5 + (i % 3) * 1.6, 2 + (i % 2) * 2);
-    s.renderOrder = 4;
-    g.add(s);
-    mists.push(s);
-  }
-
-  ctx.updaters.push((dt, time) => {
-    fallMat.uniforms.uTime.value = time;
-    fallMat.uniforms.uTint.value.copy(nightWater).lerp(dayWater, lighting.daylight); // unlit: dim it by hand at night
-    const day = 0.35 + 0.65 * lighting.daylight;
-    sprayMat.opacity = 0.45 * day;
-    for (let i = 0; i < N; i++) {
-      const j = i * 3;
-      spVel[j + 1] -= 7 * dt;
-      spPos[j] += spVel[j] * dt;
-      spPos[j + 1] += spVel[j + 1] * dt;
-      spPos[j + 2] += spVel[j + 2] * dt;
-      if (spPos[j + 1] < 0.5) reset(i);
-    }
-    sprayGeo.attributes.position.needsUpdate = true;
-    mists.forEach((s, i) => {
-      s.material.opacity = 0.4 * (0.75 + 0.25 * Math.sin(time * 0.7 + i)) * day;
-      s.scale.setScalar(12 * (1 + 0.18 * Math.sin(time * 0.5 + i * 1.7)));
-    });
-  });
-}
-
 /**
  * River water, lit like the pond (dark at night, catching the moon, the sun and the lanterns): teal in the middle and
  * clear at the edges over the bed, a gentle drift of light and ripple downstream, the sky at grazing angles, and white
@@ -352,7 +216,6 @@ export function buildStream(ctx: WorldContext) {
   const lilyPads: THREE.Matrix4[] = [], lotuses: { m: THREE.Matrix4; c: THREE.Color; p: THREE.Vector3 }[] = [];
   const rockMats: THREE.Matrix4[] = [], rockCols: THREE.Color[] = [];
   const rockTone = new THREE.Color(0x7a7872), mossTone = new THREE.Color(0x5d7246);
-  const bankMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   for (const river of RIVERS) {
     const L = riverLength(river);
     const N = Math.ceil(L / (river.falls ? 0.5 : 1));
@@ -366,26 +229,19 @@ export function buildStream(ctx: WorldContext) {
     let lastWl = S[0].wl, lastS = 0;
     S.forEach((q, i) => {
       if (q.s < 12 || q.s > L - 12 || bridges.some(([bx, bz]) => Math.hypot(q.x - bx, q.z - bz) < 9)) return; // clear of the ends and bridges
-      if ((lastWl - q.wl >= 0.5 && q.s - lastS >= 10) || q.s - lastS >= 24) { // a real drop, or every so often on the flat
+      if ((lastWl - q.wl >= 0.6 && q.s - lastS >= 14) || q.s - lastS >= 70) { // a real drop, or now and then on a long flat
         weirs.push(i);
         lastWl = q.wl;
         lastS = q.s;
       }
     });
-    for (const w of weirs) {
-      const q = S[w], level = q.wl + WEIR_CREST;
-      // the water backs up behind the weir, rising gently over the last 10 m to its sill; white water below it
-      for (let i = w; i >= 0 && q.s - S[i].s <= 10; i--) S[i].y = Math.max(S[i].y, level - (q.s - S[i].s) * (WEIR_CREST / 10));
-      for (const o of S) {
-        const d = o.s - q.s;
-        o.foam = Math.max(o.foam, smoothstep(-0.2, 0.4, d) * (1 - smoothstep(WEIR_RUN, WEIR_RUN + 4.5, d))); // (dies away fully a few metres on)
-      }
+    function sill(q: (typeof S)[number], level: number) {
       // the weir: a stone sill set across the channel and into both banks, its top just under the water
-      const sill = new THREE.Mesh(new THREE.BoxGeometry(2 * (q.half + 1.1), 0.8, 0.6), rockMat);
-      sill.position.set(q.x, level - 0.44, q.z);
-      sill.rotation.y = Math.atan2(-q.nz, q.nx);
-      sill.receiveShadow = true;
-      ctx.scene.add(sill);
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(2 * (q.half + 1.1), 0.8, 0.6), rockMat);
+      slab.position.set(q.x, level - 0.44, q.z);
+      slab.rotation.y = Math.atan2(-q.nz, q.nx);
+      slab.receiveShadow = true;
+      ctx.scene.add(slab);
       for (let k = 0; k < 4; k++) { // and a few stones on the banks at either end
         const side = k % 2 ? 1 : -1, r = 0.35 + rng() * 0.35, off = q.half + 1.0 + rng() * 0.8, along = rng() * 1.2 - 0.3;
         const m = new THREE.Mesh(stone, rockMat);
@@ -396,18 +252,51 @@ export function buildStream(ctx: WorldContext) {
         ctx.scene.add(m);
       }
     }
+    for (const w of weirs) {
+      const q = S[w], level = q.wl + WEIR_CREST;
+      // the water backs up behind the weir, rising gently over the last 10 m to its sill; white water below it
+      for (let i = w; i >= 0 && q.s - S[i].s <= 10; i--) S[i].y = Math.max(S[i].y, level - (q.s - S[i].s) * (WEIR_CREST / 10));
+      for (const o of S) {
+        const d = o.s - q.s;
+        o.foam = Math.max(o.foam, smoothstep(-0.2, 0.4, d) * (1 - smoothstep(WEIR_RUN, WEIR_RUN + 4.5, d))); // (dies away fully a few metres on)
+      }
+      sill(q, level);
+    }
+    // Where it runs into a pool (or another river) the water steps down into it over a stone lip, in a short white
+    // fall, and where it leaves one it spills out over a lip the same way: the seam between the two waters is lost
+    // in the white water (and the rocks round the mouth).
+    const lips: number[] = [], lipAt: number[] = [];
+    if (riverEndMeets(river, 1) !== null) { // in: backed up behind the lip, then falling into the pool, white all the way in
+      const w = S.findIndex((o) => o.s >= L - MOUTH), q = S[w], level = q.wl + MOUTH_STEP;
+      for (let i = w; i >= 0 && q.s - S[i].s <= 10; i--) S[i].y = Math.max(S[i].y, level - (q.s - S[i].s) * (MOUTH_STEP / 10));
+      for (const o of S) o.foam = Math.max(o.foam, smoothstep(-0.2, 0.4, o.s - q.s) * (0.6 + 0.4 * smoothstep(L, L - 1.5, o.s)));
+      sill(q, level), lips.push(q.s), lipAt.push(w);
+    }
+    if (river.falls || riverEndMeets(river, 0) !== null) { // out: over the lip from the pool (the channel steps down there: see waterLevel)
+      const w = S.findIndex((o) => o.s > MOUTH) - 1, q = S[w], level = q.wl;
+      for (const o of S) o.foam = Math.max(o.foam, smoothstep(-0.2, 0.4, o.s - q.s) * (1 - smoothstep(WEIR_RUN, WEIR_RUN + 4.5, o.s - q.s)));
+      sill(q, level), lips.push(q.s), lipAt.push(w);
+    }
+    // (over each lip a fall, not a ramp: a point just past it, already down)
+    const drops = new Set([...weirs, ...lipAt]);
+    const R = S.flatMap((q, i) => {
+      const n = S[i + 1];
+      if (!drops.has(i) || !n) return [q];
+      const t = 0.2 / (n.s - q.s), at = (a: number, b: number) => a + (b - a) * t;
+      return [q, { ...n, s: at(q.s, n.s), x: at(q.x, n.x), z: at(q.z, n.z), half: at(q.half, n.half), wl: at(q.wl, n.wl) }];
+    });
     // the water: its edges tucked just under the banks (wider where it's backed up, as it climbs them)
     // where an end runs into the pond or another river it fades into it; the falls stream fades in from its pool
     const fadeIn = river.falls || riverEndMeets(river, 0) !== null, fadeOut = riverEndMeets(river, 1) !== null;
     const pos: number[] = [], uv: number[] = [], foam: number[] = [], fade: number[] = [], idx: number[] = [];
-    S.forEach((q, i) => {
+    R.forEach((q, i) => {
       const half = q.half + 0.3 + (q.y - q.wl) * 2.6;
       const f = (fadeIn ? smoothstep(0, 2, q.s) : 1) * (fadeOut ? smoothstep(0, 2, L - q.s) : 1);
       pos.push(q.x + q.nx * half, q.y, q.z + q.nz * half, q.x - q.nx * half, q.y, q.z - q.nz * half);
       uv.push(0, q.s, 1, q.s);
       foam.push(q.foam, q.foam);
       fade.push(f, f);
-      if (i < N) idx.push(i * 2, i * 2 + 2, i * 2 + 1, i * 2 + 1, i * 2 + 2, i * 2 + 3);
+      if (i < R.length - 1) idx.push(i * 2, i * 2 + 2, i * 2 + 1, i * 2 + 1, i * 2 + 2, i * 2 + 3);
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -418,12 +307,11 @@ export function buildStream(ctx: WorldContext) {
     geo.computeVertexNormals();
     if ((geo.attributes.normal as THREE.BufferAttribute).getY(0) < 0) geo.setIndex(idx.reverse()), geo.computeVertexNormals(); // facing up, for the light
     pebbles(river, L);
-    rocks(river, L, weirs.map((w) => S[w].s));
+    rocks(river, L, [...weirs.map((w) => S[w].s), ...lips]);
     lilies(S, L, riverEndMeets(river, 0) !== null, riverEndMeets(river, 1) !== null);
     const ribbon = new THREE.Mesh(geo, mat);
     ribbon.frustumCulled = false; // long and thin: its bounds would cull it wrongly at times
     ctx.scene.add(ribbon);
-    ctx.scene.add(bankStrip(river, L));
   }
 
   function pebbles(river: (typeof RIVERS)[number], L: number) {
@@ -463,6 +351,20 @@ export function buildStream(ctx: WorldContext) {
         put(x, waterLevel(river, s) + 0.08 + rng() * 0.12 - r * 0.6, z, r, rng() < 0.5);
       }
     }
+    // where it runs into a pool (or out of one), a scatter of rocks across the mouth, in the water and on both banks,
+    // so the river's water and the pool's meet among stones rather than at a line
+    const mouth = (s: number) => {
+      const f = riverFrame(river, s), hw = riverHalfWidth(river, s), wl = waterLevel(river, Math.min(L, Math.max(0, s)));
+      for (let k = 0; k < 11; k++) {
+        const d = (k / 10 * 2 - 1) * (hw + 1.8) + (rng() - 0.5) * 0.7, along = (rng() - 0.5) * 3.2;
+        const x = f.x + f.nx * d - f.nz * along, z = f.z + f.nz * d + f.nx * along, r = 0.3 + rng() * 0.5;
+        const wet = Math.abs(d) < hw;
+        if (wet && rng() < 0.35) continue; // gaps for the water to run through
+        put(x, wet ? wl + 0.1 + rng() * 0.1 - r * 0.55 : terrainHeight(x, z) + r * 0.15, z, r, rng() < 0.4);
+      }
+    };
+    if (river.falls || riverEndMeets(river, 0) !== null) mouth(1.2);
+    if (riverEndMeets(river, 1) !== null) mouth(L - 1.2);
   }
 
   // Lily pads in clusters by the edges of quiet water (never in the white water), a lotus on a few.
@@ -482,48 +384,6 @@ export function buildStream(ctx: WorldContext) {
         }
       }
     }
-  }
-
-  function bankStrip(river: (typeof RIVERS)[number], L: number) {
-    // Across: from the grass well clear of the river, down the bank, over the bed, and up the far side. Finer near
-    // the water's edge, where the shape changes fastest.
-    const outs = [6, 4.4, 3.2, 2.4, 1.7, 1.2, 0.75, 0.35, 0];
-    const rows = Math.ceil(L / 0.8), cols = outs.length * 2 + 3;
-    const pos = new Float32Array((rows + 1) * cols * 3), col = new Float32Array((rows + 1) * cols * 3), idx: number[] = [];
-    const c = new THREE.Color(), dampGrass = new THREE.Color(0x4d7034), earth = new THREE.Color(0x76694a), pebble = new THREE.Color(0x8f8877), bed = new THREE.Color(0x5c5844);
-    for (let r = 0; r <= rows; r++) {
-      const s = (r / rows) * L, f = riverFrame(river, s), hw = riverHalfWidth(river, s), wl = waterLevel(river, s);
-      const ds = [...outs.map((o) => -(hw + o)), -hw * 0.55, 0, hw * 0.55, ...[...outs].reverse().map((o) => hw + o)];
-      ds.forEach((d, k) => {
-        // (its outer edge lies exactly on the coarse terrain's surface: no crack where they meet)
-        const x = f.x + f.nx * d, z = f.z + f.nz * d, j = (r * cols + k) * 3, edge = smoothstep(hw + 4, hw + 6, Math.abs(d));
-        const y = edge > 0 ? terrainHeight(x, z) + (coarseHeightAt(x, z) - terrainHeight(x, z)) * edge : terrainHeight(x, z);
-        pos.set([x, y, z], j);
-        const gx = (terrainHeight(x + 1, z) - terrainHeight(x - 1, z)) / 2, gz = (terrainHeight(x, z + 1) - terrainHeight(x, z - 1)) / 2;
-        groundColour(x, y, z, 1 - 1 / Math.sqrt(1 + gx * gx + gz * gz), c);
-        // (the bands wander a little, so they read as ground, not stripes)
-        const above = y - wl + (noise2(x * 0.9, z * 0.9) - 0.5) * 0.16;
-        c.lerp(dampGrass, (1 - smoothstep(0.25, 1.0, above)) * 0.4); // damp grass toward the water
-        c.lerp(earth, (1 - smoothstep(0.08, 0.36, above)) * (0.7 + 0.3 * noise2(x * 2.3, z * 2.3))); // the earthen bank
-        c.lerp(pebble, (1 - smoothstep(0, 0.14, Math.abs(above - 0.03))) * 0.7); // wet pebbles at the water's edge
-        if (above < 0) c.lerp(bed, smoothstep(0, -0.2, above)).lerp(pebble, noise2(x * 4.1, z * 4.1) * 0.35); // a pebbly streambed
-        c.multiplyScalar(0.88 + 0.24 * noise2(x * 3.3, z * 3.3)); // speckled
-        col.set([c.r, c.g, c.b], j);
-      });
-      if (r < rows) for (let k = 0; k < cols - 1; k++) {
-        const a = r * cols + k, b = a + cols;
-        idx.push(a, b, a + 1, a + 1, b, b + 1);
-      }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    if ((g.attributes.normal as THREE.BufferAttribute).getY(Math.floor(cols / 2)) < 0) g.setIndex(idx.reverse()), g.computeVertexNormals(); // face up
-    const m = new THREE.Mesh(g, bankMat);
-    m.receiveShadow = true;
-    return m;
   }
 
   if (pebbleN) {

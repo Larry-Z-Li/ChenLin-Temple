@@ -57,7 +57,9 @@ import { assignInteriors, interiorLayer, updateInteriors } from './core/interior
 import { buildSandGarden } from './world/sandGarden';
 import { buildVegetation } from './world/vegetation';
 import { Wildlife } from './world/wildlife';
-import { buildPond, buildRiverColliders, buildStream, buildWaterfall } from './world/water';
+import { buildPond, buildRiverColliders, buildStream } from './world/water';
+import { buildCaveFallsWorld } from './world/caveFallsWorld';
+import { buildRocks } from './world/rocks';
 
 /**
  * Build the world and start rendering. It opens on the entry screen's intro (your monk pacing on the
@@ -118,7 +120,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   staticBuild(() => buildBenches(ctx));
   staticBuild(() => HALLS.forEach((def) => buildHall(ctx, def, models, thangkas)));
   buildPond(ctx);
-  buildWaterfall(ctx);
+  buildCaveFallsWorld(ctx);
   buildStream(ctx);
   buildRiverColliders(ctx);
   const stupas = buildStupas(ctx);
@@ -133,6 +135,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   buildKoi(ctx);
   buildLeaves(ctx, camera);
   const { orchard } = buildVegetation(ctx);
+  buildRocks(ctx); // boulders and outcrops over the mountainsides
 
   // Real lights for the hall interiors nearest you (8, or 4 on low graphics); outdoor lamps use the night light map. See lightPool.
   const lights = new LightPool(scene, 8);
@@ -301,6 +304,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   let rigid = 0;
   if (!noMerge) scene.traverse((o) => o.userData.rigid && (rigid += mergeRigid(o)));
   const inside = assignInteriors(scene, new Set(farCulled()));
+  // Dev preview only: where you are, in the corner (to point at places when talking it over).
+  const devXYZ = import.meta.env.DEV ? document.body.appendChild(Object.assign(document.createElement('div'), { style: 'position:fixed;left:8px;bottom:8px;z-index:9999;font:12px/1.2 ui-monospace,monospace;color:#fff;background:rgba(0,0,0,.45);padding:3px 6px;border-radius:4px;pointer-events:none' })) : null;
   if (import.meta.env.DEV) console.info(`[static merge] ${merged.before} meshes → ${merged.after}; ${rigid} fewer in moving things; ${inside} inside halls`);
   const bow = (): void => (seat.seated || seat.standingFocus ? seat.bow() : player.gesture("bow", 2.4));
 
@@ -423,6 +428,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     updateFarCull(dt, camera.position, graphicsLevel() === 'low' ? 1 : 2);
     updateInteriors(camera, graphicsLevel() === 'low' ? 1 : 2);
     if (!bodhiBell.active) player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground); // stand still while the bell rings
+    if (devXYZ) devXYZ.textContent = `x ${player.pos.x.toFixed(1)}  y ${player.pos.y.toFixed(1)}  z ${player.pos.z.toFixed(1)}`;
 
     document.body.classList.toggle('cinematic', bodhiBell.active); // the bell's camera: bottom buttons out of the way
     if (bodhiBell.active) hud.setPrompt(null);

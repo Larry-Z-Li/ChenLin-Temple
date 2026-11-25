@@ -9,6 +9,12 @@ export class Ground {
   private pads: Pad[] = [];
   private ramps: Ramp[] = [];
   private rampsX: { minZ: number; maxZ: number; x0: number; x1: number; h0: number; h1: number }[] = [];
+  private surfaces: { minX: number; maxX: number; minZ: number; maxZ: number; f: (x: number, z: number) => number | null }[] = [];
+
+  /** Any walkable shape within a box: `f` gives the height there, or null where it has none. */
+  addSurface(minX: number, maxX: number, minZ: number, maxZ: number, f: (x: number, z: number) => number | null) {
+    this.surfaces.push({ minX, maxX, minZ, maxZ, f });
+  }
 
   addPad(minX: number, maxX: number, minZ: number, maxZ: number, h: number) {
     this.pads.push({ minX, maxX, minZ, maxZ, h });
@@ -36,6 +42,11 @@ export class Ground {
     for (const r of this.rampsX) {
       const lo = Math.min(r.x0, r.x1), hi = Math.max(r.x0, r.x1);
       if (z >= r.minZ && z <= r.maxZ && x >= lo && x <= hi) h = Math.max(h, r.h0 + ((r.h1 - r.h0) * (x - r.x0)) / (r.x1 - r.x0));
+    }
+    for (const s of this.surfaces) {
+      if (x < s.minX || x > s.maxX || z < s.minZ || z > s.maxZ) continue;
+      const v = s.f(x, z);
+      if (v !== null) h = Math.max(h, v);
     }
     return h;
   }

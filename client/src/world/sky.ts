@@ -116,7 +116,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     starCol.push(b * (1 + warm * 0.12), b, b * (1 - warm * 0.15));
     starSize.push(1.8 + k * 2.4);
   }
-  const stars = twinkleStars(starPos, starCol, starSize, 0.45);
+  const stars = twinkleStars(starPos, starCol, starSize, 0.6, 1); // twinkling, with now and then a glint
   scene.add(stars.pts);
   let starTime = 0;
   const milky = buildMilkyWay(scene); // a dark-sky night: the Milky Way and a dense field of faint stars

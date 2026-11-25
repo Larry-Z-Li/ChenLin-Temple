@@ -149,8 +149,9 @@ export function buildVegetation(ctx: WorldContext) {
     const r = BASIN.radius - 18 + Math.pow(rng(), 1.4) * 170;
     const x = BASIN.x + Math.sin(a) * r, z = BASIN.z + Math.cos(a) * r;
     if (isReserved(x, z, 3) || inStreamVista(x, z)) continue;
-    const h = terrainHeight(x, z);
-    if (h > 140) continue;
+    const h = terrainHeight(x, z), e = 3;
+    const gx = (terrainHeight(x + e, z) - terrainHeight(x - e, z)) / (2 * e), gz = (terrainHeight(x, z + e) - terrainHeight(x, z - e)) / (2 * e);
+    if (1 - 1 / Math.sqrt(1 + gx * gx + gz * gz) > 0.2 + rng() * 0.06 || h > 100 + rng() * 30) continue; // not on the rock (steep, or high up)
     const roll = rng();
     if (roll < 0.5) place(sp.pine, x, z, range(rng, 0.9, 1.7), pick(rng, PINE_GREENS));
     else if (roll < 0.75) place(sp.broad, x, z, range(rng, 0.9, 1.5), pick(rng, GREENS));

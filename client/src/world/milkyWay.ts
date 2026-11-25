@@ -65,7 +65,7 @@ export function buildMilkyWay(scene: THREE.Scene) {
     col.push(b * r * 1.15, b * g * 1.15, b * bl * 1.15);
     size.push(1.1 + k * 1.7);
   }
-  const field = twinkleStars(pos, col, size, 0.35);
+  const field = twinkleStars(pos, col, size, 0.5, 0.6);
   field.pts.renderOrder = -0.8;
   scene.add(field.pts);
 

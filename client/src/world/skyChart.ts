@@ -139,8 +139,9 @@ export function twinkleStars(pos: number[], tint: number[], size: number[], amp:
       varying vec3 vTint; varying float vA, vG;
       void main() {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        float sp = 1.2 + fract(phase * 7.13) * 2.4;
+        float sp = 1.6 + fract(phase * 7.13) * 3.4;
         float tw = (0.5 + 0.5 * sin(uTime * sp + phase * 6.283)) * (0.55 + 0.45 * sin(uTime * 0.63 + phase * 17.0));
+        tw = mix(tw, 0.5 + 0.5 * sin(uTime * sp * 2.9 + phase * 29.0), 0.35); // a quicker flicker over the slow swell
         // now and then a glint: a short, sharp brightening, each star at its own moments
         float g = uGlint * pow(max(0.0, sin(uTime * (0.45 + fract(phase * 3.7) * 0.45) + phase * 40.0)), 14.0);
         vG = g;

@@ -6,9 +6,10 @@ import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
 import { canvasTexture } from '../core/textures';
 import { inscription, onLocaleChange, t } from '../i18n';
-import { smallStupa } from '../buildings/stupas';
+import { lightStupaBase, smallStupa } from '../buildings/stupas';
 import { buildStatueSlot } from '../buildings/statue';
 import { ridgePlan } from './ridgeWalk';
+import { POND_LEVEL } from './terrain';
 
 const ROCK = new THREE.MeshStandardMaterial({ color: 0x77736c, roughness: 1, flatShading: true });
 
@@ -82,9 +83,10 @@ function buildStupaCourt(ctx: WorldContext, models: Record<string, string>) {
   ctx.scene.add(box(b, 1.2, b, mat(THEME.platformStone, { roughness: 0.95 }), S.x, y, S.z));
   ctx.scene.add(box(b - 5, 1.0, b - 5, mat(0xe9e4d8, { roughness: 0.9 }), S.x, y + 1.2, S.z));
   ctx.scene.add(box(b - 4.6, 0.12, b - 4.6, gold, S.x, y + 2.15, S.z));
-  const st = smallStupa(S.height);
-  st.position.set(S.x, y + 2.2, S.z);
+  const st = smallStupa(S.height, { uplit: true });
+  st.position.set(S.x, y + 2.27, S.z); // on the gilded top of the platform
   ctx.scene.add(st);
+  lightStupaBase(st); // projectors round its foot light it up after dark
   ctx.collisions.addBoxCentered(S.x, S.z, b + 0.4, b + 0.4);
   // Vairocana's altar against the platform's south face
   const az = S.z + b / 2 + 1.0;
@@ -97,14 +99,15 @@ function buildStupaCourt(ctx: WorldContext, models: Record<string, string>) {
 /** 泰山龍池: a small round pool with a stone rim and a tall Taishan rock rising from the back. */
 function buildDragonPool(ctx: WorldContext) {
   const { x, z, r } = DRAGON_POOL;
-  const y = ctx.ground.heightAt(x, z);
-  const water = new THREE.Mesh(new THREE.CircleGeometry(r, 36).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3a7f84, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.8 }));
-  water.position.set(x, y + 0.06, z);
+  const y = ctx.ground.heightAt(x, z); // (the bed is sunk about a metre; the water stands at the rivers' level)
+  const water = new THREE.Mesh(new THREE.CircleGeometry(r + 0.5, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3a7f84, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.8 }));
+  water.position.set(x, POND_LEVEL - 0.02, z);
   ctx.scene.add(water);
   const rng = mulberry32(5150);
   for (let i = 0; i < 26; i++) {
     const a = (i / 26) * Math.PI * 2;
-    rock(ctx, x + Math.cos(a) * (r + 0.3), z + Math.sin(a) * (r + 0.3), range(rng, 0.45, 0.75), rng);
+    if (Math.abs(Math.sin(a)) < 0.3 && Math.abs(Math.cos(a)) > 0.9) continue; // the brook comes in from the west and the outflow leaves to the east
+    rock(ctx, x + Math.cos(a) * (r + 0.6), z + Math.sin(a) * (r + 0.6), range(rng, 0.45, 0.75), rng);
   }
   const taishan = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), ROCK);
   taishan.scale.set(1.6, 3.6, 1.2);
