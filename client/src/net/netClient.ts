@@ -1,3 +1,4 @@
+import type { GreatWheelState } from '../../../shared/greatWheel';
 import {
   PROTOCOL_VERSION,
   type ClientMsg,
@@ -23,6 +24,8 @@ export interface NetEvents {
   seat: (seat: string, by: string | null) => void;
   seatDenied: (seat: string) => void;
   push: (wheel: string, by: string, speed: number) => void;
+  gw: (state: GreatWheelState) => void;
+  gwDo: (ev: 'board' | 'exit' | 'denied', opening: number, stair: number) => void;
   picked: (fruit: string, by: string) => void;
   strike: (inst: string, by: string) => void;
   wishAdded: (wish: Wish) => void;
@@ -119,6 +122,8 @@ export class NetClient {
       case 'seat': return this.emit('seat', msg.seat, msg.by);
       case 'seatDenied': return this.emit('seatDenied', msg.seat);
       case 'push': return this.emit('push', msg.wheel, msg.by, msg.speed);
+      case 'gw': { const { t: _t, ...st } = msg; return this.emit('gw', st); }
+      case 'gwDo': return this.emit('gwDo', msg.ev, msg.ev === 'board' ? msg.opening : -1, msg.ev === 'denied' ? -1 : msg.stair);
       case 'picked': return this.emit('picked', msg.fruit, msg.by);
       case 'strike': return this.emit('strike', msg.inst, msg.by);
       case 'wishAdded': return this.emit('wishAdded', msg.wish);
@@ -157,6 +162,19 @@ export class NetClient {
   /** The push is already applied locally; offline there's nothing else to do. */
   pushWheel(wheel: string) {
     this.send({ t: 'push', wheel });
+  }
+
+  /** The great prayer wheel: false when offline (the caller then runs the wheel itself). */
+  gwJoin(stair: number) {
+    return this.send({ t: 'gw', op: 'join', stair });
+  }
+
+  gwPress() {
+    return this.send({ t: 'gw', op: 'press' });
+  }
+
+  gwLeave() {
+    return this.send({ t: 'gw', op: 'leave' });
   }
 
   /** Already played locally; the server relays it to everyone else. */

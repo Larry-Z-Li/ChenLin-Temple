@@ -3,6 +3,7 @@ import { CAVE_FALLS, caveFallsAt } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import { buildCaveFalls, colliders } from './caveFalls';
 import { lighting } from './sky';
+import { riverWaterMaterial } from './water';
 import { coarseHeightAt, groundColour, riverBankTint, terrainHeight } from './terrain';
 
 /**
@@ -20,6 +21,7 @@ export function buildCaveFallsWorld(ctx: WorldContext) {
     falls = buildCaveFalls({
       place: { x, y, z, yaw },
       ground: false,
+      water: riverWaterMaterial(), // (its pool in the rivers' own water)
       terrain: {
         edge: coarseHeightAt,
         colour: (wx, wy, wz, slope, c) => riverBankTint(wx, wy, wz, groundColour(wx, wy, wz, slope, c)),

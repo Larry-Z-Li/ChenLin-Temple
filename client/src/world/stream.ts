@@ -74,7 +74,7 @@ export const riverLength = (def: RiverDef) => rivers.find((r) => r.def === def)!
 /** How wide a river's water is (half-width, m) at `s` metres along it: the falls stream widens into the pond; the others breathe a little. */
 export function riverHalfWidth(def: RiverDef, s: number) {
   const L = riverLength(def);
-  if (def.falls) return 1.5 + 0.9 * smoothstep(L - 14, L, s);
+  if (def.falls) return 1.85 + 0.9 * smoothstep(L - 14, L, s);
   return def.halfWidth * (0.85 + 0.3 * Math.sin(s * 0.07 + def.points.length));
 }
 

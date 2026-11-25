@@ -8,3 +8,6 @@ tour-out*/
 # a study text with names in it: kept local, never published
 client/public/assets/sutras/faben.pdf
 client/public/assets/models/*.zip
+
+# raw model exports (huge): only the optimised copies are committed (scripts/optimize-model.mjs)
+client/public/assets/models/Meshy_AI_*

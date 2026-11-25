@@ -52,6 +52,9 @@ const CARRY_ARMS = { lArm: 1.0, rArm: 1.0, lArmZ: 0.42, rArmZ: -0.42, lFore: 0.8
 const CARRY: Pose = { ...STAND, ...CARRY_ARMS, head: 0.12 };
 const CARRY_BOW: Pose = { ...STAND, ...CARRY_ARMS, torso: 0.55, head: 0.25 };
 
+/** Standing, the right arm out to the side and a little forward, the hand at rail height (the great prayer wheel). */
+const WHEEL_ARM: Pose = { ...STAND, torso: 0.04, rArm: 0.3, rArmZ: 0.95, rFore: 0.1, rPalm: 0, head: 0 };
+
 export const POSES: Record<Anim, Pose> = {
   idle: STAND,
   walk: STAND,
@@ -144,6 +147,8 @@ export class Avatar {
   steps = 0;
   /** Walk/stand with hands tucked in the sleeves and no arm swing (local only — the entry stroll). */
   clasp = false;
+  /** Walking with the right hand out on the great prayer wheel's rail (the legs keep walking). */
+  wheelArm = false;
 
   private robeMat: THREE.MeshStandardMaterial;
   private underMat: THREE.MeshStandardMaterial;
@@ -370,7 +375,8 @@ export class Avatar {
   update(dt: number, speed = 0) {
     const carrying = !!this.lantern?.g.visible, moving = this.anim === 'walk' || this.anim === 'idle' || this.anim === 'run';
     const holding = !!this.hold && (this.anim === 'walk' || this.anim === 'run'); // beads / a sutra, on the move
-    const target = carrying && moving ? CARRY : carrying && this.anim === 'bow' ? CARRY_BOW : holding ? POSES[this.hold!] : this.clasp && moving && this.anim !== 'run' ? CLASP : POSES[this.anim];
+    const wheeling = this.wheelArm && moving;
+    const target = wheeling ? WHEEL_ARM : carrying && moving ? CARRY : carrying && this.anim === 'bow' ? CARRY_BOW : holding ? POSES[this.hold!] : this.clasp && moving && this.anim !== 'run' ? CLASP : POSES[this.anim];
     const p = this.pose;
     const rate = 8;
     for (const k in target) (p as unknown as Record<string, number>)[k] = damp((p as unknown as Record<string, number>)[k], (target as unknown as Record<string, number>)[k], rate, dt);
@@ -399,7 +405,7 @@ export class Avatar {
     j.rThigh.rotation.z = p.rThighZ;
     j.lShin.rotation.z = p.lShinZ;
     j.rShin.rotation.z = p.rShinZ;
-    const armSwing = this.clasp || carrying || holding ? 0 : swing * 0.6;
+    const armSwing = this.clasp || carrying || holding || wheeling ? 0 : swing * 0.6;
     j.lHand.visible = j.rHand.visible = !this.clasp || carrying; // hands up the sleeves (unless carrying)
     j.lArm.rotation.x = p.lArm - armSwing;
     j.rArm.rotation.x = p.rArm + armSwing;

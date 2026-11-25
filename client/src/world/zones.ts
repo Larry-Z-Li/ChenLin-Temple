@@ -1,4 +1,4 @@
-import { hallHalf, ABBOT, BASIN, BENCHES, BODHI_BELL, BODHI_TREE, DORM, DRAGON_POOL, DRAGON_SPRING, FOOT_BRIDGES, FOOTPATHS, MAP_BOARD, PAGODAS, PICNIC_TABLES, POND_PAVILION, STUPA_COURT, SAND_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WHEEL_ROWS, caveFallsLocal, type Rect } from '../config/layout';
+import { hallHalf, GREAT_WHEEL, ABBOT, BASIN, BENCHES, BODHI_BELL, BODHI_TREE, DORM, DRAGON_POOL, DRAGON_SPRING, FOOT_BRIDGES, FOOTPATHS, MAP_BOARD, PAGODAS, PICNIC_TABLES, POND_PAVILION, TABLE_HUT, STUPA_COURT, SAND_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WHEEL_ROWS, caveFallsLocal, type Rect } from '../config/layout';
 import { occupied } from './caveFalls';
 import { smoothstep } from '../core/math';
 import { onRidgeTerrace } from './ridgeWalk';
@@ -42,12 +42,14 @@ export function isReserved(x: number, z: number, margin = 1.5, includeOrchard = 
   if (Math.hypot(x - DRAGON_POOL.x, z - DRAGON_POOL.z) < DRAGON_POOL.r + 2.5 + margin || Math.hypot(x - DRAGON_SPRING.x, z - DRAGON_SPRING.z) < 3 + margin) return true;
   if (inRect(x, z, { minX: POND_PAVILION.walkX0 - 3, maxX: POND_PAVILION.walkX1, minZ: POND_PAVILION.z - 4, maxZ: POND_PAVILION.z + 4 }, margin)) return true;
   if (FOOTPATHS.some((p) => distToPolyline(p, x, z) < 1.3 + margin * 0.5)) return true;
+  if (Math.abs(x - TABLE_HUT.x) < TABLE_HUT.reach + margin && Math.abs(z - TABLE_HUT.z) < TABLE_HUT.reach + margin) return true;
   for (const t of PICNIC_TABLES) if (Math.hypot(x - t.x, z - t.z) < 2.2 + margin) return true;
   for (const b of FOOT_BRIDGES) if (Math.hypot(x - b.x, z - b.z) < b.length / 2 + 1 + margin) return true;
   const c = LANTERN_CANOPY;
   if (inRect(x, z, { minX: -c.x - 0.5, maxX: c.x + 0.5, minZ: c.z0 - 0.5, maxZ: c.z1 + 0.5 }, margin)) return true;
   if (Math.hypot(x - INCENSE_BURNER.x, z - INCENSE_BURNER.z) < 3 + margin || Math.hypot(x - STELE.x, z - STELE.z) < 1.5 + margin) return true;
   if (nearestRiver(x, z).d < 2.8 + margin) return true;
+  if (Math.abs(x - GREAT_WHEEL.x) < GREAT_WHEEL.reach + margin && Math.abs(z - GREAT_WHEEL.z) < GREAT_WHEEL.reach + margin) return true;
   for (const w of WHEEL_ROWS) {
     const z1 = w.zStart + (w.count - 1) * w.spacing;
     if (inRect(x, z, { minX: w.x - 1.5, maxX: w.x + 1.5, minZ: w.zStart - 1, maxZ: z1 + 1 }, margin)) return true;

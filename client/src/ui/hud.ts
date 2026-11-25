@@ -20,6 +20,8 @@ export interface HudCallbacks {
   onMap(): void;
   /** Tapping the interaction prompt = pressing E (touch-friendly; tap repeatedly for wheels). */
   onPrompt(): void;
+  /** The great prayer wheel's "get off" button (Q on a keyboard). */
+  onWheelOff(): void;
   onBow(): void;
   onBeadStep(dir: 1 | -1): void;
   onGraphics(): void;
@@ -29,6 +31,7 @@ export class Hud {
   readonly root: HTMLElement;
   private status: HTMLElement;
   private prompt: HTMLElement;
+  private wheelOff: HTMLElement;
   private info: HTMLElement;
   private toasts: HTMLElement;
   private seatBar: HTMLElement;
@@ -128,6 +131,7 @@ export class Hud {
 
     this.info = h('div', { class: 'info hidden' });
     this.prompt = h('button', { class: 'prompt hidden', onclick: () => cb.onPrompt() });
+    this.wheelOff = h('button', { class: 'prompt wheel-off hidden', onclick: () => cb.onWheelOff() }, h('kbd', {}, 'Q'), h('span', { i18n: 'prompt.gwOff' }));
     this.toasts = h('div', { class: 'toasts' });
 
     // key hint (computer), line icon (phone), label
@@ -185,7 +189,7 @@ export class Hud {
       ),
     );
 
-    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.seatBar, this.beadBtns, this.inventory, quick, this.toasts, this.help, this.settingsPanel);
+    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.wheelOff, this.seatBar, this.beadBtns, this.inventory, quick, this.toasts, this.help, this.settingsPanel);
     parent.append(this.root, this.merit); // the drawer outside the HUD layer, so it can sit over the menus' backdrops
     this.renderMusic();
     this.renderFps();
@@ -307,6 +311,11 @@ export class Hud {
     if (this.prompt.dataset.text === `${busy}|${text}`) return; // avoid rebuilding every frame (keeps taps reliable)
     this.prompt.dataset.text = `${busy}|${text}`;
     this.prompt.replaceChildren(...(busy ? [] : [h('kbd', {}, 'E')]), h('span', {}, text));
+  }
+
+  /** The great prayer wheel: a button to get off (or leave the queue), for phones. */
+  setWheelOff(on: boolean) {
+    this.wheelOff.classList.toggle('hidden', !on);
   }
 
   setInfo(text: string | null) {

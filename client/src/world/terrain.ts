@@ -3,7 +3,7 @@ import { BASIN, CAVE_FALLS, DRAGON_POOL, POND, TERRAIN_SIZE, caveFallsAt, caveFa
 import { fbm, lerp, noise2, smoothstep } from '../core/math';
 import { shapeRidge } from './ridgeWalk';
 import { groundDetail } from './groundDetail';
-import { footprint as caveFallsFootprint, landAt as caveFallsLand, patchSink } from './caveFalls';
+import { footprint as caveFallsFootprint, landAt as caveFallsLand, patchSink, POOL_LEVEL as FALLS_POOL_LEVEL } from './caveFalls';
 import { RIVERS, type RiverDef } from '../config/layout';
 import { nearestOn, nearestOnStream, nearestRiver, nearStream, riverFrame, riverHalfWidth, riverLength } from './stream';
 
@@ -14,7 +14,7 @@ import { nearestOn, nearestOnStream, nearestRiver, nearStream, riverFrame, river
 export function terrainHeight(x: number, z: number) {
   const base = baseHeight(x, z), q = nearestRiver(x, z);
   const hw = riverHalfWidth(q.def, q.s);
-  return q.d < hw + BANK_OUT ? bankHeight(q.d, hw, waterLevel(q.def, q.s), base) : base;
+  return q.d < hw + BANK_OUT ? bankHeight(q.d, hw, riverLevelAt(q.def, q.s, x, z), base) : base;
 }
 
 /** The land before the rivers' own banks are cut into it (the valley, the ridge terrace, the swales and the ravine). */
@@ -26,14 +26,48 @@ function baseHeight(x: number, z: number) {
 /** The lotus pond's water surface (y). */
 export const POND_LEVEL = -0.45;
 
-/**
- * Where a river's end runs into the pond, or into another river, the water there must stand at that level (so it
- * flows in, rather than stopping at a step): the level it meets, or null for an end that meets nothing.
- */
-export function riverEndMeets(def: RiverDef, end: 0 | 1): number | null {
+/** The dragon pool's water (y): a step below the release pond, as the brook runs down from one to the other. */
+export const DRAGON_LEVEL = -0.86;
+/** The level of the pool a river's end lies in (just under its water, so the river tucks beneath), or null. */
+export function riverEndPool(def: RiverDef, end: 0 | 1): number | null {
+  if (def.falls && !end) return CAVE_FALLS.y + FALLS_POOL_LEVEL; // (out of the waterfall's pool)
   const f = riverFrame(def, end ? riverLength(def) : 0);
   if (Math.hypot(f.x - POND.x, f.z - POND.z) < POND.radius + 3) return POND_LEVEL - 0.03;
-  if (Math.hypot(f.x - DRAGON_POOL.x, f.z - DRAGON_POOL.z) < DRAGON_POOL.r + 3) return POND_LEVEL - 0.03; // (the dragon pool stands at the same level)
+  if (Math.hypot(f.x - DRAGON_POOL.x, f.z - DRAGON_POOL.z) < DRAGON_POOL.r + 3) return DRAGON_LEVEL - 0.03;
+  return null;
+}
+/** The pool a river's end lies in (not the waterfall's): its middle, and the radius its ring of stones runs at. */
+const mouthPools = new Map<string, { x: number; z: number; r: number } | null>(), mouths = new Map<string, number | null>();
+export function riverMouthPool(def: RiverDef, end: 0 | 1): { x: number; z: number; r: number } | null {
+  const key = def.id + end;
+  if (!mouthPools.has(key)) mouthPools.set(key, findMouthPool(def, end));
+  return mouthPools.get(key)!;
+}
+function findMouthPool(def: RiverDef, end: 0 | 1): { x: number; z: number; r: number } | null {
+  if (def.falls && !end) return null;
+  const f = riverFrame(def, end ? riverLength(def) : 0);
+  if (Math.hypot(f.x - POND.x, f.z - POND.z) < POND.radius + 3) return { x: POND.x, z: POND.z, r: POND.radius };
+  if (Math.hypot(f.x - DRAGON_POOL.x, f.z - DRAGON_POOL.z) < DRAGON_POOL.r + 3) return { x: DRAGON_POOL.x, z: DRAGON_POOL.z, r: DRAGON_POOL.r + 0.6 };
+  return null;
+}
+/** How far from its end a river crosses its pool's rim (where it steps over a row of rocks on the ring), or null. */
+export function riverMouth(def: RiverDef, end: 0 | 1): number | null {
+  const key = def.id + end;
+  if (!mouths.has(key)) mouths.set(key, findMouth(def, end));
+  return mouths.get(key)!;
+}
+function findMouth(def: RiverDef, end: 0 | 1): number | null {
+  const P = riverMouthPool(def, end);
+  if (!P) return null;
+  const L = riverLength(def);
+  for (let d = 0; d < 30; d += 0.25) { const f = riverFrame(def, end ? L - d : d); if (Math.hypot(f.x - P.x, f.z - P.z) >= P.r) return d; }
+  return MOUTH;
+}
+/** Where a river's end runs into a pool or into another river, the level it meets there; null for an end that meets nothing. */
+export function riverEndMeets(def: RiverDef, end: 0 | 1): number | null {
+  const p = riverEndPool(def, end);
+  if (p !== null) return p;
+  const f = riverFrame(def, end ? riverLength(def) : 0);
   for (const o of RIVERS) {
     if (o === def) continue;
     const q = nearestOn(o, f.x, f.z);
@@ -41,47 +75,84 @@ export function riverEndMeets(def: RiverDef, end: 0 | 1): number | null {
   }
   return null;
 }
-/** Where a river runs into or out of a pool it steps over a stone lip this far (m) from its end, falling this much. */
-export const MOUTH = 3, MOUTH_STEP = 0.28;
+/** Where a river runs into or out of a pool it steps over a row of rocks this far (m) from its end, falling this much. */
+export const MOUTH = 3, MOUTH_STEP = 0.2;
 /** Banks reach this far beyond the water's edge (m); the grass stands this high above the water. */
 export const BANK_OUT = 3.2;
 const FREEBOARD = 0.45, DEPTH = 0.45;
 
-/** The water's natural level `s` m along a river: below the lowest grass beside it, smoothed along the river. */
-const levels = new Map<RiverDef, Float32Array>();
-export function waterLevel(def: RiverDef, s: number) {
-  let t = levels.get(def);
-  if (!t) {
-    const L = riverLength(def), n = Math.ceil(L) + 1, raw = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      const f = riverFrame(def, i), hw = riverHalfWidth(def, i) + 1.2;
-      raw[i] = Math.min(baseHeight(f.x, f.z), baseHeight(f.x + f.nx * hw, f.z + f.nz * hw), baseHeight(f.x - f.nx * hw, f.z - f.nz * hw)) - FREEBOARD;
-    }
-    t = new Float32Array(n);
-    for (let i = 0; i < n; i++) { // the lowest nearby (so no bank is ever under water), then averaged (so it runs smoothly)
-      let lo = Infinity;
-      for (let k = Math.max(0, i - 4); k <= Math.min(n - 1, i + 4); k++) lo = Math.min(lo, raw[k]);
-      t[i] = lo;
-    }
-    const sm = Float32Array.from(t);
-    for (let i = 0; i < n; i++) {
-      let a = 0, c = 0;
-      for (let k = Math.max(0, i - 5); k <= Math.min(n - 1, i + 5); k++) (a += t[k]), c++;
-      sm[i] = Math.min(t[i], a / c);
-    }
-    levels.set(def, sm); // (in place before the ends are eased, for a river that meets this one)
-    ([0, 1] as const).forEach((end) => { // ease each end over its last 15 m to the level it runs into
-      const meet = riverEndMeets(def, end);
-      if (meet === null) return;
-      for (let i = 0; i < n; i++) {
-        const k = 1 - smoothstep(0, 15, end ? n - 1 - i : i);
-        if (k > 0) sm[i] += (meet - sm[i]) * k;
-      }
-    });
-    if (def.falls || riverEndMeets(def, 0) !== null) // out of a pool, over a stone lip MOUTH m on, and a step lower for a while (see water.ts)
-      for (let i = MOUTH + 1; i < n; i++) sm[i] -= MOUTH_STEP * (1 - smoothstep(1, 25, i - MOUTH));
-    t = sm;
+/** The water's natural level along a river, metre by metre: below the lowest grass beside it, smoothed along it. */
+function naturalLevels(def: RiverDef) {
+  const L = riverLength(def), n = Math.ceil(L) + 1, raw = new Float32Array(n), t = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const f = riverFrame(def, i), hw = riverHalfWidth(def, i) + 1.2;
+    raw[i] = Math.min(baseHeight(f.x, f.z), baseHeight(f.x + f.nx * hw, f.z + f.nz * hw), baseHeight(f.x - f.nx * hw, f.z - f.nz * hw)) - FREEBOARD;
   }
+  for (let i = 0; i < n; i++) { // the lowest nearby (so no bank is ever under water), then averaged (so it runs smoothly)
+    let lo = Infinity;
+    for (let k = Math.max(0, i - 4); k <= Math.min(n - 1, i + 4); k++) lo = Math.min(lo, raw[k]);
+    t[i] = lo;
+  }
+  const sm = Float32Array.from(t);
+  for (let i = 0; i < n; i++) {
+    let a = 0, c = 0;
+    for (let k = Math.max(0, i - 5); k <= Math.min(n - 1, i + 5); k++) (a += t[k]), c++;
+    sm[i] = Math.min(t[i], a / c);
+  }
+  return sm;
+}
+/**
+ * Every river's level, metre by metre, worked out for them all at once (upstream first), so water only ever runs
+ * downhill: from the pool it leaves (over a row of rocks MOUTH m on, a step lower; the waterfall's stream straight
+ * out), never rising, to a step above the pool it runs into (falling into it over rocks MOUTH m from its end). Where
+ * a river runs into another's side, the two meet at the lower of their levels, the other easing down to it.
+ */
+function solveLevels() {
+  const out = new Map<RiverDef, Float32Array>();
+  for (const def of RIVERS) {
+    const lv = naturalLevels(def), n = lv.length, from = riverEndPool(def, 0), to = riverEndPool(def, 1);
+    const m0 = riverMouth(def, 0) ?? MOUTH, m1 = riverMouth(def, 1) ?? MOUTH; // (the steps lie on the pools' rims)
+    if (from !== null) for (let i = 0; i < n; i++) { // (out of the pool's basin, where the land is low, at the pool's level)
+      const below = def.falls ? from : i <= m0 ? from : from - MOUTH_STEP;
+      lv[i] = i <= 14 ? below : Math.min(lv[i], below);
+    }
+    for (let i = 1; i < n; i++) lv[i] = Math.min(lv[i], lv[i - 1]);
+    if (to !== null) for (let i = 0; i < n; i++) lv[i] = i > n - 1 - m1 ? to : Math.max(lv[i], to + MOUTH_STEP);
+    out.set(def, lv);
+  }
+  for (const def of RIVERS) {
+    if (riverEndPool(def, 1) !== null) continue;
+    const lv = out.get(def)!, n = lv.length, f = riverFrame(def, riverLength(def));
+    for (const o of RIVERS) {
+      const q = o === def ? null : nearestOn(o, f.x, f.z);
+      if (!q || q.d >= 4) continue;
+      const m = out.get(o)!, j = Math.min(m.length - 1, Math.round(q.s)), a = lv[n - 1], w = m[j];
+      if (a < w) { const j0 = Math.max(0, j - 20), w0 = m[j0]; for (let i = j0; i < m.length; i++) m[i] = Math.min(m[i], i >= j ? a : w0 + (a - w0) * ((i - j0) / (j - j0 || 1))); }
+      else for (let i = Math.max(0, n - 16); i < n; i++) lv[i] = Math.min(lv[i], lv[i] + (w - lv[i]) * ((i - (n - 16)) / 15));
+      break;
+    }
+  }
+  return out;
+}
+/**
+ * The water's level at a point by a river: as waterLevel, but where it runs into or out of a pool the step lies along
+ * the pool's rim (aslant across the river, as the rim crosses it), not straight across.
+ */
+export function riverLevelAt(def: RiverDef, s: number, x: number, z: number) {
+  const L = riverLength(def);
+  for (const end of [0, 1] as const) {
+    const m = riverMouth(def, end);
+    if (m === null || (end ? L - s : s) > m + riverHalfWidth(def, s) + 3) continue;
+    const P = riverMouthPool(def, end)!, inside = 1 - smoothstep(P.r - 0.15, P.r + 0.15, Math.hypot(x - P.x, z - P.z));
+    const pool = waterLevel(def, end ? L : 0), river = waterLevel(def, end ? L - m - 0.6 : m + 0.6);
+    return river + (pool - river) * inside;
+  }
+  return waterLevel(def, s);
+}
+let levels: Map<RiverDef, Float32Array> | null = null;
+/** The water's level `s` m along a river. */
+export function waterLevel(def: RiverDef, s: number) {
+  const t = (levels ??= solveLevels()).get(def)!;
   const i = Math.max(0, Math.min(t.length - 1, s)), i0 = Math.floor(i), i1 = Math.min(t.length - 1, i0 + 1);
   return t[i0] + (t[i1] - t[i0]) * (i - i0);
 }
@@ -159,7 +230,7 @@ const dampGrass = new THREE.Color(0x4d7034), bankEarth = new THREE.Color(0x76694
 export function riverBankTint(x: number, y: number, z: number, c: THREE.Color) {
   const q = nearestRiver(x, z), hw = riverHalfWidth(q.def, q.s);
   if (q.d > hw + 3.2) return c;
-  const f = riverFrame(q.def, q.s), side = (x - f.x) * f.nx + (z - f.z) * f.nz > 0, wl = waterLevel(q.def, q.s);
+  const f = riverFrame(q.def, q.s), side = (x - f.x) * f.nx + (z - f.z) * f.nz > 0, wl = riverLevelAt(q.def, q.s, x, z);
   const above = y - wl + (noise2(x * 0.9, z * 0.9) - 0.5) * 0.3 + (noise2(x * 0.23, z * 0.23) - 0.5) * 0.4;
   const bare = 0.25 + 0.75 * smoothstep(0.3, 0.7, noise2(q.s * 0.045, side ? 3.7 : 9.1));
   const near = 1 - smoothstep(hw + 1, hw + 3, q.d);
@@ -178,7 +249,9 @@ export function groundColour(x: number, y: number, z: number, slope: number, c: 
   c.copy(meadow).lerp(meadowDry, n * 0.6);
   c.lerp(forest, smoothstep(4, 40, y));
   c.lerp(rock, smoothstep(0.25, 0.55, slope) * 0.85 + smoothstep(90, 160, y) * 0.5);
-  if (y < -0.2) c.lerp(mud, smoothstep(-0.2, -1.0, y));
+  // (mud only under the pools' water; dry ground round them stays grass)
+  if ((y < POND_LEVEL && Math.hypot(x - POND.x, z - POND.z) < POND.radius + 0.3) || (y < DRAGON_LEVEL && Math.hypot(x - DRAGON_POOL.x, z - DRAGON_POOL.z) < DRAGON_POOL.r + 0.6))
+    c.lerp(mud, smoothstep(0, 0.6, (Math.hypot(x - POND.x, z - POND.z) < POND.radius + 0.3 ? POND_LEVEL : DRAGON_LEVEL) - y));
   return c;
 }
 
@@ -235,7 +308,7 @@ export function rawTerrainHeight(x: number, z: number) {
 
   // Dragon pool basin: a flat bed under its water (the brook runs in, its outflow out)
   const dd = Math.hypot(x - DRAGON_POOL.x, z - DRAGON_POOL.z);
-  if (dd < DRAGON_POOL.r + 1.5) h = lerp(h, Math.min(h, -1.0), 1 - smoothstep(DRAGON_POOL.r - 0.8, DRAGON_POOL.r + 1.5, dd));
+  if (dd < DRAGON_POOL.r + 1.5) h = lerp(h, Math.min(h, DRAGON_LEVEL - 0.8), 1 - smoothstep(DRAGON_POOL.r - 0.8, DRAGON_POOL.r + 1.5, dd));
 
   return h;
 }

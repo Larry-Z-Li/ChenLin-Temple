@@ -52,8 +52,9 @@ export function groundDetail<T extends THREE.MeshStandardMaterial>(mat: T, opts:
           vec3 rockC = mix(vec3(0.19, 0.18, 0.16), vec3(0.32, 0.3, 0.27), bed) * (0.82 + 0.3 * grain);
           float big = gNoise(p * 0.03 + vec2(vGW.y * 0.015, 0.0));                        // lighter and darker stretches of rock
           float streak = gNoise(p * 0.45 + vec2(0.0, vGW.y * 0.012));                     // (on a sheer face, streaks down it)
-          rockC *= (0.75 + 0.45 * big) * (1.0 - 0.3 * smoothstep(0.6, 0.9, streak));
-          rockC = mix(rockC, rockC * vec3(1.08, 1.0, 0.88), smoothstep(0.4, 0.8, gNoise(p * 0.07 + 5.3)));
+          rockC *= (0.62 + 0.62 * big) * (1.0 - 0.45 * smoothstep(0.55, 0.9, streak));
+          rockC = mix(rockC, rockC * vec3(1.1, 1.0, 0.85), smoothstep(0.4, 0.8, gNoise(p * 0.07 + 5.3)));
+          rockC = mix(rockC, vec3(0.16, 0.2, 0.12), 0.45 * smoothstep(0.62, 0.85, gNoise(p * 0.11 + vec2(vGW.y * 0.05, 2.7)))); // moss and lichen
           g = mix(g, rockC, rock);
           #ifdef GROUND_SHADE
             g *= vShade;

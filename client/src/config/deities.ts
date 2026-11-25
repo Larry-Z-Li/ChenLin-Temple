@@ -6,7 +6,7 @@
  */
 export type DeityId =
   | 'manjushri'
-  | 'cintamanicakra'
+  | 'avalokiteshvara'
   | 'cundi'
   | 'daikokuten'
   | 'marici'
@@ -31,7 +31,7 @@ export interface DeityDef {
 
 export const DEITIES: Record<DeityId, DeityDef> = {
   manjushri: { nameKey: 'deity.manjushri', height: 2.8 },
-  cintamanicakra: { nameKey: 'deity.cintamanicakra', height: 2.8 },
+  avalokiteshvara: { nameKey: 'deity.avalokiteshvara', height: 2.8 },
   cundi: { nameKey: 'deity.cundi', height: 3.4 },
   daikokuten: { nameKey: 'deity.daikokuten', height: 2.8 },
   marici: { nameKey: 'deity.marici', height: 2.2 },

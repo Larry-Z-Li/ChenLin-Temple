@@ -9,7 +9,7 @@ import { inscription, onLocaleChange, t } from '../i18n';
 import { lightStupaBase, smallStupa } from '../buildings/stupas';
 import { buildStatueSlot } from '../buildings/statue';
 import { ridgePlan } from './ridgeWalk';
-import { POND_LEVEL } from './terrain';
+import { DRAGON_LEVEL } from './terrain';
 
 const ROCK = new THREE.MeshStandardMaterial({ color: 0x77736c, roughness: 1, flatShading: true });
 
@@ -101,7 +101,7 @@ function buildDragonPool(ctx: WorldContext) {
   const { x, z, r } = DRAGON_POOL;
   const y = ctx.ground.heightAt(x, z); // (the bed is sunk about a metre; the water stands at the rivers' level)
   const water = new THREE.Mesh(new THREE.CircleGeometry(r + 0.5, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3a7f84, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.8 }));
-  water.position.set(x, POND_LEVEL - 0.02, z);
+  water.position.set(x, DRAGON_LEVEL, z);
   ctx.scene.add(water);
   const rng = mulberry32(5150);
   for (let i = 0; i < 26; i++) {

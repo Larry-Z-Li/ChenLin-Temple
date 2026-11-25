@@ -41,6 +41,7 @@ import {
   type ServerMsg,
   type Transform,
 } from '../../shared/protocol';
+import { GW_MAX_PRESS_HZ, GreatWheelSim } from '../../shared/greatWheel';
 import { isBlocked } from '../../shared/moderation';
 import { openStore } from './store';
 
@@ -148,6 +149,7 @@ interface Client {
   dirty: boolean;
   seat: string | null;
   lastPush: number;
+  lastGwPress: number;
   lastOffer: number;
   lastStrike: number;
   lastWish: number;
@@ -311,6 +313,30 @@ function broadcast(msg: ServerMsg, except?: string) {
   }
 }
 
+/** The great prayer wheel: the server turns it and decides who is in which opening; clients only draw it and walk their own person. */
+const greatWheel = new GreatWheelSim({
+  board: (id, opening, stair) => {
+    const c = clients.get(id);
+    if (c) send(c, { t: 'gwDo', ev: 'board', opening, stair });
+  },
+  exit: (id, stair) => {
+    const c = clients.get(id);
+    if (c) send(c, { t: 'gwDo', ev: 'exit', stair });
+  },
+});
+let gwSent = -1, gwSentAt = 0, gwLast = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  greatWheel.step(Math.min(0.25, (now - gwLast) / 1000));
+  gwLast = now;
+  // on every change, and ten times a second while it turns (clients carry the angle on between, and correct themselves)
+  if (greatWheel.version !== gwSent || (greatWheel.moving && now - gwSentAt > 100)) {
+    gwSent = greatWheel.version;
+    gwSentAt = now;
+    broadcast({ t: 'gw', ...greatWheel.state() });
+  }
+}, 50);
+
 function releaseSeat(c: Client) {
   if (c.seat && seats.get(c.seat) === c.id) {
     seats.delete(c.seat);
@@ -345,6 +371,7 @@ function handle(c: Client, msg: ClientMsg) {
       players: others,
       seats: Object.fromEntries(seats),
       wheels: turningWheels(now),
+      gw: greatWheel.state(),
       picked: pickedAgo,
       offerings: liveOfferings(now),
       wishes: [...wishes.values()].map(pub),
@@ -384,6 +411,19 @@ function handle(c: Client, msg: ClientMsg) {
       const speed = Math.min(WHEEL_MAX, wheelSpeedNow(msg.wheel, now) + WHEEL_PUSH);
       wheels.set(msg.wheel, { speed, t: now });
       broadcast({ t: 'push', wheel: msg.wheel, by: c.id, speed });
+      break;
+    }
+    case 'gw': {
+      if (msg.op === 'join') {
+        if (!c.placed || !greatWheel.join(c.id, msg.stair)) send(c, { t: 'gwDo', ev: 'denied' });
+      } else if (msg.op === 'leave') greatWheel.leave(c.id);
+      else if (msg.op === 'press') {
+        const now = Date.now();
+        if (now - c.lastGwPress >= 1000 / GW_MAX_PRESS_HZ - 2) {
+          c.lastGwPress = now;
+          greatWheel.press(c.id);
+        }
+      }
       break;
     }
     case 'strike': {
@@ -535,6 +575,7 @@ wss.on('connection', (ws, req) => {
     dirty: false,
     seat: null,
     lastPush: 0,
+    lastGwPress: 0,
     lastOffer: 0,
     lastStrike: 0,
     lastWish: 0,
@@ -569,6 +610,7 @@ wss.on('connection', (ws, req) => {
     if (n > 0) connsByIp.set(c.ip, n);
     else connsByIp.delete(c.ip);
     releaseSeat(c);
+    greatWheel.remove(c.id);
     clients.delete(c.id);
     if (c.info && c.placed) broadcast({ t: 'leave', id: c.id });
   });

@@ -38,7 +38,9 @@ const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 // ---------- the layout (metres) ----------
 /** The gorge curves round C; HC the cliff's height at the back; the pool's water; the ledge in the recess. */
-const C = { x: 0, z: -3 }, HC = 48, POOL_Y = -0.3, FLOOR_Y = 3.5;
+const C = { x: 0, z: -3 }, HC = 48, POOL_Y = -0.65, FLOOR_Y = 3.5;
+/** The pool's water level (y, in this frame): the stream leaves it at this level (see terrain.ts riverEndMeets). */
+export const POOL_LEVEL = POOL_Y;
 /** The pool (centre and radius), and the fall: centre line x and half width. */
 const POOL = { x: -0.8, z: -6.5, r: 10 };
 const XC = 0.4, HW = 4.5;
@@ -65,8 +67,16 @@ const SHELF_Z = arcZ(FLOOR_Y) - 1.4;
 
 /** The mountain front: HC at the rim, climbing behind, its foot wandering along the valley's edge; a gully carries the stream. */
 function hillTop(x: number, z: number) {
-  let h = HC + 1.5 * sn3(x * 0.04, 3.3, z * 0.04) + Math.max(0, LIP_Z - z) * 0.22;
-  h *= (1 - sstep(95, 175, Math.abs(x))) * (1 - sstep(-20 + 8 * sn3(x * 0.03, 1.1, 0.4), 9 + 8 * sn3(x * 0.022, 2.2, 0.7), z));
+  // (round the fall the rim stays as it is, where the stream crosses it; away from it, the hill is broken up)
+  const away = sstep(14, 40, Math.abs(x));
+  let h = HC + 1.5 * sn3(x * 0.04, 3.3, z * 0.04) + away * (7 * sn3(x * 0.018, 3.3, 1.7) + 3 * sn3(x * 0.05, 8.1, z * 0.05)) + Math.max(0, LIP_Z - z) * 0.22;
+  // its front, falling to the valley: spurs and bays, its brow and foot wandering, and down it steps of rock with
+  // grassy benches between them
+  const spur = away * (9 * sn3(x * 0.021, 1.9, 0.3) + 4 * sn3(x * 0.06, 5.5, 0.9) + 1.5 * sn3(x * 0.17, 2.2, 4.1));
+  const f = sstep(-20 + 8 * sn3(x * 0.03, 1.1, 0.4) + spur, 9 + 8 * sn3(x * 0.022, 2.2, 0.7) + spur, z);
+  const ph = 0.5 + 0.5 * sn3(x * 0.035, 6.6, 1.2), terr = (g: number) => { const k = Math.floor(g); return k + sstep(0.25, 0.85, g - k); };
+  const stepped = (terr(f * 5 + ph) - terr(ph)) / (terr(5 + ph) - terr(ph));
+  h *= (1 - sstep(95, 175, Math.abs(x))) * (1 - (f + (stepped - f) * 0.65 * away));
   const hw = streamHW(z), gully = (1 - sstep(hw + 1.2, hw + 5.5, Math.abs(x - streamX(z)))) * sstep(SPRING_Z - 4, SPRING_Z + 3, z);
   return h + (Math.min(h, streamY(z) - 0.8) - h) * gully;
 }
@@ -96,13 +106,15 @@ function floorHeight(x: number, z: number) {
   const dx = x - POOL.x, dz = z - POOL.z, r = Math.hypot(dx, dz), a = Math.atan2(dz, dx);
   const R = POOL.r + 1.4 * sn3(Math.cos(a) * 1.4 + 3, 1.5, Math.sin(a) * 1.4 + 3) + 0.45 * sn3(Math.cos(a) * 4 + 9, 4.5, Math.sin(a) * 4 + 1);
   const g = base - 2.0 * (1 - sstep(R - 3.5, R + 0.4, r));
-  if (meadow) return g;
-  const outlet = (1 - sstep(1.2, 2.8, Math.abs(x - POOL.x))) * sstep(POOL.z, POOL.z + 3, z) * (1 - sstep(POOL.z + POOL.r + 3, POOL.z + POOL.r + 4.5, z));
-  return Math.min(g, -0.95 * outlet);
+  return g; // (in the game the stream's own channel is carved by the terrain, from inside the pool's rim)
 }
-/** Where the stream begins, in this frame (the layout starts the stream here). */
-export const OUTLET = { x: POOL.x, z: POOL.z + POOL.r + 3.5 };
 
+/** How far out from the pool's middle, this way, its floor rises out of the water (where its ring of rocks lies). */
+function waterline(a: number) {
+  let r = POOL.r - 4;
+  while (r < POOL.r + 3 && floorHeight(POOL.x + Math.cos(a) * r, POOL.z + Math.sin(a) * r) < POOL_Y) r += 0.15;
+  return r;
+}
 /**
  * The land (y) here: the hill, cut away into a gorge with sheer cliffs round the back and slopes where it opens out;
  * the recess behind the fall; the ledge, the stairs and the pool on its floor. `cut` is 1 inside the gorge (where the
@@ -110,12 +122,14 @@ export const OUTLET = { x: POOL.x, z: POOL.z + POOL.r + 3.5 };
  */
 export function landAt(x: number, z: number) {
   const r = Math.hypot(x - C.x, z - C.z), phi = bearing(x, z), a = Math.abs(phi);
-  // the cliffs are broken up (not where the water falls, nor over the stairs): buttresses, ribs and gullies,
-  // wandering as they go up
-  const jag = sstep(0.32, 0.6, a) * cliffness(a) * sstep(2, 6, onPath(x, z).d), raw = r - edgeR(phi), up = Math.max(0, raw) / 0.06;
-  const over = raw - jag * (3.2 * sn3(phi * 6.5, up * 0.035, 0.7) + 1.3 * sn3(phi * 17, up * 0.06, 4.4) + 0.5 * sn3(phi * 41, up * 0.1, 2.2));
+  // the walls are broken up all round (not the face behind the fall, nor over the stairs): big buttresses and bays,
+  // ribs and gullies wandering as they go up; scree heaped at their feet; bands of sheer rock and benches (cliffRise)
+  const jag = sstep(0.32, 0.6, a) * sstep(2, 6, onPath(x, z).d), raw = r - edgeR(phi), up = Math.max(0, raw) / (0.06 + 0.44 * (1 - cliffness(a)));
+  const over = raw - jag * (6 * sn3(x * 0.028, up * 0.02, z * 0.028) + 2.6 * sn3(x * 0.075, up * 0.045, z * 0.075) + 1 * sn3(x * 0.2, up * 0.09, z * 0.2));
+  const talus = jag * sstep(1.0, 1.5, a) * Math.max(0, 2.5 + 6 * sn3(x * 0.03, 7.7, z * 0.03)), TW = 1.7; // (its height; out TW m per metre)
   let floor = floorHeight(x, z);
-  let wall = over <= 0 ? -Infinity : Math.min(floor, 0) + cliffRise(over, phi, a, jag); // (the cliffs rise from the floor: into the pool, where it's there)
+  let wall = over <= -talus * TW ? -Infinity // (the walls rise from the floor: into the pool, where it's there)
+    : Math.min(floor, 0) + (over < 0 ? talus * ((over + talus * TW) / (talus * TW)) ** 1.5 : talus + cliffRise(over, x, z, a, jag));
   const al = Math.hypot((x - ALC.x) / ALC.rx, (z - ALC.z) / ALC.rz);
   if (al < 1.4) wall = Math.min(wall, al < 1 ? FLOOR_Y : FLOOR_Y + ((al - 1) * ALC.rx) / 0.035);
   const sh = Math.hypot((x - XC) / 7, (z - FACE_Z) / (SHELF_Z - FACE_Z));
@@ -129,14 +143,15 @@ export function landAt(x: number, z: number) {
  * How high the wall stands `over` m beyond its foot: sheer faces and slopes as the gorge opens; on the cliffs (by
  * `jag`), faces of varying steepness in bands, with ledges between them that come and go.
  */
-function cliffRise(over: number, phi: number, a: number, jag: number) {
-  const run = 0.035 + 0.465 * (1 - cliffness(a)); // metres out per metre up
+function cliffRise(over: number, x: number, z: number, a: number, jag: number) {
+  const cl = cliffness(a), run = 0.035 + 0.465 * (1 - cl); // metres out per metre up
   if (jag <= 0) return over / run;
-  const H = 6.5 + 3 * sn3(phi * 3.1, 1.3, 0.4);
+  const H = 6.5 + 3 * sn3(x * 0.02, 1.3, z * 0.02);
   let o = over, h = 0, r = run;
-  for (let k = 0; k < 12; k++) { // band by band up the wall: a face, sheer or leaning back, then a ledge (or none)
-    r = run * (1 + 5 * jag * Math.max(0, sn3(phi * 4.3, k * 0.7, 3.1)));
-    const face = H * r, ledge = jag * Math.max(0, 0.4 + 2.4 * sn3(phi * 5.2 + k * 1.7, k * 0.9, 0.5));
+  for (let k = 0; k < 12; k++) { // band by band up the wall: a face, sheer, leaning back or grassy, then a ledge (or none)
+    const n = sn3(x * 0.035, k * 0.7, z * 0.035);
+    r = run * (n > 0 ? 1 + 5 * jag * n : 1 + 0.7 * jag * (1 - cl) * n);
+    const face = H * r, ledge = jag * Math.max(0, 0.4 + 2.4 * sn3(x * 0.05 + k * 1.7, k * 0.9, z * 0.05));
     if (o <= face) return h + o / r;
     (o -= face), (h += H);
     if (o <= ledge) return h + o * 0.25;
@@ -238,12 +253,12 @@ function poolMaterial(time: { value: number }, sky: THREE.Color, light: { value:
         float ring = sin(r * 2.4 - t * 2.6 + n1 * 2.0) * exp(-r * 0.2);
         float wav = (n1 - 0.5) * 0.7 + (n2 - 0.5) * 0.4 + ring * 0.5;
         float fres = 0.06 + 0.7 * pow(1.0 - clamp(V.y + wav * 0.14, 0.0, 1.0), 3.0);
-        vec3 col = mix(vec3(0.04, 0.22, 0.25), vec3(0.12, 0.42, 0.42), 0.35 + 0.3 * n1);
+        vec3 col = mix(vec3(0.17, 0.47, 0.5), vec3(0.3, 0.59, 0.56), 0.3 + 0.3 * n1); // (the rivers' blues)
         col = mix(col, uSky, fres * vShade);
         col += pow(max(0.0, n1 * n2 * 2.2 - 0.95), 2.0) * 1.2 * vShade;    // glints
         float foam = smoothstep(3.2, 0.4, r + (n1 - 0.5) * 2.2) + smoothstep(0.82, 1.0, ring + n2 * 0.25) * smoothstep(6.0, 1.5, r) * 0.4;
         col = mix(col * vShade, vec3(0.93, 0.97, 1.0) * mix(0.55, 1.0, vShade), clamp(foam, 0.0, 1.0) * 0.85);
-        gl_FragColor = vec4(col * uLight, 0.9);
+        gl_FragColor = vec4(col * uLight, 0.84);
         #include <fog_fragment>
       }`,
   });
@@ -273,7 +288,7 @@ export interface CaveFallsTerrain {
  * Builds it. In the game, `place` sets it in the world and `terrain` lets its ground meet the terrain's; in the
  * mock it lays a meadow of its own. Returns the group, and an update to call every frame.
  */
-export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; place?: { x: number; y: number; z: number; yaw: number }; terrain?: CaveFallsTerrain } = {}) {
+export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; place?: { x: number; y: number; z: number; yaw: number }; terrain?: CaveFallsTerrain; water?: THREE.Material } = {}) {
   const group = new THREE.Group();
   const time = { value: 0 }, light = { value: 1 }, sky = opts.sky?.clone() ?? new THREE.Color(0xd2e6ee);
   meadow = opts.ground !== false;
@@ -365,10 +380,29 @@ export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; plac
 
   // --- the pool ---
   {
-    const R = POOL.r + 3;
-    const g = new THREE.PlaneGeometry(R * 2, R * 2, 30, 30).rotateX(-Math.PI / 2).translate(POOL.x, POOL_Y, POOL.z);
+    // out to its ring of rocks and no further (the stream's own water carries on from inside it)
+    // (in the game, in the rivers' own water: deep in the middle, clear at the rocks, rippling out from the foot of
+    // the fall and white there)
+    const SEGS = 96, RINGS = 8, pos: number[] = [], idx: number[] = [], ruv: number[] = [], foam: number[] = [];
+    for (let i = 0; i <= SEGS; i++) {
+      const a = (i / SEGS) * Math.PI * 2, rr = waterline(a) + 0.3;
+      for (let j = 0; j <= RINGS; j++) {
+        const x = POOL.x + Math.cos(a) * rr * (j / RINGS), z = POOL.z + Math.sin(a) * rr * (j / RINGS);
+        pos.push(x, POOL_Y, z);
+        ruv.push(0.5 + 0.5 * (j / RINGS), Math.hypot(x - XC, z - LAND_Z));
+        foam.push(1 - sstep(0.5, 4, Math.hypot(Math.max(0, Math.abs(x - XC) - HW * 0.8), z - LAND_Z)));
+      }
+      if (i < SEGS) for (let j = 0; j < RINGS; j++) { const k = i * (RINGS + 1) + j; idx.push(k, k + RINGS + 1, k + 1, k + 1, k + RINGS + 1, k + RINGS + 2); } // (facing up)
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
     g.setAttribute('aShade', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(1), 1));
-    const mesh = new THREE.Mesh(g, poolMaterial(time, sky, light));
+    g.setAttribute('aRiverUv', new THREE.Float32BufferAttribute(ruv, 2));
+    g.setAttribute('aFoam', new THREE.Float32BufferAttribute(foam, 1));
+    g.setAttribute('aFade', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(1), 1));
+    g.computeVertexNormals();
+    const mesh = new THREE.Mesh(g, opts.water ?? poolMaterial(time, sky, light));
     mesh.renderOrder = 1;
     group.add(mesh);
   }
@@ -406,6 +440,46 @@ export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; plac
     group.add(mesh);
   }
 
+  // --- spray: droplets flung up and out where the water lands, falling back, and a slow drift of fine mist ---
+  {
+    const N = 320, seed = new Float32Array(N * 4);
+    for (let i = 0; i < N; i++) seed.set([rng(), rng(), rng(), rng()], i * 4);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+    const F = (v: number) => v.toFixed(2);
+    const pts = new THREE.Points(g, new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, fog: true,
+      uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uTime: time, uLight: light, uPx: { value: Math.min(2, window.devicePixelRatio || 1) } },
+      vertexShader: /* glsl */ `
+        #include <fog_pars_vertex>
+        attribute vec4 aSeed; uniform float uTime, uPx; varying float vA;
+        void main() {
+          float fine = step(0.7, aSeed.w);                                   // (three in ten: fine mist, slow, drifting)
+          float life = mix(1.1, 2.0, aSeed.z) * (1.0 + fine * 1.5), tau = mod(uTime + aSeed.x * 17.0, life);
+          vec3 p0 = vec3(${F(XC)} + (aSeed.y - 0.5) * ${F(HW * 1.8)}, ${F(POOL_Y)}, ${F(LAND_Z)} + (aSeed.z - 0.5) * 1.2);
+          vec3 v = vec3((aSeed.w - 0.5) * 2.0, mix(2.0, 5.0, fract(aSeed.x * 7.3)), mix(0.4, 2.6, fract(aSeed.y * 5.1)));
+          vec3 p = p0 + v * tau * mix(1.0, 0.45, fine) - vec3(0.0, 0.5 * mix(9.8, 1.2, fine) * tau * tau, 0.0);
+          p.y = max(p.y, ${F(POOL_Y)});
+          vA = sin(3.14159 * tau / life) * mix(0.55, 0.22, fine);
+          vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = mix(0.12, 0.9, fine) * mix(0.7, 1.3, aSeed.y) * 300.0 * uPx / -mvPosition.z;
+          #include <fog_vertex>
+        }`,
+      fragmentShader: /* glsl */ `
+        #include <fog_pars_fragment>
+        uniform float uLight; varying float vA;
+        void main() {
+          float a = smoothstep(0.5, 0.1, length(gl_PointCoord - 0.5)) * vA;
+          gl_FragColor = vec4(vec3(0.95, 0.98, 1.0) * uLight, a);
+          #include <fog_fragment>
+        }`,
+    }));
+    pts.frustumCulled = false;
+    group.add(pts);
+  }
+
   // --- mist at the foot ---
   const mists: THREE.Sprite[] = [];
   for (let i = 0; i < 3; i++) {
@@ -441,6 +515,13 @@ export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; plac
       if (y < 0.5 || steep > 0.9) continue;
       if (rng() < 0.4) tree(x, y, z, 3.5 + rng() * 2.5); else bush(x, y, z, 0.6 + rng() * 0.6);
     }
+    for (let k = 0; k < 900; k++) { // on the ledges and benches all round the walls, where a bush or a tree has footing
+      const phi = (rng() < 0.5 ? -1 : 1) * (0.4 + rng() * 2.2), r = edgeR(phi) - 6 + rng() * 46, x = C.x + Math.sin(phi) * r, z = C.z - Math.cos(phi) * r;
+      if (onPath(x, z).d < 3 || occupied(x, z, 1)) continue;
+      const y = landY(x, z), e = 0.7, steep = Math.max(...[[e, 0], [-e, 0], [0, e], [0, -e]].map(([dx, dz]) => Math.abs(landY(x + dx, z + dz) - y)));
+      if (y < 5 || y > hillTop(x, z) - 1.5 || steep > 0.45) continue;
+      if (rng() < 0.3) tree(x, y, z, 3 + rng() * 2.5); else bush(x, y, z, 0.5 + rng() * 0.7);
+    }
     for (let k = 0; k < (meadow ? 70 : 0); k++) { // the mock's hilltop
       const x = (rng() - 0.5) * 120, z = -80 + rng() * 75;
       if (landAt(x, z).cut > 0.5 || Math.abs(x - streamX(z)) < 8) continue;
@@ -463,10 +544,18 @@ export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; plac
       g.computeVertexNormals();
       parts.push(coloured(g, c.set(0x6e685f).multiplyScalar(0.8 + rng() * 0.25)));
     };
-    for (let i = 0; i < 22; i++) {
-      const a = rng() * Math.PI * 2, x = POOL.x + Math.cos(a) * (POOL.r + 0.6 + rng() * 1.2), z = POOL.z + Math.sin(a) * (POOL.r + 0.6 + rng() * 1.2);
-      if (landY(x, z) > 1.5 || onPath(x, z).d < 1.8) continue;
-      boulder(x, landY(x, z), z, 0.35 + rng() * 0.8);
+    // a ring of rocks along the pool's waterline (hiding its edge), heaped up either side of where the stream leaves it
+    for (let a = 0; a < Math.PI * 2; a += 0.07 + rng() * 0.06) {
+      const toOut = Math.abs(Math.atan2(Math.sin(a - Math.PI / 2), Math.cos(a - Math.PI / 2))); // (the stream leaves at +z)
+      const out = 1 - sstep(0.12, 0.5, toOut), rr = waterline(a) + (rng() - 0.6) * 1.3;
+      if (toOut < 0.12 && rng() < 0.75) continue; // (the stream's own way out stays open, but for a stone or two in it)
+      const x = POOL.x + Math.cos(a) * rr, z = POOL.z + Math.sin(a) * rr;
+      if (landY(x, z) > 1.5 || onPath(x, z).d < 1.6) continue;
+      boulder(x, Math.max(landY(x, z), POOL_Y - 0.5), z, (0.3 + rng() * 0.6) * (1 + 0.9 * out));
+      if (out > 0.3 || rng() < 0.35) { // a second row, here and there (and always by the stream)
+        const r2 = rr + 0.9 + rng() * 1.2, x2 = POOL.x + Math.cos(a) * r2, z2 = POOL.z + Math.sin(a) * r2;
+        if (landY(x2, z2) < 1.5 && onPath(x2, z2).d > 1.6) boulder(x2, landY(x2, z2), z2, (0.25 + rng() * 0.45) * (1 + 0.6 * out));
+      }
     }
     for (let i = 0; i < 30; i++) { // tumbled from the cliffs
       const phi = (rng() - 0.5) * 3.2, r = edgeR(phi) - 0.5 - rng() * 2.5, x = C.x + Math.sin(phi) * r, z = C.z - Math.cos(phi) * r;
@@ -540,7 +629,8 @@ export function colliders(): [number, number, number][] {
 /** Somewhere taken (the gorge, its stream, the pool, the stairs): the terrain's own trees and grass keep off. */
 export function occupied(x: number, z: number, margin = 0) {
   const stream = z > SPRING_Z - 8 && z < LIP_Z + 1 && Math.abs(x - streamX(z)) < streamHW(z) + 3.5 + margin;
-  return stream || landAt(x, z).cut > 0.3 || Math.hypot(x - POOL.x, z - POOL.z) < POOL.r + 3 + margin || onPath(x, z).d < 2 + margin;
+  const L = landAt(x, z); // (the gorge's floor is kept clear, for the view of the fall; its walls' benches may grow trees)
+  return stream || (L.cut > 0.3 && L.y < 10) || Math.hypot(x - POOL.x, z - POOL.z) < POOL.r + 3 + margin || onPath(x, z).d < 2 + margin;
 }
 /** On the gorge's floor, the ledge or in the recess, where people may go (beyond the valley's usual edge). */
 export function inCut(x: number, z: number) {

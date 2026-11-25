@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ABBOT, DORM } from '../config/layout';
+import { ABBOT, DORM, TABLE_HUT } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
@@ -48,6 +48,7 @@ export function buildHuts(ctx: WorldContext) {
   buildWoodpile(ctx, a.x + 5.6, a.z + 0.5, Math.PI / 2);
   for (const dx of [-3, 3]) waterJar(ctx, a.x + dx, a.z + 6.1);
   buildVegPatch(ctx, a.x - 4, a.x + 4, a.z - 12, a.z - 8);
+  buildTableHut(ctx);
 
   // Monks' quarters: north, east and south wings facing a courtyard that opens to the west.
   const d = DORM, w = d.wing;
@@ -206,4 +207,85 @@ function buildVegPatch(ctx: WorldContext, x0: number, x1: number, z0: number, z1
   rail(x0 - m0, z1 + m0, x1 + m0, z1 + m0);
   rail(x0 - m0, z0 - m0, x0 - m0, z1 + m0);
   rail(x1 + m0, z0 - m0, x1 + m0, (z0 + z1) / 2 - 0.8);
+}
+
+/**
+ * 茶亭: a 4 × 4 m hut open along its front, in the abbot's-quarters style (white walls over a wood band, dark posts and
+ * beams, lattice windows, bark roof), on a low stone plinth with a step. A table, a bench and two stools stand inside
+ * (all seats you can sit on). Built facing +Z in its own frame, then turned by TABLE_HUT.yaw (a multiple of π/2).
+ */
+function buildTableHut(ctx: WorldContext) {
+  const { x, z, yaw } = TABLE_HUT;
+  const c = Math.round(Math.cos(yaw)), s = Math.round(Math.sin(yaw));
+  const toWorld = (lx: number, lz: number): [number, number] => [x + lx * c + lz * s, z - lx * s + lz * c];
+  const aabb = (x0: number, x1: number, z0: number, z1: number) => {
+    const [ax, az] = toWorld(x0, z0), [bx, bz] = toWorld(x1, z1);
+    return { minX: Math.min(ax, bx), maxX: Math.max(ax, bx), minZ: Math.min(az, bz), maxZ: Math.max(az, bz) };
+  };
+  // The floor is level with the highest ground under the plinth; the plinth's skirt runs down to the lowest.
+  let hi = -Infinity, lo = Infinity;
+  for (const lx of [-2.6, 0, 2.6]) for (const lz of [-2.4, 0, 2.8]) { const h = ctx.ground.heightAt(...toWorld(lx, lz)); hi = Math.max(hi, h); lo = Math.min(lo, h); }
+  const PLH = 0.3, y0 = hi + PLH;
+  const g = new THREE.Group();
+  g.position.set(x, hi, z);
+  g.rotation.y = yaw;
+  ctx.scene.add(g);
+  const stone = mat(THEME.platformStone, { roughness: 0.95 });
+  const dark = mat(HOJO_DARK, { roughness: 0.7 }), wood = mat(HOJO_WOOD, { roughness: 0.8 });
+  const furn = mat(0x8a6038, { roughness: 0.8 }); // the picnic tables' wood
+  const Hh = 2.6, half = 2;
+
+  // Plinth (skirted down to the lowest ground), step in front
+  g.add(box(4.8, PLH + (hi - lo), 5.2, stone, 0, -(hi - lo), 0.2));
+  g.add(box(2.4, PLH * 0.5, 0.5, stone, 0, 0, 3.05));
+  // Walls: back and sides (white over a wood band, dark cap), lattice windows on the sides
+  const wall = mat(THEME.wall, { roughness: 0.9 });
+  g.add(box(4, Hh, 0.2, wall, 0, PLH, -half + 0.1), box(4.06, 0.6, 0.26, wood, 0, PLH, -half + 0.1));
+  for (const sx of [-1, 1]) {
+    g.add(box(0.2, Hh, 3.8, wall, sx * (half - 0.1), PLH, 0), box(0.26, 0.6, 3.86, wood, sx * (half - 0.1), PLH, 0));
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.0), new THREE.MeshStandardMaterial({ map: latticeTex(), roughness: 0.8, side: THREE.DoubleSide }));
+    win.position.set(sx * (half + 0.015), PLH + 1.45, 0.1);
+    win.rotation.y = sx * Math.PI / 2;
+    g.add(win);
+  }
+  g.add(box(4.5, 0.32, 0.3, dark, 0, PLH + Hh - 0.32, -half + 0.1)); // beams round the top
+  g.add(box(0.3, 0.32, 4.3, dark, -half, PLH + Hh - 0.32, 0), box(0.3, 0.32, 4.3, dark, half, PLH + Hh - 0.32, 0));
+  g.add(box(4.5, 0.32, 0.3, dark, 0, PLH + Hh - 0.32, half)); // the front lintel: open below it
+  for (const [px, pz] of [[-half, -half], [half, -half], [-half, half], [half, half]]) g.add(cylinder(0.12, 0.14, Hh, dark, px, PLH, pz, 10));
+  hojoRoof(g, 6.4, 6.0, 1.9, PLH + Hh, 0);
+
+  // Furniture: a table against the back, a bench in front of it, a stool at each end
+  const tz = -0.7;
+  g.add(box(1.9, 0.07, 0.85, furn, 0, 0.72 + PLH, tz));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(box(0.08, 0.72, 0.08, furn, sx * 0.82, PLH, tz + sz * 0.34));
+  g.add(box(1.7, 0.06, 0.06, furn, 0, PLH + 0.4, tz - 0.34), box(1.7, 0.06, 0.06, furn, 0, PLH + 0.4, tz + 0.34));
+  g.add(box(1.9, 0.06, 0.32, furn, 0, 0.42 + PLH, tz + 0.82)); // bench seat
+  for (const sx of [-1, 1]) g.add(box(0.08, 0.42, 0.28, furn, sx * 0.8, PLH, tz + 0.82));
+  for (const sx of [-1, 1]) { // stools
+    g.add(cylinder(0.2, 0.2, 0.06, furn, sx * 1.35, PLH + 0.4, tz, 12));
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.add(box(0.05, 0.4, 0.05, furn, sx * 1.35 + dx * 0.11, PLH, tz + dz * 0.11));
+  }
+  g.traverse((o) => (o.castShadow = o.receiveShadow = true));
+
+  // Ground: the floor and a ramp up the step
+  const fl = aabb(-half, half, -half, half + 0.7);
+  ctx.ground.addPad(fl.minX, fl.maxX, fl.minZ, fl.maxZ, y0);
+  const st = aabb(-1.2, 1.2, 2.7, 3.5);
+  if (s === 0) ctx.ground.addRamp(st.minX, st.maxX, c > 0 ? st.minZ : st.maxZ, c > 0 ? st.maxZ : st.minZ, y0, hi);
+  else ctx.ground.addRampX(st.minZ, st.maxZ, s > 0 ? st.minX : st.maxX, s > 0 ? st.maxX : st.minX, y0, hi);
+  // Collision: the three walls (the front stays open), the table and the seats
+  const wallBox = (x0: number, x1: number, z0: number, z1: number) => { const b = aabb(x0, x1, z0, z1); ctx.collisions.addBox(b.minX, b.maxX, b.minZ, b.maxZ); };
+  wallBox(-half - 0.15, half + 0.15, -half - 0.05, -half + 0.25);
+  for (const sx of [-1, 1]) wallBox(sx * half - 0.15, sx * half + 0.15, -half, half);
+  wallBox(-0.98, 0.98, tz - 0.45, tz + 0.45);
+  wallBox(-0.98, 0.98, tz + 0.64, tz + 1.0);
+  for (const sx of [-1, 1]) { const [wx, wz] = toWorld(sx * 1.35, tz); ctx.collisions.addCircle(wx, wz, 0.28); }
+  // Seats: two on the bench (facing the table), one on each stool (facing in)
+  const seat = (id: string, lx: number, lz: number, faceLocal: number, exitLx: number, exitLz: number) => {
+    const [wx, wz] = toWorld(lx, lz), [ex, ez] = [exitLx * c + exitLz * s, -exitLx * s + exitLz * c];
+    ctx.seats.set(id, { id, kind: 'bench', x: wx, y: y0, z: wz, yaw: yaw + faceLocal + Math.PI, exit: [ex * 0.8, ez * 0.8], occupiedBy: null });
+  };
+  [-0.45, 0.45].forEach((lx, k) => seat(`teahut-b${k}`, lx, tz + 0.8, Math.PI, 0, 1));
+  seat('teahut-sL', -1.35, tz, Math.PI / 2, -1, 0);
+  seat('teahut-sR', 1.35, tz, -Math.PI / 2, 1, 0);
 }

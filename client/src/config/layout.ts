@@ -92,7 +92,7 @@ const gateHall = (id: string, px: number, pz: number, deities: DeityId[], extra:
 });
 
 export const HALLS: HallDef[] = [
-  gateHall('guanyin', -39.5, -27, ['cintamanicakra']), // 開門 NW · 如意輪觀音
+  gateHall('guanyin', -39.5, -27, ['avalokiteshvara']), // 開門 NW · 觀世音菩薩
   gateHall('yangsheng', 0, -28, ['sarvanivarana'], { depth: 21, backDoor: true }), // 休門 N · 除蓋障菩薩 (a back door through to Chengjiu)
   gateHall('caishen', 39.5, -27, ['akashagarbha', 'daikokuten']), // 生門 NE · 虛空藏菩薩, 大黑天財神
   gateHall('zangmi', -39.5, 9, ['samantabhadra', 'amitabha']), // 驚門 W · 普賢菩薩, 阿彌陀佛
@@ -166,7 +166,8 @@ export const BODHI_BELL = { ...at(-62.5, 23), yaw: 0 };
  * world/caveFalls.ts). Its own frame: x across, z toward the temple, y up from its ground (y here).
  */
 const CF_DIR = (() => { const dx = -243 - BASIN.x, dz = 12 - BASIN.z, l = Math.hypot(dx, dz); return [dx / l, dz / l]; })();
-export const CAVE_FALLS = { x: BASIN.x + CF_DIR[0] * 218, z: BASIN.z + CF_DIR[1] * 218, y: 0.2, yaw: Math.atan2(-CF_DIR[0], -CF_DIR[1]) };
+export const CAVE_FALLS = { x: BASIN.x + CF_DIR[0] * 218, z: BASIN.z + CF_DIR[1] * 218, y: 0.55, // (above the release pond, for its stream to fall to it)
+  yaw: Math.atan2(-CF_DIR[0], -CF_DIR[1]) };
 /** A point in the cave waterfall's own frame (x across, z toward the temple), in the world. */
 export function caveFallsAt(lx: number, lz: number): [number, number] {
   const s = Math.sin(CAVE_FALLS.yaw), c = Math.cos(CAVE_FALLS.yaw);
@@ -181,7 +182,7 @@ export function caveFallsLocal(x: number, z: number): [number, number] {
 export const WATERFALL = (() => { const [x, z] = caveFallsAt(0.4, -9.5); return { x, z, width: 9, height: 48 }; })();
 
 /** Stream from the cave waterfall's pool (its outlet, in front) down to the release pond. */
-const STREAM_FROM = caveFallsAt(-0.8, 7.0), STREAM_TO = [POND.x - POND.radius + 1.5, POND.z];
+const STREAM_FROM = caveFallsAt(-0.8, 1.5), STREAM_TO = [POND.x - POND.radius + 1.5, POND.z];
 /** The stream's shape was drawn from (-198, 12) to (-117.5, -40.5); this stretches/turns it to run from the falls to the pond. */
 const streamMap = (() => {
   const o: [number, number] = [-198, 12], vo: [number, number] = [80.5, -52.5], vn = [STREAM_TO[0] - STREAM_FROM[0], STREAM_TO[1] - STREAM_FROM[1]];
@@ -203,18 +204,18 @@ const DRAGON_POOL_X = 0, DRAGON_POOL_Z = spreadPoint(0, -80)[1]; // (the dragon 
 export const RIVERS: RiverDef[] = [
   { id: 'falls', points: STREAM, halfWidth: 1.5, falls: true },
   {
-    id: 'west', halfWidth: 2.1,
+    id: 'west', halfWidth: 2.5,
     points: [[POND.x, POND.z + POND.radius - 1], ...([[-72, 5], [-76, 25], [-77, 45], [-72, 65], [-62, 85], [-46, 102], [-26, 116], [-8, 124], [0, 126], [3, 142], [1, 170], [0, 230]] as [number, number][]).map(([x, z]) => spreadPoint(x, z))],
   },
   // the brook: out of the release pond's north side, under a footbridge, round the north of the halls and the abbot's, to the dragon pool
   {
-    id: 'brook', halfWidth: 1.6,
+    id: 'brook', halfWidth: 1.95,
     points: [[POND.x + 2, POND.z - 11], [-120, -74], [-105.3, -77], [-92, -82], [-78, -98], [-64, -116], [-50, -134], [-37, -148], [-26, -155.6], [-14, DRAGON_POOL_Z], [DRAGON_POOL_X - 3.5, DRAGON_POOL_Z]],
   },
   // the east river: out of the dragon pool's east side under a footbridge, on across the north meadow, then south
   // past the monks' quarters and the orchard
   {
-    id: 'east', halfWidth: 1.8,
+    id: 'east', halfWidth: 2.15,
     points: [[DRAGON_POOL_X + 3.5, DRAGON_POOL_Z], [14, DRAGON_POOL_Z], [28, DRAGON_POOL_Z - 4], [48, DRAGON_POOL_Z - 2], [70, DRAGON_POOL_Z + 8], [92, DRAGON_POOL_Z + 16], [114, DRAGON_POOL_Z + 14], [136, DRAGON_POOL_Z + 22], [157, DRAGON_POOL_Z + 20], [169, DRAGON_POOL_Z + 29],
       ...([[88, -56], [83, -28], [82, 0], [82, 28], [78, 56], [64, 82], [44, 104], [22, 118], [8, 124], [0, 126]] as [number, number][]).map(([x, z]) => spreadPoint(x, z))],
   },
@@ -238,6 +239,13 @@ export const WHEEL_ROWS: WheelRowDef[] = [
   { id: 'ne', x: CH - 2.7, zStart: MID.z - (CH - 3), count: 19, spacing: 1.3, side: 'west' },
   { id: 'se', x: CH - 2.7, zStart: MID.z + 7.6, count: 19, spacing: 1.3, side: 'west' },
 ];
+
+/**
+ * 大轉經輪: the great prayer wheel in its pavilion, on the meadow between 地藏 and the walk to the plaza.
+ * `half`: half the plinth's side; `plinth`: its height (4 steps); `reach`: how far its stairs and the head of each queue
+ * extend from the centre (kept clear of trees, rocks and paths). Its rules are in shared/greatWheel.ts.
+ */
+export const GREAT_WHEEL = { x: -34, z: 76, half: 7.5, plinth: 1.0, reach: 14 };
 
 /** 櫻花樹林: cherry trees all round the wish garden. */
 export const CHERRY_GROVE = { ...at(0, -98), r: 27 };
@@ -278,7 +286,7 @@ export const STUPA_RIDGE = { count: 15, bearingFrom: -2.35, bearingTo: -0.75, rM
 export interface FlagAnchor { x: number; z: number; h: number; pole?: boolean }
 
 const pole = (x: number, z: number, h = 5): FlagAnchor => ({ x, z, h, pole: true });
-const pondPoles = [0.4, 1.95, 2.75, 3.55, 4.3, 5.9].map((a) => pole(POND.x + Math.cos(a) * (POND.radius + 6.5), POND.z + Math.sin(a) * (POND.radius + 6.5), 5.5));
+const pondPoles = [0.4, 1.95, 2.45, 3.55, 4.3, 5.9].map((a) => pole(POND.x + Math.cos(a) * (POND.radius + 6.5), POND.z + Math.sin(a) * (POND.radius + 6.5), 5.5));
 const stupaTop: FlagAnchor = { x: GREAT_STUPA.x, z: GREAT_STUPA.z, h: 23 };
 
 /** Strings of prayer flags (the ridge strings between stupas are added automatically). */
@@ -416,13 +424,13 @@ export const CAT_SPOTS: { x: number; z: number; h: number; coat: CatCoat; pose: 
 
 /** Wooden footbridges over the rivers (flat decks, red rails). `axis` = the direction you walk across. */
 export const FOOT_BRIDGES: { x: number; z: number; axis: 'x' | 'z'; length: number }[] = [
-  { ...at(-76.7, 38), axis: 'x', length: 9 }, // west river, west of the Bodhi tree
-  { ...at(-68.4, 72), axis: 'x', length: 9.5 }, // west river, by the Linggu pagoda
+  { ...at(-76.7, 38), axis: 'x', length: 10 }, // west river, west of the Bodhi tree
+  { ...at(-68.4, 72), axis: 'x', length: 10.5 }, // west river, by the Linggu pagoda
   { ...at(82.2, -4.25), axis: 'x', length: 9 }, // east river, to the orchard
   { ...at(72.6, 66), axis: 'x', length: 10 }, // east river, by the Wenchang pagoda
-  { x: -105.3, z: -77, axis: 'z', length: 8 }, // the brook, on the way to the abbot's and Ruyi pagoda
-  { x: -14, z: DRAGON_POOL_Z, axis: 'z', length: 7 }, // the brook, by the dragon pool
-  { x: 14, z: DRAGON_POOL_Z, axis: 'z', length: 7 }, // the dragon pool's outflow
+  { x: -105.3, z: -77, axis: 'z', length: 9 }, // the brook, on the way to the abbot's and Ruyi pagoda
+  { x: -14, z: DRAGON_POOL_Z, axis: 'z', length: 8.5 }, // the brook, by the dragon pool
+  { x: 14, z: DRAGON_POOL_Z, axis: 'z', length: 8.5 }, // the dragon pool's outflow
 ];
 
 /** Path ends that should meet something exactly: bridge ends, the pond walkway, the wish garden's gate. */
@@ -511,6 +519,9 @@ export const PICNIC_TABLES = [
   { ...at(-60, -4), yaw: 0.4 }, // by the pond
   { ...at(-22, -96), yaw: 0.3 }, { ...at(22, -96), yaw: -0.3 }, // cherry grove
 ];
+
+/** 茶亭: a small open-fronted hut with a table and seats, on the meadow just west of the walk from Baosheng Court to the plaza. Faces `yaw` (a multiple of π/2; π/2 = east, onto the walk). The plinth is 4.8 m wide × 5.2 deep (local), centred 0.2 m in front of the centre. */
+export const TABLE_HUT = { x: -8.5, z: 152, yaw: Math.PI / 2, reach: 4.2 };
 
 /** Sign at the orchard's entrance from the bridge: the fruit is for offering. */
 export const ORCHARD_SIGN = { x: FOOT_BRIDGES[2].x + FOOT_BRIDGES[2].length / 2 + 2.5, z: FOOT_BRIDGES[2].z + 2.6 };

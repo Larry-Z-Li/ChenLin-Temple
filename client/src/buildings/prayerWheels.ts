@@ -28,7 +28,7 @@ export interface Wheel {
   turns: number;
 }
 
-function drumTexture() {
+export function drumTexture() {
   // Abstract banding only; swap for a real mantra texture during the art pass.
   return canvasTexture(512, 128, (g) => {
     g.fillStyle = '#b8862b';

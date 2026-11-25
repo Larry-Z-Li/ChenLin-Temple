@@ -1,4 +1,5 @@
 // Wire protocol shared by client and server. No outside dependencies (only ./moderation, beside it).
+import type { GreatWheelState } from './greatWheel';
 import { isBlocked } from './moderation';
 
 export const PROTOCOL_VERSION = 13;
@@ -33,6 +34,7 @@ export const FLAG_INCENSE_LIT = 4; // …and it is lit
 export const FLAG_CLOUD = 8; // riding a cloud
 export const FLAG_LANTERN = 16; // carrying a lantern to bless it…
 export const FLAG_GLOW_SHIFT = 5; // …and how brightly it glows: 2 bits (0–3) from here
+export const FLAG_WHEEL = 1024; // turning the great prayer wheel: right hand out on its rail
 export const FLAG_TRAIL_SHIFT = 7; // the trail of light from walking round the stupa: 3 bits (0–4) from here
 /** Places before a hall's altar where people bless lanterns (more than this share). */
 export const BLESS_SPOTS = 6;
@@ -119,6 +121,11 @@ export type ClientMsg =
   | { t: 'move'; tr: Transform }
   | { t: 'seat'; seat: string | null }
   | { t: 'push'; wheel: string }
+  /** The great prayer wheel: join the queue at a stair (0–3 = N E S W), or (queued) leave or (riding) get off at the next stair. */
+  | { t: 'gw'; op: 'join'; stair: number }
+  | { t: 'gw'; op: 'leave' }
+  /** A rider's press of E: all riders' presses are pooled to turn the wheel. */
+  | { t: 'gw'; op: 'press' }
   | { t: 'pick'; fruit: string }
   /** Strike a hall instrument (bell, drum, singing bowl, wooden fish). */
   | { t: 'strike'; inst: string }
@@ -144,6 +151,8 @@ export type ServerMsg =
       seats: Record<string, string>;
       /** wheelId -> current speed (rev/s), only wheels still turning */
       wheels: Record<string, number>;
+      /** The great prayer wheel: its angle, who is in its openings and in its queues. */
+      gw?: GreatWheelState;
       /** fruitId -> ms since it was picked (still regrowing) */
       picked: Record<string, number>;
       /** hallId -> today's offerings */
@@ -159,6 +168,12 @@ export type ServerMsg =
   | { t: 'seatDenied'; seat: string }
   /** A push landed; `speed` is the wheel's authoritative speed right after it. */
   | { t: 'push'; wheel: string; by: string; speed: number }
+  /** The great prayer wheel's state: sent on every change, and about twice a second while it turns. */
+  | ({ t: 'gw' } & GreatWheelState)
+  /** To one person: walk into opening `opening`; step out at `stair`; or the request was refused. */
+  | { t: 'gwDo'; ev: 'board'; opening: number; stair: number }
+  | { t: 'gwDo'; ev: 'exit'; stair: number }
+  | { t: 'gwDo'; ev: 'denied' }
   | { t: 'picked'; fruit: string; by: string }
   | { t: 'strike'; inst: string; by: string }
   | { t: 'wishAdded'; wish: Wish }
@@ -211,6 +226,6 @@ export function isTransform(v: unknown): v is Transform {
     v[4] < ANIMS.length &&
     Number.isInteger(v[5]) &&
     v[5] >= 0 &&
-    v[5] < 1024
+    v[5] < 2048
   );
 }

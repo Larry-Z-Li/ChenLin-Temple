@@ -113,6 +113,11 @@ export class CameraRig {
     this.ray.far = this.dist + 0.3;
     const hit = this.ray.intersectObjects(blockers, false)[0];
     if (hit) allowed = Math.max(0.4, hit.distance - 0.3);
+    // …and where the ground rises steeply across the way (a cliff), rather than lifting the camera up over it
+    for (let s = 0.6; s < allowed; s += 0.3) {
+      const px = this.focus.x + dir.x * s, pz = this.focus.z + dir.z * s;
+      if (ground.heightAt(px, pz) + 0.3 > this.focus.y + dir.y * s + 1.2) { allowed = Math.max(0.4, s - 0.4); break; }
+    }
     this.curDist = allowed < this.curDist ? allowed : damp(this.curDist, allowed, 5, dt);
 
     const pos = this.focus.clone().addScaledVector(dir, this.curDist);

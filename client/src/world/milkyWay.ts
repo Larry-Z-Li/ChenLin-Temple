@@ -36,7 +36,15 @@ export function buildMilkyWay(scene: THREE.Scene) {
         float u = -atan(d.z, -d.x) / 6.2831853, v = 1.0 - acos(clamp(d.y, -1.0, 1.0)) / 3.14159265;
         float uA = fract(u), uB = fract(u + 0.5) - 0.5;
         vec2 uv = vec2(fwidth(uA) <= fwidth(uB) + 1e-5 ? uA : uB, v);
-        vec3 c = textureGrad(uMap, uv, dFdx(uv), dFdy(uv)).rgb * uColor;
+        vec3 c = textureGrad(uMap, uv, dFdx(uv), dFdy(uv)).rgb;
+        // Round the galactic poles the panorama's stars are smeared into streaks: there, a patch of another part of
+        // the sky (an ordinary starfield well off the band) laid on true to size, faded in at its edge.
+        float rho = acos(clamp(abs(d.y), 0.0, 1.0));
+        vec2 off = d.xz / max(length(d.xz), 1e-5) * rho;
+        float lat = 0.785 + off.y;
+        vec2 puv = vec2((d.y > 0.0 ? 0.0556 : 0.222) + off.x / cos(lat) / 6.2831853, 0.5 + lat / 3.14159265);
+        vec3 patch = textureGrad(uMap, puv, dFdx(puv), dFdy(puv)).rgb;
+        c = mix(c, patch, smoothstep(0.86, 0.93, abs(d.y))) * uColor;
         gl_FragColor = vec4(c, 1.0);
         #include <colorspace_fragment>
       }`,
@@ -64,6 +72,21 @@ export function buildMilkyWay(scene: THREE.Scene) {
     const [r, g, bl] = t < 0.45 ? [0.65, 0.8, 1.25] : t < 0.75 ? [1, 0.98, 0.9] : t < 0.92 ? [1.2, 0.95, 0.6] : [1.25, 0.55, 0.42];
     col.push(b * r * 1.15, b * g * 1.15, b * bl * 1.15);
     size.push(1.1 + k * 1.7);
+  }
+  // …and more along the Milky Way's band, thickest toward its core (placed in the panorama's frame, then turned with it)
+  const local = new THREE.Vector3();
+  for (let i = 0, n = 0; n < 3200 && i < 40000; i++) {
+    const l = (rng() - 0.5) * Math.PI * 2, b = (rng() + rng() + rng() - 1.5) * 0.2 * (1 + 0.8 * Math.exp(-l * l / 0.5));
+    if (rng() > 0.3 + 0.7 * Math.exp(-l * l / 0.8)) continue;
+    const th = -Math.PI + l;
+    dir.copy(local.set(-Math.cos(b) * Math.cos(th), Math.sin(b), Math.cos(b) * Math.sin(th))).applyQuaternion(dome.quaternion);
+    if (dir.y < 0.02) continue;
+    n++;
+    pos.push(dir.x * 1420, dir.y * 1420, dir.z * 1420);
+    const k = rng() ** 3.5, br = 0.14 + k * 0.6, t = rng();
+    const [r, g, bl] = t < 0.35 ? [0.7, 0.82, 1.2] : t < 0.8 ? [1, 0.97, 0.88] : [1.2, 0.92, 0.62];
+    col.push(br * r * 1.15, br * g * 1.15, br * bl * 1.15);
+    size.push(1 + k * 1.6);
   }
   const field = twinkleStars(pos, col, size, 0.5, 0.6);
   field.pts.renderOrder = -0.8;
