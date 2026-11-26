@@ -12,7 +12,7 @@ const loader = new GLTFLoader();
  * in /assets/models/index.json this is a plain plinth (the name plate on the altar identifies it).
  * glTF models face +Z by convention, which is south here, so no rotation is needed.
  */
-export function buildStatueSlot(id: DeityId, x: number, y: number, z: number, modelFile?: string, sizeK = 1) {
+export function buildStatueSlot(id: DeityId, x: number, y: number, z: number, modelFile?: string, sizeK = 1, haloFile?: string) {
   const g = new THREE.Group();
   g.position.set(x, y, z);
   g.name = `statue-${id}`;
@@ -39,10 +39,48 @@ export function buildStatueSlot(id: DeityId, x: number, y: number, z: number, mo
           if ((o as THREE.Mesh).isMesh) o.castShadow = o.receiveShadow = true;
         });
         g.add(model);
+        if (haloFile) addHalo(g, model, haloFile);
       },
       undefined,
       (err) => console.warn(`[statue] could not load ${modelFile}`, err),
     );
   }
   return g;
+}
+
+/**
+ * A halo (its own model, a disc facing +Z) hung behind the statue's head: the head found as the highest point near the
+ * statue's centre line (so a staff held out to one side doesn't count), the halo about a third the statue's height.
+ */
+function addHalo(g: THREE.Group, model: THREE.Object3D, haloFile: string) {
+  g.updateMatrixWorld(true);
+  const toG = new THREE.Matrix4(), inv = g.matrixWorld.clone().invert(), v = new THREE.Vector3(), pts: THREE.Vector3[] = [];
+  const box = new THREE.Box3();
+  model.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    toG.multiplyMatrices(inv, m.matrixWorld);
+    const p = m.geometry.attributes.position;
+    for (let i = 0; i < p.count; i += 3) { v.fromBufferAttribute(p, i).applyMatrix4(toG); box.expandByPoint(v); pts.push(v.clone()); }
+  });
+  const H = box.max.y - box.min.y, cx = (box.min.x + box.max.x) / 2;
+  let top = -Infinity;
+  for (const q of pts) if (Math.abs(q.x - cx) < 0.06 * H && q.y > top) top = q.y;
+  let back = Infinity;
+  for (const q of pts) if (Math.abs(q.x - cx) < 0.08 * H && q.y > top - 0.16 * H) back = Math.min(back, q.z);
+  loader.load(
+    assetUrl('models', haloFile),
+    (gltf) => {
+      const halo = gltf.scene, hb = new THREE.Box3().setFromObject(halo), hs = hb.getSize(new THREE.Vector3());
+      const k = (0.34 * H) / Math.max(hs.y, 1e-3);
+      halo.scale.setScalar(k);
+      hb.setFromObject(halo);
+      const hc = hb.getCenter(new THREE.Vector3());
+      halo.position.set(cx - hc.x, top - 0.08 * H - hc.y, back - 0.02 * H - hb.max.z);
+      halo.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = o.receiveShadow = true; });
+      g.add(halo);
+    },
+    undefined,
+    (err) => console.warn(`[statue] could not load ${haloFile}`, err),
+  );
 }

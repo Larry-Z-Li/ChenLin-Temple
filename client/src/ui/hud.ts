@@ -134,9 +134,9 @@ export class Hud {
     this.wheelOff = h('button', { class: 'prompt wheel-off hidden', onclick: () => cb.onWheelOff() }, h('kbd', {}, 'Q'), h('span', { i18n: 'prompt.gwOff' }));
     this.toasts = h('div', { class: 'toasts' });
 
-    // key hint (computer), line icon (phone), label
-    const mk = (action: SeatAction, key: string, label: I18nKey, ico: string = action) => {
-      const b = h('button', { class: 'seat-btn', onclick: () => cb.onSeatAction(action) }, h('kbd', {}, key), icon(ico) as unknown as Node, h('span', { i18n: label }));
+    // a line icon over its label (by mouse or touch: no number keys)
+    const mk = (action: SeatAction, label: I18nKey, ico: string = action) => {
+      const b = h('button', { class: 'seat-btn', onclick: () => cb.onSeatAction(action) }, icon(ico) as unknown as Node, h('span', { i18n: label }));
       this.seatBtns[action] = b;
       return b;
     };
@@ -144,11 +144,11 @@ export class Hud {
     this.seatBar = h(
       'nav',
       { class: 'seatbar hidden' },
-      mk('prostrate', '1', 'seat.prostrate'),
-      mk('beads', '2', 'seat.beads'),
-      (this.chantBtns[0] = h('button', { class: 'seat-btn', onclick: () => cb.onChants() }, h('kbd', {}, 'C'), icon('chant') as unknown as Node, h('span', { i18n: 'hud.chants' })) as HTMLButtonElement),
-      mk('sutra', '3', 'seat.sutras'),
-      mk('stand', 'Esc', 'seat.stand'),
+      mk('prostrate', 'seat.prostrate'),
+      mk('beads', 'seat.beads'),
+      (this.chantBtns[0] = h('button', { class: 'seat-btn', onclick: () => cb.onChants() }, icon('chant') as unknown as Node, h('span', { i18n: 'hud.chants' })) as HTMLButtonElement),
+      mk('sutra', 'seat.sutras'),
+      mk('stand', 'seat.stand'),
     );
     this.beadBtns = h(
       'div',

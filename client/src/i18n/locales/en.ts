@@ -33,10 +33,10 @@ const en = {
   'help.run': 'Shift: walk faster',
   'help.look': 'Drag mouse: look around · Scroll: zoom',
   'help.interact': 'E: kneel on a cushion or sit on a bench · pick fruit · offer incense and fruit at the altar table · strike the bowl bell, wooden fish, drum and bell · tap repeatedly beside a prayer wheel to spin it faster',
-  'help.chants': 'C: chants (listen anywhere, even while walking)',
+  'help.chants': 'Chants: the Chants button at the bottom (listen anywhere, even while walking)',
   'help.map': 'M: temple map',
   'help.leave': 'Esc: stand up / close',
-  'help.seated': 'On a cushion: 1 prostrations · 2 prayer beads · 3 sutras · C chants. On a bench: 2 prayer beads · 3 sutras. Standing: 2 prayer beads · 3 sutras (walk with them; press again or Esc to put them away)',
+  'help.seated': 'On a cushion: prostrations, prayer beads, sutras and chants from the bar at the bottom. On a bench: prayer beads and sutras. Standing: prayer beads and sutras from the bar too (walk with them; click again or Esc to put them away)',
   'help.beads': 'Prayer beads: ← / → move one bead',
 
   'prompt.sit': 'Kneel on cushion',

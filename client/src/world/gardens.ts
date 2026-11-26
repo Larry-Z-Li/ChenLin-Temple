@@ -92,7 +92,7 @@ function buildStupaCourt(ctx: WorldContext, models: Record<string, string>) {
   const az = S.z + b / 2 + 1.0;
   ctx.scene.add(box(4.2, 1.1, 1.8, mat(THEME.altar, { roughness: 0.55 }), S.x, y, az));
   ctx.scene.add(box(4.4, 0.1, 2.0, mat(THEME.altarTrim, { metalness: 0.7, roughness: 0.35 }), S.x, y + 1.1, az));
-  ctx.scene.add(buildStatueSlot('vairocana', S.x, y + 1.2, az - 0.1, models.vairocana));
+  ctx.scene.add(buildStatueSlot('vairocana', S.x, y + 1.2, az - 0.1, models.vairocana, 1, models['vairocana.halo']));
   ctx.collisions.addBoxCentered(S.x, az, 4.4, 2.0);
 }
 

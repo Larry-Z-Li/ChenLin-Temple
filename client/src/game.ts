@@ -343,7 +343,6 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     if (e.code === 'KeyQ' && gw.controlling) return !e.repeat && gw.getOff(), true;
     if (e.code === 'KeyB') return !e.repeat && bow(), true;
     // Standing: 2 beads, 3 sutra (seated, the seat bar handles the number keys).
-    if (!seat.seated && (e.code === 'Digit2' || e.code === 'Digit3')) return !e.repeat && seat.standAction(e.code === 'Digit2' ? 'beads' : 'sutra'), true;
     // Dev preview only: F toggles flying (never in the live build).
     if ((import.meta.env.DEV || tester) && e.code === 'KeyF' && !e.repeat && !seat.seated && !cloud.riding) {
       player.flying = !player.flying;
@@ -356,7 +355,6 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     if (e.code === 'Escape' && blessing.active) return blessing.cancel(), true;
     const openWall = lanternWalls.find((w) => w.isOpen);
     if (e.code === 'Escape' && openWall) return openWall.close(), true;
-    if (e.code === 'KeyC') return chantPanel.show(!chantPanel.isOpen), true; // listening works anywhere
     if (e.code === 'Escape' && chantPanel.isOpen) return chantPanel.show(false), true;
     if (e.code === 'Escape' && hud.settingsOpen) return hud.toggleSettings(false), true;
     if (e.code === 'Escape' && hud.helpOpen) return hud.toggleHelp(false), true;

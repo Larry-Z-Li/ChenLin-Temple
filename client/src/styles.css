@@ -60,6 +60,10 @@ body.touch .prompt.wheel-off { bottom: 290px; }
 .seat-btn:hover { border-color: var(--panel-border); }
 .seat-btn.active { background: rgba(217, 164, 65, 0.22); border-color: var(--accent); }
 .seat-btn .ico { display: none; }
+/* (on a computer too: an icon over its label, as standing) */
+body:not(.touch) .seatbar { gap: 4px; padding: 6px; border-radius: 22px; }
+body:not(.touch) .seat-btn { flex-direction: column; gap: 3px; min-width: 64px; padding: 8px 10px 6px; border: 0; border-radius: 14px; font: 500 12px var(--sans); }
+body:not(.touch) .seat-btn .ico { display: block; width: 20px; height: 20px; }
 /* touch: no keys to press, so an icon over a small label, like the dock */
 body.touch .seat-btn { flex-direction: column; gap: 3px; min-width: 56px; padding: 7px 6px 5px; font: 500 11px var(--sans); }
 body.touch .seat-btn kbd { display: none; }

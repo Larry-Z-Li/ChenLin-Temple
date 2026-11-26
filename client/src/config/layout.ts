@@ -93,7 +93,7 @@ const gateHall = (id: string, px: number, pz: number, deities: DeityId[], extra:
 
 export const HALLS: HallDef[] = [
   gateHall('guanyin', -39.5, -27, ['avalokiteshvara', 'cintamanicakra']), // 開門 NW · 觀世音菩薩, 如意輪觀音
-  gateHall('yangsheng', 0, -28, ['sarvanivarana'], { depth: 21, backDoor: true }), // 休門 N · 除蓋障菩薩 (a back door through to Chengjiu)
+  gateHall('yangsheng', 0, -28, ['sarvanivarana', 'cundi'], { depth: 21, backDoor: true }), // 休門 N · 除蓋障菩薩, 準提菩薩 (a back door through to Chengjiu)
   gateHall('caishen', 39.5, -27, ['akashagarbha', 'daikokuten']), // 生門 NE · 虛空藏菩薩, 大黑天財神
   gateHall('zangmi', -39.5, 9, ['samantabhadra', 'amitabha']), // 驚門 W · 普賢菩薩, 阿彌陀佛
   gateHall('dongmi', 39.5, 9, ['bhaisajyaguru', 'akshobhya', 'vajrapani']), // 傷門 E · 藥師佛, 阿閦佛, 金剛手菩薩

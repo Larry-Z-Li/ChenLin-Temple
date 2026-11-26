@@ -62,7 +62,7 @@ export function buildModelGallery(ctx: WorldContext, models: Record<string, stri
       ctx.updaters.push((dt) => g.update(dt, 'idle'));
       label('Garuda', x, 4.6 * K, z);
     } else {
-      const s = buildStatueSlot(id, x, 0, z, models[id]);
+      const s = buildStatueSlot(id, x, 0, z, models[id], 1, models[`${id}.halo`]);
       s.rotation.y = face;
       s.scale.setScalar(K);
       group.add(s);

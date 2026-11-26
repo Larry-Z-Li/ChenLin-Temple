@@ -242,9 +242,6 @@ export class SeatSession {
     if (!this.seat) return false;
     if (this.reading && this.d.sutra.handleKey(e)) return true;
     switch (e.code) {
-      case 'Digit1': this.action('prostrate'); return true;
-      case 'Digit2': this.action('beads'); return true;
-      case 'Digit3': this.action('sutra'); return true;
       case 'KeyB': if (!e.repeat) this.bow(); return true;
       case 'Escape':
       case 'KeyE':
