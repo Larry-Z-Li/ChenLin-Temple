@@ -440,31 +440,46 @@ export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; plac
     group.add(mesh);
   }
 
-  // --- spray: droplets flung up and out where the water lands, falling back, and a slow drift of fine mist ---
+  // --- spray: drops falling with the water from the lip and scattering as they go, bursting up and out where they hit
+  // the pool and falling back, and a slow drift of fine mist ---
   {
-    const N = 320, seed = new Float32Array(N * 4);
+    const N = 760, seed = new Float32Array(N * 4);
     for (let i = 0; i < N; i++) seed.set([rng(), rng(), rng(), rng()], i * 4);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
     g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
-    const F = (v: number) => v.toFixed(2);
+    const F = (v: number) => v.toFixed(3);
+    const uScale = { value: (typeof window === 'undefined' ? 900 : window.innerHeight * Math.min(2, window.devicePixelRatio || 1)) * 0.9 };
+    if (typeof window !== 'undefined') window.addEventListener('resize', () => (uScale.value = window.innerHeight * Math.min(2, window.devicePixelRatio || 1) * 0.9));
     const pts = new THREE.Points(g, new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, fog: true,
-      uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uTime: time, uLight: light, uPx: { value: Math.min(2, window.devicePixelRatio || 1) } },
+      uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uTime: time, uLight: light, uScale },
       vertexShader: /* glsl */ `
         #include <fog_pars_vertex>
-        attribute vec4 aSeed; uniform float uTime, uPx; varying float vA;
+        attribute vec4 aSeed; uniform float uTime, uScale; varying float vA;
         void main() {
-          float fine = step(0.7, aSeed.w);                                   // (three in ten: fine mist, slow, drifting)
-          float life = mix(1.1, 2.0, aSeed.z) * (1.0 + fine * 1.5), tau = mod(uTime + aSeed.x * 17.0, life);
-          vec3 p0 = vec3(${F(XC)} + (aSeed.y - 0.5) * ${F(HW * 1.8)}, ${F(POOL_Y)}, ${F(LAND_Z)} + (aSeed.z - 0.5) * 1.2);
-          vec3 v = vec3((aSeed.w - 0.5) * 2.0, mix(2.0, 5.0, fract(aSeed.x * 7.3)), mix(0.4, 2.6, fract(aSeed.y * 5.1)));
-          vec3 p = p0 + v * tau * mix(1.0, 0.45, fine) - vec3(0.0, 0.5 * mix(9.8, 1.2, fine) * tau * tau, 0.0);
-          p.y = max(p.y, ${F(POOL_Y)});
-          vA = sin(3.14159 * tau / life) * mix(0.55, 0.22, fine);
+          float r1 = fract(aSeed.x * 7.31), r2 = fract(aSeed.y * 5.17), r3 = fract(aSeed.z * 3.73);
+          vec3 p; float size, a;
+          if (aSeed.w < 0.42) {                                    // falling with the water, scattering as it goes
+            float life = ${F(T_FALL)}, tau = mod(uTime * (0.9 + 0.2 * r3) + aSeed.x * 17.0, life), k = tau / life;
+            vec3 p0 = vec3(${F(XC)} + (aSeed.y - 0.5) * ${F(HW * 1.9)}, ${F(SY)} - 0.2, ${F(LIP_Z)} + 0.1);
+            p = p0 + vec3((r1 - 0.5) * 1.6 * tau, -0.5 * ${F(G)} * tau * tau, ${F(V)} * (0.96 + 0.08 * r2) * tau + (r3 - 0.3) * 0.5 * tau);
+            size = mix(0.14, 0.3, r2) * (1.0 + k);
+            a = smoothstep(0.0, 0.08, k) * (1.0 - smoothstep(0.92, 1.0, k)) * 0.5;
+          } else {
+            float fine = step(0.8, aSeed.w);                       // (two in ten: fine mist, slow, drifting)
+            float life = mix(1.0, 1.8, aSeed.z) * (1.0 + fine * 1.6), tau = mod(uTime + aSeed.x * 17.0, life);
+            vec3 p0 = vec3(${F(XC)} + (aSeed.y - 0.5) * ${F(HW * 1.8)}, ${F(POOL_Y)}, ${F(LAND_Z)} + (aSeed.z - 0.5) * 1.4);
+            vec3 v = vec3((r1 - 0.5) * 2.6, mix(2.2, 5.5, r2), mix(-0.6, 2.8, r3));
+            p = p0 + v * tau * mix(1.0, 0.45, fine) - vec3(0.0, 0.5 * mix(9.8, 1.0, fine) * tau * tau, 0.0);
+            p.y = max(p.y, ${F(POOL_Y)});
+            size = mix(mix(0.12, 0.26, r2), mix(1.3, 2.4, r2), fine);
+            a = sin(3.14159 * tau / life) * mix(0.6, 0.2, fine);
+          }
+          vA = a;
           vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mvPosition;
-          gl_PointSize = mix(0.12, 0.9, fine) * mix(0.7, 1.3, aSeed.y) * 300.0 * uPx / -mvPosition.z;
+          gl_PointSize = size * uScale / -mvPosition.z;
           #include <fog_vertex>
         }`,
       fragmentShader: /* glsl */ `

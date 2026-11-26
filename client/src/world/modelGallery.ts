@@ -15,7 +15,7 @@ const G = { x: BASIN.x, y: 300, z: BASIN.z };
  */
 export function buildModelGallery(ctx: WorldContext, models: Record<string, string>) {
   const ids = Object.keys(DEITIES) as DeityId[], slots: (DeityId | 'garuda')[] = [...ids, 'garuda'];
-  const per = Math.ceil(slots.length / 2), GAP = 4.4, W = per * GAP + 8, D = 20;
+  const K = 2, per = Math.ceil(slots.length / 2), GAP = 3.6 * K, W = per * GAP + 8, D = 15 * K; // (everything twice life on the altars, to see it well)
   const group = new THREE.Group();
   group.position.set(G.x, G.y, G.z);
   const stone = new THREE.MeshStandardMaterial({ color: 0xb9b2a5, roughness: 0.9 }), wallMat = new THREE.MeshStandardMaterial({ color: 0x8f877a, roughness: 0.9 });
@@ -27,7 +27,7 @@ export function buildModelGallery(ctx: WorldContext, models: Record<string, stri
     const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), wallMat);
     wall.position.set(x, 0.45, z);
     group.add(wall);
-    ctx.collisions.addBoxCentered(G.x + x, G.z + z, w + 0.3, d + 0.3);
+    ctx.collisions.addBoxCentered(G.x + x, G.z + z, w + 0.3, d + 0.3, true);
   }
   ctx.ground.addSurface(G.x - W / 2, G.x + W / 2, G.z - D / 2, G.z + D / 2, () => G.y);
 
@@ -45,26 +45,28 @@ export function buildModelGallery(ctx: WorldContext, models: Record<string, stri
     g.fillText(text, 256, 58, 490);
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthWrite: false }));
     s.material.map!.colorSpace = THREE.SRGBColorSpace;
-    s.scale.set(2.6, 0.57, 1);
+    s.scale.set(2.6 * 1.6, 0.57 * 1.6, 1);
     s.position.set(x, y, z);
     group.add(s);
   };
   slots.forEach((id, i) => {
-    const row = i < per ? 0 : 1, k = row ? i - per : i, x = -((per - 1) * GAP) / 2 + k * GAP, z = row ? 5.5 : -5.5, face = row ? Math.PI : 0;
+    const row = i < per ? 0 : 1, k = row ? i - per : i, x = -((per - 1) * GAP) / 2 + k * GAP, z = (row ? 1 : -1) * 4 * K, face = row ? Math.PI : 0;
     if (id === 'garuda') {
       const g = buildGaruda();
       g.root.position.set(x, 0, z);
       g.root.rotation.y = face;
+      g.root.scale.setScalar(K);
       group.add(g.root);
       ctx.updaters.push((dt) => g.update(dt, 'idle'));
-      label('Garuda', x, 4.6, z);
+      label('Garuda', x, 4.6 * K, z);
     } else {
       const s = buildStatueSlot(id, x, 0, z, models[id]);
       s.rotation.y = face;
+      s.scale.setScalar(K);
       group.add(s);
-      label(`${t(DEITIES[id].nameKey as Parameters<typeof t>[0])}${models[id] ? '' : '  (—)'}`, x, 4.6, z);
+      label(`${t(DEITIES[id].nameKey as Parameters<typeof t>[0])}${models[id] ? '' : '  (—)'}`, x, 4.6 * K, z);
     }
-    ctx.collisions.addCircle(G.x + x, G.z + z, 1.2);
+    ctx.collisions.addCircle(G.x + x, G.z + z, 1.2 * K, true);
   });
   ctx.scene.add(group);
   return { x: G.x - W / 2 + 3, y: G.y, z: G.z, yaw: -Math.PI / 2 }; // at one end, looking down the aisle (+x)

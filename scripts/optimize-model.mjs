@@ -90,7 +90,10 @@ for (const mesh of json.meshes) for (const prim of mesh.primitives) {
 const tmp = mkdtempSync(join(tmpdir(), 'optmodel-'));
 const baseImages = new Set(json.materials.map((m) => m.pbrMetallicRoughness?.baseColorTexture?.index).filter((i) => i !== undefined).map((t) => json.textures[t].source));
 for (const [i, img] of (json.images ?? []).entries()) {
-  const ext = img.mimeType === 'image/png' ? 'png' : 'jpg', src = join(tmp, `in${i}.${ext}`), dst = join(tmp, `out${i}.jpg`);
+  // (a PNG becomes a JPEG unless a material needs its transparency: PNGs of painted textures barely compress)
+  const opaque = json.materials.every((m) => !m.alphaMode || m.alphaMode === 'OPAQUE');
+  const ext = img.mimeType === 'image/png' && !opaque ? 'png' : 'jpg', src = join(tmp, `in${i}.${img.mimeType === 'image/png' ? 'png' : 'jpg'}`), dst = join(tmp, `out${i}.jpg`);
+  if (ext === 'jpg') img.mimeType = 'image/jpeg';
   writeFileSync(src, view(img.bufferView));
   const size = baseImages.has(i) ? +baseArg : +otherArg;
   execFileSync('sips', ['-Z', String(size), '-s', 'format', ext === 'png' ? 'png' : 'jpeg', ...(ext === 'png' ? [] : ['-s', 'formatOptions', '82']), src, '--out', ext === 'png' ? dst.replace('.jpg', '.png') : dst], { stdio: 'ignore' });

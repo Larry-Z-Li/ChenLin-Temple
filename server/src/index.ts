@@ -319,9 +319,9 @@ const greatWheel = new GreatWheelSim({
     const c = clients.get(id);
     if (c) send(c, { t: 'gwDo', ev: 'board', opening, stair });
   },
-  exit: (id, stair) => {
+  exit: (id) => {
     const c = clients.get(id);
-    if (c) send(c, { t: 'gwDo', ev: 'exit', stair });
+    if (c) send(c, { t: 'gwDo', ev: 'exit' });
   },
 });
 let gwSent = -1, gwSentAt = 0, gwLast = Date.now();

@@ -116,7 +116,7 @@ export class LocalPlayer {
     this.vel.y = damp(this.vel.y, target.y, 10, dt);
     this.speed = this.vel.length();
 
-    const p = { x: this.pos.x + this.vel.x * dt, z: this.pos.z + this.vel.y * dt };
+    const p = { x: this.pos.x + this.vel.x * dt, z: this.pos.z + this.vel.y * dt, y: this.pos.y }; // (its height: up on the gallery only its own walls count)
     collisions.resolve(p, RADIUS);
     // Soft boundary around the valley
     const dx = p.x - BASIN.x, dz = p.z - BASIN.z, r = Math.hypot(dx, dz);

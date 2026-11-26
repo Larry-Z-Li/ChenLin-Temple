@@ -298,8 +298,8 @@ export class Soundscape {
     this.falls!.gain.gain.setTargetAtTime(0.9 * clamp01(1 - df / 150) ** 2 * out, now, 0.2);
     this.falls!.pan.pan.setTargetAtTime(this.panFor(listener, camYaw, WATERFALL.x, WATERFALL.z), now, 0.2);
     const q = nearestRiver(listener.x, listener.z);
-    if (q.d < 30) {
-      this.stream!.gain.gain.setTargetAtTime(0.5 * clamp01(1 - q.d / 30) ** 2 * out, now, 0.2);
+    if (q.d < 22) {
+      this.stream!.gain.gain.setTargetAtTime(0.2 * clamp01(1 - q.d / 22) ** 2 * out, now, 0.2); // (soft: there are rivers near most places)
       this.stream!.pan.pan.setTargetAtTime(this.panFor(listener, camYaw, q.px, q.pz), now, 0.2);
     } else this.stream!.gain.gain.setTargetAtTime(0, now, 0.3);
 

@@ -1,7 +1,9 @@
 /** 2D (XZ-plane) collision world: boxes + circles in a uniform spatial hash. */
 
-interface Box { kind: 'box'; minX: number; maxX: number; minZ: number; maxZ: number }
-interface Circle { kind: 'circle'; x: number; z: number; r: number }
+// (`sky`: up on the model gallery's platform, far above the valley; there, only these count, and down here, only the rest)
+interface Box { kind: 'box'; minX: number; maxX: number; minZ: number; maxZ: number; sky?: boolean }
+interface Circle { kind: 'circle'; x: number; z: number; r: number; sky?: boolean }
+const SKY_Y = 200;
 type Collider = Box | Circle;
 
 const CELL = 8;
@@ -23,21 +25,22 @@ export class CollisionWorld {
       }
   }
 
-  addBox(minX: number, maxX: number, minZ: number, maxZ: number) {
-    this.insert({ kind: 'box', minX, maxX, minZ, maxZ }, minX, maxX, minZ, maxZ);
+  addBox(minX: number, maxX: number, minZ: number, maxZ: number, sky = false) {
+    this.insert({ kind: 'box', minX, maxX, minZ, maxZ, sky }, minX, maxX, minZ, maxZ);
   }
 
   /** Box from centre + full size. */
-  addBoxCentered(x: number, z: number, w: number, d: number) {
-    this.addBox(x - w / 2, x + w / 2, z - d / 2, z + d / 2);
+  addBoxCentered(x: number, z: number, w: number, d: number, sky = false) {
+    this.addBox(x - w / 2, x + w / 2, z - d / 2, z + d / 2, sky);
   }
 
-  addCircle(x: number, z: number, r: number) {
-    this.insert({ kind: 'circle', x, z, r }, x - r, x + r, z - r, z + r);
+  addCircle(x: number, z: number, r: number, sky = false) {
+    this.insert({ kind: 'circle', x, z, r, sky }, x - r, x + r, z - r, z + r);
   }
 
   /** Push a circle of `radius` at (x,z) out of all colliders. Mutates and returns `p`. */
-  resolve(p: { x: number; z: number }, radius: number) {
+  resolve(p: { x: number; z: number; y?: number }, radius: number) {
+    const sky = (p.y ?? 0) > SKY_Y;
     for (let iter = 0; iter < 3; iter++) {
       const list = this.grid.get(this.key(Math.floor(p.x / CELL), Math.floor(p.z / CELL)));
       const seen = new Set<Collider>();
@@ -50,6 +53,7 @@ export class CollisionWorld {
           for (const c of cell) {
             if (seen.has(c)) continue;
             seen.add(c);
+            if (!!c.sky !== sky) continue;
             if (c.kind === 'circle') {
               const ddx = p.x - c.x, ddz = p.z - c.z;
               const d = Math.hypot(ddx, ddz), min = c.r + radius;

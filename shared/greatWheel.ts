@@ -24,7 +24,7 @@ export const GW_RATE_SCALE = 20;
 /**
  * A heavy flywheel: it is still until someone mashes. Presses speed it up toward the pace they call for (GW_EASE_S); with none
  * it only loses speed to a light friction (GW_FRICTION_S: from top speed about 20 s to wind down), then creeps (GW_CREEP, rad/s)
- * to the next 45° mark and stops, riders or not. A rider who has asked to get off keeps it creeping until they reach a stair.
+ * to the next 45° mark and stops, riders or not. Getting off is at once, from wherever they are.
  * Most presses counted per player per second: GW_MAX_PRESS_HZ.
  */
 export const GW_EASE_S = 1.5;
@@ -39,7 +39,7 @@ export const GW_QUEUE_R0 = 11.4;
 export const GW_QUEUE_GAP = 0.95;
 /** Walking from the first queue place to an opening (s), and from an opening down a staircase and aside (s, at least). */
 export const GW_BOARD_S = (GW_QUEUE_R0 - GW_RIDER_R) / GW_WALK;
-export const GW_EXIT_S = 3.2;
+export const GW_EXIT_S = 4.5;
 export const GW_MAX_QUEUE = 12;
 
 const TAU = Math.PI * 2, QUARTER = Math.PI / 2, EIGHTH = Math.PI / 4;
@@ -60,20 +60,18 @@ export interface GreatWheelState {
   stop: number | null;
   /** Who is in (or walking into) each opening. */
   openings: (string | null)[];
-  /** Bit k: the rider in opening k will get off at the next stair. */
-  leaving: number;
   /** The queue at each stair, first to last. */
   queues: string[][];
 }
 
 type Phase = 'queued' | 'boarding' | 'riding' | 'exiting';
-interface Rider { stair: number; phase: Phase; opening: number; leaving: boolean; until: number }
+interface Rider { stair: number; phase: Phase; opening: number; until: number }
 
 export interface GreatWheelEvents {
   /** Walk from the head of the queue into opening `opening` (arriving in GW_BOARD_S). */
   board: (id: string, opening: number, stair: number) => void;
-  /** Step out at `stair` and down to the ground. */
-  exit: (id: string, stair: number) => void;
+  /** Let go and walk off, straight out from where they stand. */
+  exit: (id: string) => void;
 }
 
 export class GreatWheelSim {
@@ -108,7 +106,7 @@ export class GreatWheelSim {
 
   join(id: string, stair: number) {
     if (!Number.isInteger(stair) || stair < 0 || stair >= GW_STAIRS || this.riders.has(id) || this.queues[stair].length >= GW_MAX_QUEUE) return false;
-    this.riders.set(id, { stair, phase: 'queued', opening: -1, leaving: false, until: 0 });
+    this.riders.set(id, { stair, phase: 'queued', opening: -1, until: 0 });
     this.queues[stair].push(id);
     this.version++;
     return true;
@@ -121,14 +119,18 @@ export class GreatWheelSim {
     return true;
   }
 
-  /** Leave the queue; or ask to get off at the next stair. */
+  /** Leave the queue, or get off the wheel at once. */
   leave(id: string) {
     const r = this.riders.get(id);
     if (!r) return false;
     if (r.phase === 'queued') return this.remove(id);
-    if (r.phase === 'riding' && !r.leaving) {
-      r.leaving = true;
+    if (r.phase === 'riding') { // let go at once, wherever the wheel is
+      this.openings[r.opening] = null;
+      r.phase = 'exiting';
+      r.until = this.time + GW_EXIT_S;
+      r.opening = -1;
       this.version++;
+      this.on.exit(id);
       return true;
     }
     return false;
@@ -147,11 +149,9 @@ export class GreatWheelSim {
   }
 
   state(): GreatWheelState {
-    let leaving = 0;
-    this.openings.forEach((id, k) => id && this.riders.get(id)?.leaving && (leaving |= 1 << k));
     const stop = this.settling && this.moving ? Math.ceil(this.angle / EIGHTH - 1e-9) * EIGHTH : null;
     const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
-    return { angle: r4(this.angle), omega: r4(this.omega), moving: this.moving, stop: stop === null ? null : r4(stop), openings: [...this.openings], leaving, queues: this.queues.map((q) => [...q]) };
+    return { angle: r4(this.angle), omega: r4(this.omega), moving: this.moving, stop: stop === null ? null : r4(stop), openings: [...this.openings], queues: this.queues.map((q) => [...q]) };
   }
 
   private startBoarding(id: string, s: number, k: number) {
@@ -181,9 +181,9 @@ export class GreatWheelSim {
     // A flywheel: the pooled presses raise it toward the pace they call for; otherwise only friction slows it.
     const target = gwOmega(rate);
     let omega = target > this.omega ? this.omega + (target - this.omega) * (1 - Math.exp(-dt / GW_EASE_S)) : this.omega * Math.exp(-dt / GW_FRICTION_S);
-    const coasting = rate === 0, leaver = [...this.riders.values()].some((r) => r.phase === 'riding' && r.leaving);
-    if (coasting && omega < GW_CREEP * 1.25) omega = this.moving || leaver ? Math.max(omega, GW_CREEP) : 0; // (slowed to a creep: on to the mark, or a stair)
-    this.settling = coasting && !leaver && omega <= GW_CREEP * 1.25;
+    const coasting = rate === 0;
+    if (coasting && omega < GW_CREEP * 1.25) omega = this.moving ? Math.max(omega, GW_CREEP) : 0; // (slowed to a creep: on to the mark)
+    this.settling = coasting && omega <= GW_CREEP * 1.25;
     const before = this.angle;
     let d = omega * dt;
     if (this.settling && omega > 0) {
@@ -196,21 +196,6 @@ export class GreatWheelSim {
     this.omega = omega;
     this.angle = mod(omega > 0 ? before + d : Math.round((before + d) / EIGHTH) * EIGHTH, TAU);
     if (this.moving !== wasMoving) this.version++;
-
-    // Someone getting off: their opening reaches a stair during this step.
-    for (const [id, r] of this.riders) {
-      if (r.phase !== 'riding' || !r.leaving) continue;
-      const psi = openingAzimuth(before, r.opening), m = mod(-psi, QUARTER), rem = m > QUARTER - 1e-6 ? 0 : m;
-      if (rem <= d + 1e-9 && (d > 0 || rem === 0)) {
-        const stair = mod(Math.round((psi + rem) / QUARTER), GW_STAIRS);
-        this.openings[r.opening] = null;
-        r.phase = 'exiting';
-        r.until = this.time + GW_EXIT_S;
-        r.opening = -1;
-        this.version++;
-        this.on.exit(id, stair);
-      }
-    }
 
     // The head of each queue steps on: at once when the wheel is at rest (every stair faces a place);
     // while it turns, where a place will be at the stair just as they get there.

@@ -26,7 +26,7 @@ const STEP_H = 0.25, STEP_D = 0.6, STAIR_W = 3.6;
 const SIDE_STEP = 2.6;
 
 type Phase = 'free' | 'queued' | 'boarding' | 'riding' | 'exiting';
-const EMPTY: GreatWheelState = { angle: 0, omega: 0, moving: false, stop: null, openings: Array(GW_OPENINGS).fill(null), leaving: 0, queues: [[], [], [], []] };
+const EMPTY: GreatWheelState = { angle: 0, omega: 0, moving: false, stop: null, openings: Array(GW_OPENINGS).fill(null), queues: [[], [], [], []] };
 
 /** Unit vector (x, z) of compass azimuth ψ: 0 = north, clockwise. */
 const dirOf = (psi: number): [number, number] => [Math.sin(psi), -Math.cos(psi)];
@@ -65,14 +65,14 @@ export class GreatWheel {
       this.sim = this.makeSim(); // (anything we ran alone is over: the server's wheel is the wheel)
       this.onState(m.gw ?? EMPTY);
     });
-    net.on('gwDo', (ev, opening, stair) => (ev === 'board' ? this.board(opening, stair) : ev === 'exit' ? this.exit(stair) : this.denied()));
+    net.on('gwDo', (ev, opening, stair) => (ev === 'board' ? this.board(opening, stair) : ev === 'exit' ? this.exit() : this.denied()));
     if (import.meta.env.DEV && Math.abs(GW_WALK - 3.8) > 1e-9) console.warn('GW_WALK differs from the player walk speed');
   }
 
   private makeSim() {
     return new GreatWheelSim({
       board: (id, k, s) => id === this.net.id && this.board(k, s),
-      exit: (id, s) => id === this.net.id && this.exit(s),
+      exit: (id) => id === this.net.id && this.exit(),
     });
   }
 
@@ -183,12 +183,24 @@ export class GreatWheel {
     this.from.copy(this.player.pos);
   }
 
-  private exit(stair: number) {
+  /** Let go and walk off: on foot along the floor round the wheel (clear of the rail and the pillars) the shorter way to the nearest stair, then down it and aside. */
+  private exit() {
     if (this.phase !== 'riding' && this.phase !== 'boarding') return;
     this.phase = 'exiting';
+    const c = GREAT_WHEEL, p = this.player.pos, TAU = Math.PI * 2;
+    const psi = Math.atan2(p.x - c.x, -(p.z - c.z)), stair = ((Math.round(psi / (Math.PI / 2)) % GW_STAIRS) + GW_STAIRS) % GW_STAIRS;
     this.stair = stair;
-    const p = this.player.pos, r = GW_QUEUE_R0 - 1.2;
-    this.path = [[p.x, p.z], this.at(stair, r), this.at(stair, r, SIDE_STEP)]; // straight out and down the stair, then aside
+    let delta = stair * (Math.PI / 2) - psi;
+    delta -= Math.round(delta / TAU) * TAU; // the shorter way round (at most 45°)
+    const ARC_R = 6.0, steps = Math.max(1, Math.ceil(Math.abs(delta) / 0.15)), r0 = Math.hypot(p.x - c.x, p.z - c.z);
+    this.path = [[p.x, p.z]];
+    for (let i = 1; i <= steps; i++) {
+      const u = i / steps, a = psi + delta * u, r = r0 + (ARC_R - r0) * Math.min(1, u * 3); // out to a safe radius within the first third, then round
+      const [dx, dz] = dirOf(a);
+      this.path.push([c.x + dx * r, c.z + dz * r]);
+    }
+    const out = GW_QUEUE_R0 - 1.2;
+    this.path.push(this.at(stair, out), this.at(stair, out, SIDE_STEP)); // straight down the stair, then aside
     this.pathLen = 0;
     for (let i = 1; i < this.path.length; i++) this.pathLen += Math.hypot(this.path[i][0] - this.path[i - 1][0], this.path[i][1] - this.path[i - 1][1]);
     this.t0 = performance.now();
@@ -205,33 +217,27 @@ export class GreatWheel {
     else this.sim.press(this.net.id);
   }
 
-  /** Q: leave the queue, or get off at the next stair. */
+  /** Q: leave the queue, or let go of the wheel at once and walk to the nearest stair. */
   getOff() {
     if (this.phase === 'queued') {
       if (this.online) this.net.gwLeave();
       else this.sim.leave(this.net.id);
       this.release();
-    } else if (this.phase === 'riding' && !this.leavingNow()) {
-      if (this.online) {
-        this.net.gwLeave();
-        this.snap = { ...this.snap, leaving: this.snap.leaving | (1 << this.opening) }; // (shown at once; the server's word follows)
-      } else this.sim.leave(this.net.id);
+    } else if (this.phase === 'riding') {
+      if (this.online) this.net.gwLeave(); // (the server's word starts the walk)
+      else this.sim.leave(this.net.id);
     }
   }
 
   /** There is something for Q (or the Get off button) to do. */
   get canLeave() {
-    return this.phase === 'queued' || (this.phase === 'riding' && !this.leavingNow());
-  }
-
-  private leavingNow() {
-    return this.opening >= 0 && ((this.online ? this.snap.leaving : this.sim.state().leaving) & (1 << this.opening)) !== 0;
+    return this.phase === 'queued' || this.phase === 'riding';
   }
 
   /** The prompt while we're in the wheel's hands (no E badge: the keys are in the words). */
   prompt(): { text: string; busy: boolean } | null {
     if (this.phase === 'queued') return { text: t('prompt.gwLeaveQueue'), busy: true };
-    if (this.phase === 'riding') return { text: this.leavingNow() ? t('prompt.gwLeaving') : t('prompt.gwGetOff'), busy: true };
+    if (this.phase === 'riding') return { text: t('prompt.gwGetOff'), busy: true };
     return null;
   }
 

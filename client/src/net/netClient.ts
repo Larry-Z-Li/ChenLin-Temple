@@ -123,7 +123,7 @@ export class NetClient {
       case 'seatDenied': return this.emit('seatDenied', msg.seat);
       case 'push': return this.emit('push', msg.wheel, msg.by, msg.speed);
       case 'gw': { const { t: _t, ...st } = msg; return this.emit('gw', st); }
-      case 'gwDo': return this.emit('gwDo', msg.ev, msg.ev === 'board' ? msg.opening : -1, msg.ev === 'denied' ? -1 : msg.stair);
+      case 'gwDo': return this.emit('gwDo', msg.ev, msg.ev === 'board' ? msg.opening : -1, msg.ev === 'board' ? msg.stair : -1);
       case 'picked': return this.emit('picked', msg.fruit, msg.by);
       case 'strike': return this.emit('strike', msg.inst, msg.by);
       case 'wishAdded': return this.emit('wishAdded', msg.wish);

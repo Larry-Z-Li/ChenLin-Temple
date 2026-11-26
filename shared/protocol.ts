@@ -121,7 +121,7 @@ export type ClientMsg =
   | { t: 'move'; tr: Transform }
   | { t: 'seat'; seat: string | null }
   | { t: 'push'; wheel: string }
-  /** The great prayer wheel: join the queue at a stair (0–3 = N E S W), or (queued) leave or (riding) get off at the next stair. */
+  /** The great prayer wheel: join the queue at a stair (0–3 = N E S W), or (queued) leave or (riding) get off at once. */
   | { t: 'gw'; op: 'join'; stair: number }
   | { t: 'gw'; op: 'leave' }
   /** A rider's press of E: all riders' presses are pooled to turn the wheel. */
@@ -172,7 +172,7 @@ export type ServerMsg =
   | ({ t: 'gw' } & GreatWheelState)
   /** To one person: walk into opening `opening`; step out at `stair`; or the request was refused. */
   | { t: 'gwDo'; ev: 'board'; opening: number; stair: number }
-  | { t: 'gwDo'; ev: 'exit'; stair: number }
+  | { t: 'gwDo'; ev: 'exit' }
   | { t: 'gwDo'; ev: 'denied' }
   | { t: 'picked'; fruit: string; by: string }
   | { t: 'strike'; inst: string; by: string }
