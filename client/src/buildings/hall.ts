@@ -331,7 +331,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
 
   def.deities.forEach((id, i) => {
     const sx = hx - altarW / 2 + (i + 0.5) * (altarW / n);
-    g.add(buildStatueSlot(id, sx, F + altarH + 0.1, altarZ - 0.2, models[id]));
+    g.add(buildStatueSlot(id, sx, F + altarH + 0.1, altarZ - 0.2, models[id], 1.2)); // (a fifth larger than their listed height, on the altars)
     for (let k = 0; k < 7; k++) {
       const bx = sx + (k - 3) * 0.27, by = F + altarH + 0.1, bz = altarZ + 0.95;
       bowlMesh.setMatrixAt(i * 7 + k, bm.makeTranslation(bx, by, bz));
@@ -340,7 +340,7 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
     // Hanging canopy (華蓋) above the statue.
     if (!isShrine) {
       const c = buildCanopy();
-      c.position.set(sx, F + H - 1.1, altarZ - 0.2);
+      c.position.set(sx, F + H - 0.9, altarZ - 0.2);
       g.add(c);
     }
     // Name plate on the altar front

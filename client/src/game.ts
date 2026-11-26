@@ -531,7 +531,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       tester = test === 'flytest' ? 'fly' : test === 'model' ? 'model' : null;
       if (tester) devXYZ ??= makeXYZ();
       if (tester === 'model') { // straight to the model gallery, high over the valley
-        const at = buildModelGallery(ctx, models);
+        const at = buildModelGallery(ctx, models, () => player.pos.y > 200);
         player.pos.set(at.x, at.y, at.z);
         player.yaw = at.yaw;
         rig.lookAlong(at.yaw, 0.12, 6);

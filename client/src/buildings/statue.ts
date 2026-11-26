@@ -12,7 +12,7 @@ const loader = new GLTFLoader();
  * in /assets/models/index.json this is a plain plinth (the name plate on the altar identifies it).
  * glTF models face +Z by convention, which is south here, so no rotation is needed.
  */
-export function buildStatueSlot(id: DeityId, x: number, y: number, z: number, modelFile?: string) {
+export function buildStatueSlot(id: DeityId, x: number, y: number, z: number, modelFile?: string, sizeK = 1) {
   const g = new THREE.Group();
   g.position.set(x, y, z);
   g.name = `statue-${id}`;
@@ -30,7 +30,7 @@ export function buildStatueSlot(id: DeityId, x: number, y: number, z: number, mo
         // Fit to target height, centre on the plinth, rest the base on its top.
         const bbox = new THREE.Box3().setFromObject(model);
         const size = bbox.getSize(new THREE.Vector3());
-        const s = DEITIES[id].height / Math.max(size.y, 1e-3);
+        const s = (DEITIES[id].height * sizeK) / Math.max(size.y, 1e-3);
         model.scale.setScalar(s);
         bbox.setFromObject(model);
         const c = bbox.getCenter(new THREE.Vector3());

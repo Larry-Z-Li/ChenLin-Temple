@@ -5,6 +5,7 @@ import type { WorldContext } from '../core/context';
 import { buildStatueSlot } from '../buildings/statue';
 import { t } from '../i18n';
 import { buildGaruda } from './garuda';
+import { addLamp } from './lightPool';
 
 /** Where the gallery floats: high over the valley (built only on the screen of whoever asks for it). */
 const G = { x: BASIN.x, y: 300, z: BASIN.z };
@@ -13,7 +14,7 @@ const G = { x: BASIN.x, y: 300, z: BASIN.z };
  * A test gallery of the models (entered with the name "model"): a walled platform high in the sky with every deity's
  * altar slot on its plinth and named (bare where no model has been given yet), and Garuda. Returns where to stand.
  */
-export function buildModelGallery(ctx: WorldContext, models: Record<string, string>) {
+export function buildModelGallery(ctx: WorldContext, models: Record<string, string>, up: () => boolean) {
   const ids = Object.keys(DEITIES) as DeityId[], slots: (DeityId | 'garuda')[] = [...ids, 'garuda'];
   const K = 2, per = Math.ceil(slots.length / 2), GAP = 3.6 * K, W = per * GAP + 8, D = 15 * K; // (everything twice life on the altars, to see it well)
   const group = new THREE.Group();
@@ -29,7 +30,8 @@ export function buildModelGallery(ctx: WorldContext, models: Record<string, stri
     group.add(wall);
     ctx.collisions.addBoxCentered(G.x + x, G.z + z, w + 0.3, d + 0.3, true);
   }
-  ctx.ground.addSurface(G.x - W / 2, G.x + W / 2, G.z - D / 2, G.z + D / 2, () => G.y);
+  // (its floor only while you're up there: the valley's ground below stays as it is)
+  ctx.ground.addSurface(G.x - W / 2, G.x + W / 2, G.z - D / 2, G.z + D / 2, () => (up() ? G.y : null));
 
   const label = (text: string, x: number, y: number, z: number) => {
     const c = document.createElement('canvas');
@@ -68,6 +70,15 @@ export function buildModelGallery(ctx: WorldContext, models: Record<string, stri
     }
     ctx.collisions.addCircle(G.x + x, G.z + z, 1.2 * K, true);
   });
+  // lit day and night: lanterns hung over the aisle, each a real light while you're up here (see lightPool)
+  const glow = new THREE.MeshBasicMaterial({ color: 0xffe0a8 });
+  for (let k = 0; k < 5; k++) {
+    const x = -W / 2 + ((k + 0.5) * W) / 5;
+    const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10).scale(1, 1.25, 1), glow);
+    lantern.position.set(x, 10, 0);
+    group.add(lantern);
+    addLamp({ x: G.x + x, y: G.y + 10, z: G.z, color: 0xffe2b0, intensity: 45, range: 36, decay: 1.2, indoor: true });
+  }
   ctx.scene.add(group);
   return { x: G.x - W / 2 + 3, y: G.y, z: G.z, yaw: -Math.PI / 2 }; // at one end, looking down the aisle (+x)
 }
