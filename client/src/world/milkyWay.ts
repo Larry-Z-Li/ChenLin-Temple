@@ -64,18 +64,18 @@ export function buildMilkyWay(scene: THREE.Scene) {
 
   // ---- a field of faint stars over the whole sky ----
   const pos: number[] = [], col: number[] = [], size: number[] = [];
-  for (let i = 0; i < 4000; i++) {
+  for (let i = 0; i < 9000; i++) {
     dir.set(rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1).normalize();
     if (dir.y < 0.02) continue;
     pos.push(dir.x * 1420, dir.y * 1420, dir.z * 1420);
     const k = rng() ** 3, b = 0.16 + k * 0.6, t = rng();
     const [r, g, bl] = t < 0.45 ? [0.65, 0.8, 1.25] : t < 0.75 ? [1, 0.98, 0.9] : t < 0.92 ? [1.2, 0.95, 0.6] : [1.25, 0.55, 0.42];
     col.push(b * r * 1.15, b * g * 1.15, b * bl * 1.15);
-    size.push(1.1 + k * 1.7);
+    size.push((1.1 + k * 1.7) * 2);
   }
   // …and more along the Milky Way's band, thickest toward its core (placed in the panorama's frame, then turned with it)
   const local = new THREE.Vector3();
-  for (let i = 0, n = 0; n < 3200 && i < 40000; i++) {
+  for (let i = 0, n = 0; n < 6400 && i < 80000; i++) {
     const l = (rng() - 0.5) * Math.PI * 2, b = (rng() + rng() + rng() - 1.5) * 0.2 * (1 + 0.8 * Math.exp(-l * l / 0.5));
     if (rng() > 0.3 + 0.7 * Math.exp(-l * l / 0.8)) continue;
     const th = -Math.PI + l;
@@ -86,9 +86,9 @@ export function buildMilkyWay(scene: THREE.Scene) {
     const k = rng() ** 3.5, br = 0.14 + k * 0.6, t = rng();
     const [r, g, bl] = t < 0.35 ? [0.7, 0.82, 1.2] : t < 0.8 ? [1, 0.97, 0.88] : [1.2, 0.92, 0.62];
     col.push(br * r * 1.15, br * g * 1.15, br * bl * 1.15);
-    size.push(1 + k * 1.6);
+    size.push((1 + k * 1.6) * 2);
   }
-  const field = twinkleStars(pos, col, size, 0.5, 0.6);
+  const field = twinkleStars(pos, col, size, 0.35, 0.42);
   field.pts.renderOrder = -0.8;
   scene.add(field.pts);
 
