@@ -11,3 +11,5 @@ client/public/assets/models/*.zip
 
 # raw model exports (huge): only the optimised copies are committed (scripts/optimize-model.mjs)
 client/public/assets/models/Meshy_AI_*
+client/public/assets/models/*\ *
+client/public/assets/models/*.raw.glb
