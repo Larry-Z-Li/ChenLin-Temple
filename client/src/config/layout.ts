@@ -251,8 +251,8 @@ export interface GreatWheelDef { id: GreatWheelId; x: number; z: number; half: n
 export const GREAT_WHEELS: GreatWheelDef[] = [
   { id: 'west', x: -34, z: 76, half: 7.5, plinth: 1.0, reach: 14 },
   { id: 'east', x: 34, z: 76, half: 7.5, plinth: 1.0, reach: 14 },
-  { id: 'north-west', x: -43, z: -63, half: 7.5, plinth: 1.0, reach: 14 }, // (a metre in from -44, to keep clear of 觀音's hall)
-  { id: 'north-east', x: 43, z: -63, half: 7.5, plinth: 1.0, reach: 14 },
+  { id: 'north-west', x: -34, z: -58, half: 7.5, plinth: 1.0, reach: 14 }, // (the north pair mirrors the south across the stupa)
+  { id: 'north-east', x: 34, z: -58, half: 7.5, plinth: 1.0, reach: 14 },
 ];
 
 /** 櫻花樹林: cherry trees all round the wish garden. */
@@ -286,7 +286,7 @@ export const BENCHES: BenchDef[] = [
   { x: 56.1, z: -44.3, face: 0 }, { x: -47.9, z: 94.8, face: 3.142 }, { x: -21.9, z: 94.8, face: 3.142 }, { x: 30.1, z: 94.8, face: 3.142 },
   { x: 56.1, z: 90.8, face: 0 }, { x: -60.6, z: -30.3, face: 1.571 }, { x: -45.8, z: 136, face: 2.161 }, { x: -28, z: 155.4, face: -0.981 },
   { x: 60.6, z: -30.3, face: -1.571 }, { x: 45.8, z: 136, face: -2.161 }, { x: 28, z: 155.4, face: 0.981 }, { x: -49.1, z: 57.9, face: -2.356 },
-  { x: 49.1, z: 57.9, face: 2.356 }, { x: -24, z: -54.3, face: 1.571 }, { x: 24, z: -54.3, face: -1.571 }, { x: -24.6, z: -106.7, face: 1.621 },
+  { x: 49.1, z: 57.9, face: 2.356 }, { x: -24.6, z: -106.7, face: 1.621 },
   { x: 24.6, z: -106.7, face: -1.621 }, { x: -85.9, z: -40.3, face: -3.142 }, { x: -98.9, z: -57.6, face: 2.099 }, { x: -145.7, z: -109.6, face: 0.165 },
   { x: 85.9, z: -40.3, face: 3.142 }, { x: 96, z: -73.8, face: 1.304 }, { x: -70.8, z: 29.2, face: 0.096 }, { x: -96.2, z: 35.6, face: -3.045 },
   { x: 70.6, z: -14.5, face: 3.12 }, { x: 96.6, z: -17.9, face: -0.022 }, { x: 129.9, z: -13.8, face: 3.142 }, { x: 70.8, z: 29.5, face: -0.125 },
@@ -336,11 +336,21 @@ export const SAND_GARDEN = {
 
 /** Stone lanterns (石燈籠). */
 /** A pair of stone lanterns beside a hall's front (or back) steps, turned with the hall. */
-const stairLanterns = (h: HallDef, back = false): [number, number][] => {
+/** Beside a hall's steps (k −1 on the visitor's left, 1 the right; `back`: its back steps). */
+const stairSpot = (h: HallDef, k: -1 | 1, back = false): [number, number] => {
   const yaw = hallYaw(h), c = Math.cos(yaw), s = Math.sin(yaw);
   const lz = (h.depth / 2 + 1.6 + 1.2) * (back ? -1 : 1), half = (back ? 5 : h.kind === 'shrine' ? 4 : 7) / 2 + 1.2;
-  return [-1, 1].map((k): [number, number] => [h.x + k * half * c + lz * s, h.z - k * half * s + lz * c]);
+  return [h.x + k * half * c + lz * s, h.z - k * half * s + lz * c];
 };
+// (the front steps' lanterns gave way to the hall's prayer wheels; the back steps keep theirs)
+const stairLanterns = (h: HallDef, back = false): [number, number][] => (back ? ([-1, 1] as const).map((k) => stairSpot(h, k, true)) : []);
+/** Two medium prayer wheels in little pavilions before every hall, either side of its front steps. */
+export const HALL_WHEELS = HALLS.flatMap((h) =>
+  ([-1, 1] as const).map((k) => {
+    const [x, z] = stairSpot(h, k);
+    return { id: `hall-${h.id}-${k < 0 ? 'w' : 'e'}`, x, z };
+  }),
+);
 
 export const STONE_LANTERNS: [number, number][] = [
   ...HALLS.flatMap((h) => [...stairLanterns(h), ...(h.backDoor ? stairLanterns(h, true) : [])]),
@@ -423,7 +433,14 @@ export const DEER_RANGES: Rect[] = [
   { minX: -40, maxX: -29, minZ: 86, maxZ: 104 }, // beside the plaza (west)
   { minX: 29, maxX: 40, minZ: 86, maxZ: 104 }, // beside the plaza (east)
   { minX: -30, maxX: -16, minZ: -100, maxZ: -88 }, // in the cherry grove
-].map(moved);
+].map(moved).concat([
+  // more along the footpaths (open, level grass a few metres off them; they wander onto the path now and then)
+  { minX: -72, maxX: -60, minZ: -41, maxZ: -29 }, { minX: 18, maxX: 30, minZ: 94, maxZ: 106 },
+  { minX: -58, maxX: -46, minZ: 12, maxZ: 24 }, { minX: -58, maxX: -46, minZ: 67, maxZ: 79 }, { minX: 46, maxX: 58, minZ: 12, maxZ: 24 },
+  { minX: 46, maxX: 58, minZ: 67, maxZ: 79 }, { minX: -21, maxX: -9, minZ: -83, maxZ: -71 }, { minX: -20, maxX: -8, minZ: -144, maxZ: -132 },
+  { minX: -104, maxX: -92, minZ: -63, maxZ: -51 }, { minX: 76, maxX: 88, minZ: -41, maxZ: -29 }, { minX: -129, maxX: -117, minZ: 30, maxZ: 42 },
+  { minX: 106, maxX: 118, minZ: -29, maxZ: -17 }, { minX: -111, maxX: -99, minZ: 101, maxZ: 113 },
+]);
 
 /** On a south-facing hall's front steps, `dx` from its centre line (`h` = height of that step). */
 const onSteps = (id: string, dx: number) => {
@@ -433,9 +450,9 @@ const onSteps = (id: string, dx: number) => {
 
 /** Cats napping about the place (`h` = height they lie at). */
 export const CAT_SPOTS: { x: number; z: number; h: number; coat: CatCoat; pose: CatPose }[] = [
-  { ...onSteps('guanyin', 2.9), coat: 'ginger', pose: 'loaf' }, // Guanyin Court's steps
-  { ...onSteps('wenshu', 2.9), coat: 'silver', pose: 'loaf' }, // Mañjuśrī Court's steps
-  { ...onSteps('baosheng', 2.9), coat: 'tuxedo', pose: 'loaf' }, // Baosheng Court's steps
+  { ...onSteps('guanyin', 3.25), coat: 'ginger', pose: 'loaf' }, // Guanyin Court's steps
+  { ...onSteps('wenshu', 3.25), coat: 'silver', pose: 'loaf' }, // Mañjuśrī Court's steps
+  { ...onSteps('baosheng', 3.25), coat: 'tuxedo', pose: 'loaf' }, // Baosheng Court's steps
   { x: DORM.minX + 8, z: (DORM.minZ + DORM.maxZ) / 2, h: 0, coat: 'calico', pose: 'sit' }, // the monks' courtyard
   { x: BODHI_TREE.x + 2.4, z: BODHI_TREE.z + 3.2, h: 0, coat: 'brown', pose: 'sit' }, // under the Bodhi tree
 ];

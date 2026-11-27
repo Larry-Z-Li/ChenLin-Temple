@@ -6,7 +6,7 @@ export interface Interactable {
   z: number;
   radius: number;
   /** Prompt text, or null when unavailable right now. `busy` = show greyed-out text. */
-  prompt: () => { text: string; busy?: boolean } | null;
+  prompt: () => { text: string; busy?: boolean; mash?: boolean } | null;
   onInteract: () => void;
   /** Its own key (shown on the prompt), when it isn't E. */
   key?: string;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FLAG_CIRCLE, FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, FLAG_TRAIL_SHIFT, FLAG_WHEEL, SNAPSHOT_HZ } from '../../shared/protocol';
+import { FLAG_CIRCLE, FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, FLAG_TRAIL_SHIFT, FLAG_WHEEL, SNAPSHOT_HZ, WHEEL_MAX } from '../../shared/protocol';
 import { Circumambulation } from './activities/circumambulation';
 import { CircleWalk } from './activities/circleWalk';
 import { LightTrail } from './world/lightTrail';
@@ -208,7 +208,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     onChants: () => chantPanel.show(!chantPanel.isOpen),
     onFastTravel: () => (insideHall() ? hud.toast(t('travel.inside')) : (circle.stop(), seat.endStanding(), bigMap.toggle(true))),
     onMap: () => bigMap.toggle(),
-    onPrompt: () => (circle.active ? circle.pressE() : gw.controlling ? gw.pressE() : !seat.seated && ctx.interactions.trigger()),
+    onPrompt: () => (circle.active ? circle.pressE() : gw.controlling ? gw.pressE() : !seat.seated && useInteraction()),
     onWheelOff: () => (circle.active ? circle.stop() : gw.getOff()),
     onCircle: () => startCircle(),
     onBow: () => bow(),
@@ -247,6 +247,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   // Prayer wheels: tap E beside one to push it. Local pushes apply instantly; the server
   // echoes everyone's pushes with the authoritative speed.
   const wheels = new PrayerWheels(ctx, (w) => net.pushWheel(w.id));
+  /** Use what's at hand (E, or a tap on the prompt); a prayer wheel's gold button bounces with each push. */
+  const useInteraction = (key?: string) => {
+    const id = ctx.interactions.current?.id;
+    if (ctx.interactions.trigger(key) && id?.startsWith('wheel-')) hud.bumpMash();
+  };
   // The great prayer wheel (大轉經輪): queue at a stair, ride an opening round, E to get off. The server turns it.
   const gw = new GreatWheels(ctx, net, player, rig);
   gw.onPress = () => hud.bumpMash(); // (the mash button bounces with each press)
@@ -384,14 +389,13 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   input.onKey((e) => {
     if (phase !== 'play' || landing || bodhiBell.active) return false; // the entry screen, the flight down, the bell
     if (e.code === 'KeyE') {
-      if (!e.repeat) circle.active ? circle.pressE() : gw.controlling ? gw.pressE() : ctx.interactions.trigger('E'); // each tap counts; holding doesn't auto-push
+      if (!e.repeat) circle.active ? circle.pressE() : gw.controlling ? gw.pressE() : useInteraction('E'); // each tap counts; holding doesn't auto-push
       return true;
     }
     if (e.code === 'KeyQ' && circle.active) return !e.repeat && circle.stop(), true;
     if (e.code === 'KeyQ' && gw.controlling) return !e.repeat && gw.getOff(), true;
     if (e.code === 'KeyQ' && !player.flying && circle.canStart) return !e.repeat && startCircle(), true;
     if (e.code === 'KeyB') return !e.repeat && bow(), true;
-    if (e.code === 'KeyR') return !e.repeat && ctx.interactions.trigger('R'), true; // (the small prayer wheels: R to turn)
     // Standing: 2 beads, 3 sutra (seated, the seat bar handles the number keys).
     // Dev preview only: F toggles flying (never in the live build).
     if ((import.meta.env.DEV || tester) && e.code === 'KeyF' && !e.repeat && !seat.seated && !cloud.riding) {
@@ -506,7 +510,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     else if (!seat.seated && !cloud.riding && !offerings.busy && !blessing.active) {
       const it = ctx.interactions.update(player.pos.x, player.pos.z);
       const p = it?.prompt();
-      hud.setPrompt(p?.text ?? null, p?.busy, false, it?.key);
+      hud.setPrompt(p?.text ?? null, p?.busy, p?.mash, it?.key);
+      if (p?.mash) hud.setMash(Math.min(1, (wheels.wheels.get(it!.id)?.speed ?? 0) / WHEEL_MAX)); // (a prayer wheel's: glowing with its speed)
     }
 
     wheels.update(dt);

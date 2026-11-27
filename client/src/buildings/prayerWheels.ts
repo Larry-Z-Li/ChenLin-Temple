@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { WHEEL_MAX, WHEEL_PUSH, WHEEL_PUSH_COOLDOWN_MS, wheelSpeedAfter } from '../../../shared/protocol';
-import { PLATFORM_H, WHEEL_ROWS } from '../config/layout';
+import { HALL_WHEELS, PLATFORM_H, WHEEL_ROWS } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
-import { canvasTexture, glowTexture } from '../core/textures';
+import { glowTexture } from '../core/textures';
 import { t } from '../i18n';
-import { box, cylinder, mat } from './materials';
+import { box, cylinder, hipRoofGeometry, mat } from './materials';
 
 const MAX_CHARGE = 120;
 const DRUM_Y = 1.2;
@@ -26,26 +26,58 @@ export interface Wheel {
   spinner: string | null;
   /** Turns made, counting up (a whole number passed = one turn for the spinner). */
   turns: number;
+  /** The drum's radius and height (the small ones' by default), for its glow and the motes off it. */
+  size?: number;
 }
 
+/**
+ * The drum: 唵嘛呢叭咪吽 (om mani padme hum, from /assets/wheel/om-mani-padme-hum.png, as on the great wheels) raised in
+ * gold on deep red, twice round, between gold rims banded in red. The lettering is drawn in when the image arrives.
+ */
 export function drumTexture() {
-  // Abstract banding only; swap for a real mantra texture during the art pass.
-  return canvasTexture(512, 128, (g) => {
-    g.fillStyle = '#b8862b';
-    g.fillRect(0, 0, 512, 128);
-    g.fillStyle = '#8e1f16';
-    g.fillRect(0, 0, 512, 22);
-    g.fillRect(0, 106, 512, 22);
-    g.fillStyle = '#e8c76a';
-    for (let i = 0; i < 16; i++) {
-      g.beginPath();
-      g.arc(16 + i * 32, 64, 9, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.strokeStyle = '#6b4a12';
-    g.lineWidth = 3;
-    g.strokeRect(0, 26, 512, 76);
-  });
+  const W = 1024, H = 416, c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d')!;
+  const rim = g.createLinearGradient(0, 0, 0, H);
+  rim.addColorStop(0, '#e8c76a'), rim.addColorStop(0.5, '#b8862b'), rim.addColorStop(1, '#e8c76a');
+  g.fillStyle = rim;
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = '#8e1f16';
+  g.fillRect(0, 14, W, 18), g.fillRect(0, H - 32, W, 18); // (red bands in the rims)
+  const ground = g.createLinearGradient(0, 46, 0, H - 46);
+  ground.addColorStop(0, '#6e1410'), ground.addColorStop(0.5, '#8a1d15'), ground.addColorStop(1, '#5e100c');
+  g.fillStyle = ground;
+  g.fillRect(0, 46, W, H - 92);
+  g.strokeStyle = '#6b4a12';
+  g.lineWidth = 4;
+  g.strokeRect(-4, 46, W + 8, H - 92);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  const img = new Image();
+  img.onload = () => {
+    const h = (H - 92) * 0.78, w = (img.width / img.height) * h, y = (H - h) / 2;
+    const tint = (color: string | CanvasGradient) => { // the letters' shape, filled with a colour, twice round
+      const t = document.createElement('canvas');
+      t.width = W;
+      t.height = H;
+      const tg = t.getContext('2d')!;
+      for (const k of [0, 1]) tg.drawImage(img, k * (W / 2) + (W / 2 - w) / 2, y, w, h);
+      tg.globalCompositeOperation = 'source-in';
+      tg.fillStyle = color;
+      tg.fillRect(0, 0, W, H);
+      return t;
+    };
+    g.drawImage(tint('rgba(40, 8, 4, 0.85)'), 3, 4); // (the raised edge's shadow)
+    const gold = g.createLinearGradient(0, y, 0, y + h);
+    gold.addColorStop(0, '#fff1b0'), gold.addColorStop(0.45, '#e2b545'), gold.addColorStop(1, '#a8741c');
+    g.drawImage(tint(gold), 0, 0);
+    tex.needsUpdate = true;
+  };
+  img.src = '/assets/wheel/om-mani-padme-hum.png';
+  return tex;
 }
 
 /**
@@ -106,11 +138,45 @@ export class PrayerWheels {
         this.wheels.set(wheel.id, wheel);
         ctx.interactions.add({
           id: wheel.id, x: row.x + sign * 0.95, z, radius: 0.8,
-          prompt: () => ({ text: t('prompt.spin') }),
+          prompt: () => ({ text: t('prompt.gwMash'), mash: true }), // (the gold tap-fast button, as at the great wheels)
           onInteract: () => this.push(wheel),
-          key: 'R', // (its own key: E is everything else's)
         });
       }
+    }
+
+    // Two medium wheels before every hall, either side of its steps where the lanterns were: a man's height of drum, turning on a bronze
+    // axle in a little pavilion (stone base, red posts, a dark hip roof with a gold finial); E to turn it, like the rest
+    const stone = mat(THEME.platformStone, { roughness: 0.95 }), red = mat(THEME.column, { roughness: 0.55 }), bronze = mat(0x6b5434, { metalness: 0.7, roughness: 0.4 });
+    const roofMat = mat(THEME.roof, { roughness: 0.75, flatShading: true, side: THREE.DoubleSide });
+    const M = 2.1, MR = 0.26 * M, MH = 0.66 * M, P = 0.82; // (drum twice the small ones'; posts at ±P)
+    for (const hw of HALL_WHEELS) {
+      const y0 = ctx.ground.heightAt(hw.x, hw.z), g = new THREE.Group();
+      g.position.set(hw.x, y0, hw.z);
+      g.add(cylinder(0.78, 0.86, 0.22, stone, 0, 0, 0, 8)); // the base
+      g.add(cylinder(0.03, 0.03, 2.35, bronze, 0, 0.22, 0, 8)); // the axle
+      for (const [px, pz] of [[-P, -P], [P, -P], [-P, P], [P, P]]) {
+        g.add(cylinder(0.065, 0.075, 2.45, red, px, 0.2, pz, 8));
+        ctx.collisions.addCircle(hw.x + px, hw.z + pz, 0.12);
+      }
+      for (const sd of [-1, 1]) g.add(box(2 * P + 0.24, 0.12, 0.12, wood, 0, 2.55, sd * P), box(0.12, 0.12, 2 * P + 0.24, wood, sd * P, 2.55, 0));
+      const roof = new THREE.Mesh(hipRoofGeometry(2.6, 2.6, 0.85).geometry, roofMat);
+      roof.position.y = 2.67;
+      roof.castShadow = true;
+      g.add(roof, cylinder(0.06, 0.1, 0.3, capMat, 0, 3.5, 0, 10));
+      g.traverse((o) => (o.castShadow = o.receiveShadow = true));
+      ctx.scene.add(g);
+      ctx.collisions.addCircle(hw.x, hw.z, MR + 0.12);
+      const drumMat = new THREE.MeshStandardMaterial({ map: drumMap, metalness: 0.55, roughness: 0.4, emissive: new THREE.Color(0xffc45a), emissiveIntensity: 0 });
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(MR, MR, MH, 40), [drumMat, capMat, capMat]);
+      drum.position.set(hw.x, y0 + 0.42 + MH / 2, hw.z);
+      drum.castShadow = true;
+      ctx.scene.add(drum);
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffd27a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+      glow.position.copy(drum.position);
+      ctx.scene.add(glow);
+      const wheel: Wheel = { id: `wheel-${hw.id}`, x: hw.x, z: hw.z, drum, drumMat, glow, speed: 0, charge: 0, emitAcc: 0, spinner: null, turns: 0, size: M };
+      this.wheels.set(wheel.id, wheel);
+      ctx.interactions.add({ id: wheel.id, x: hw.x, z: hw.z + MR + 0.75, radius: 1.3, prompt: () => ({ text: t('prompt.gwMash'), mash: true }), onInteract: () => this.push(wheel) }); // (the gold tap-fast button, as at the great wheels)
     }
 
     // Shared light-mote particle system
@@ -169,7 +235,7 @@ export class PrayerWheels {
       const level = 1 - Math.exp(-w.charge / 20); // 0..1, grows the longer (and faster) it turns
       w.drumMat.emissiveIntensity = level * 1.2;
       w.glow.material.opacity = level * 0.75;
-      w.glow.scale.setScalar(0.6 + level * 3.2);
+      w.glow.scale.setScalar((0.6 + level * 3.2) * (w.size ?? 1));
       if (level > 0.01) {
         w.emitAcc += dt * (level * 6 + w.speed * level * 14);
         while (w.emitAcc >= 1) {
@@ -205,9 +271,10 @@ export class PrayerWheels {
     const i = this.pNext;
     this.pNext = (this.pNext + 1) % this.pLife.length;
     const a = Math.random() * Math.PI * 2, k = i * 3;
-    this.pPos[k] = w.drum.position.x + Math.cos(a) * 0.28;
-    this.pPos[k + 1] = w.drum.position.y + (Math.random() - 0.5) * 0.6;
-    this.pPos[k + 2] = w.drum.position.z + Math.sin(a) * 0.28;
+    const sz = w.size ?? 1;
+    this.pPos[k] = w.drum.position.x + Math.cos(a) * 0.28 * sz;
+    this.pPos[k + 1] = w.drum.position.y + (Math.random() - 0.5) * 0.6 * sz;
+    this.pPos[k + 2] = w.drum.position.z + Math.sin(a) * 0.28 * sz;
     this.pVel[k] = Math.cos(a) * 0.15 + (Math.random() - 0.5) * 0.1;
     this.pVel[k + 1] = 0.5 + Math.random() * 0.6 + level * 0.8;
     this.pVel[k + 2] = Math.sin(a) * 0.15 + (Math.random() - 0.5) * 0.1;

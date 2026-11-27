@@ -11,9 +11,6 @@ export class Circumambulation {
   laps = 0;
   /** A lap was completed: the new count. */
   onLap: (laps: number, auto: boolean) => void = () => {};
-  /** Time spent on the lap in progress, and how much of it on autopilot (a lap earns merit only if nearly all was). */
-  private lapTime = 0;
-  private lapAuto = 0;
   private turned = 0;
   private prev: number | null = null;
   private inside = false;
@@ -31,26 +28,20 @@ export class Circumambulation {
       this.inside = false;
       this.prev = null;
       this.turned = 0;
-      this.lapTime = this.lapAuto = 0;
       this.laps = Math.max(0, this.laps - dt * 0.5);
       return;
     }
     this.inside = true;
     const b = Math.atan2(dx, -dz); // bearing from the stupa: north 0, east π/2 … (clockwise, seen from above, adds)
-    if (this.prev !== null) {
+    if (this.prev !== null && auto) { // (only the way round on autopilot counts: on foot, nothing)
       let d = b - this.prev;
       if (d > Math.PI) d -= Math.PI * 2;
       if (d < -Math.PI) d += Math.PI * 2;
       this.turned += d;
     }
     this.prev = b;
-    this.lapTime += dt;
-    if (auto) this.lapAuto += dt;
     if (this.turned >= Math.PI * 2) {
       this.turned -= Math.PI * 2;
-      const wholly = this.lapAuto >= this.lapTime * 0.9;
-      this.lapTime = this.lapAuto = 0;
-      if (!wholly) return; // (a lap walked on foot counts for nothing: no merit, no light)
       this.laps = Math.floor(this.laps + 1e-6) + 1;
       this.onLap(this.laps, true);
     }

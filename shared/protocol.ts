@@ -54,7 +54,7 @@ export interface PlayerInfo {
 /** Speed (rev/s) added by each push. Mash to go faster. */
 export const WHEEL_PUSH = 0.3;
 /** Top speed (rev/s). */
-export const WHEEL_MAX = 3.5;
+export const WHEEL_MAX = 2.8; // (was 3.5: 0.8× that)
 /** Coasting time constant (s): speed falls to 37% after this long without pushes. */
 export const WHEEL_TAU = 5;
 /** Minimum ms between counted pushes from one person (caps auto-clickers). */
