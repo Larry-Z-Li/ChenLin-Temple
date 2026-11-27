@@ -282,7 +282,9 @@ export class Avatar {
     if (this.tag) {
       this.root.remove(this.tag);
       this.tag.material.map?.dispose();
+      this.tag = null;
     }
+    if (['flytest', 'model'].includes(name.trim().toLowerCase())) return; // (the test names go about unlabelled)
     const mat = new THREE.SpriteMaterial({ map: textTexture(name, { w: 512, h: 96, color: '#fff8e7', font: `600 46px system-ui, sans-serif` }), depthWrite: false, transparent: true });
     this.tag = new THREE.Sprite(mat);
     this.tag.scale.set(1.6, 0.3, 1);

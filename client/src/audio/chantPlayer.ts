@@ -1,5 +1,5 @@
 import { saveSettings, settings } from '../config/settings';
-import { assetUrl, loadChants, type AudioEntry } from '../content/manifest';
+import { assetUrl, loadChants, ownServerUrl, type AudioEntry } from '../content/manifest';
 import { damp } from '../core/math';
 import { audioCtx } from './sfx';
 
@@ -9,7 +9,16 @@ export class ChantPlayer {
   index = -1;
   /** Repeat the current chant (on by default: a mantra goes round and round). */
   loop = true;
-  private el = new Audio();
+  private el = (() => {
+    const el = new Audio();
+    el.addEventListener('error', () => { // (from the CDN and it failed: the same chant from our own server)
+      const own = ownServerUrl(el.src), wasPlaying = !el.paused || el.autoplay;
+      if (!own) return;
+      el.src = own;
+      if (wasPlaying) void el.play().catch(() => {});
+    });
+    return el;
+  })();
   private level = 0;
   private fadingOut = false;
   private listeners = new Set<() => void>();

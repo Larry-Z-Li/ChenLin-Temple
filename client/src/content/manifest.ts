@@ -45,7 +45,11 @@ async function getJson<T>(url: string, fallback: T): Promise<T> {
 }
 
 const BASE = `${import.meta.env.BASE_URL}assets`;
-export const assetUrl = (folder: string, file: string) => `${BASE}/${folder}/${file}`;
+/** The heavy folders, fetched from the CDN when there is one (see vite.config.ts); the rest from our own server. */
+const CDN_FOLDERS = new Set(['models', 'chants']);
+export const assetUrl = (folder: string, file: string) => (__ASSET_CDN__ && CDN_FOLDERS.has(folder) ? `${__ASSET_CDN__}/${folder}/${file}` : `${BASE}/${folder}/${file}`);
+/** For a file that failed from the CDN: the same file from our own server (null if it wasn't a CDN one). */
+export const ownServerUrl = (url: string) => (__ASSET_CDN__ && url.startsWith(__ASSET_CDN__) ? BASE + url.slice(__ASSET_CDN__.length) : null);
 
 export const loadSutras = () => getJson<{ items: SutraEntry[] }>(`${BASE}/sutras/index.json`, { items: [] }).then((m) => m.items ?? []);
 export const loadChants = () => getJson<{ items: AudioEntry[] }>(`${BASE}/chants/index.json`, { items: [] }).then((m) => m.items ?? []);

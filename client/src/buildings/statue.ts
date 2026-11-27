@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { queueLoad } from '../core/loadQueue';
 import { DEITIES, type DeityId } from '../config/deities';
 import { THEME } from '../config/theme';
-import { assetUrl } from '../content/manifest';
+import { assetUrl, ownServerUrl } from '../content/manifest';
 import { box, mat } from './materials';
 import { interiorLayer } from '../core/interiorCull';
 
@@ -11,7 +11,14 @@ const gltf = new GLTFLoader();
 /** Load a model in its turn (after what you see first; two at a time: see loadQueue). */
 const loader = {
   load(url: string, onLoad: (g: GLTF) => void, _p?: unknown, onError?: (e: unknown) => void) {
-    queueLoad(() => new Promise<void>((done) => gltf.load(url, (g) => (onLoad(g), done()), undefined, (e) => (onError?.(e), done()))));
+    queueLoad(() => new Promise<void>((done) => {
+      const fail = (e: unknown) => (onError?.(e), done());
+      gltf.load(url, (g) => (onLoad(g), done()), undefined, (e) => { // (from the CDN and it failed: our own server)
+        const own = ownServerUrl(url);
+        if (own) gltf.load(own, (g) => (onLoad(g), done()), undefined, fail);
+        else fail(e);
+      });
+    }));
   },
 };
 
