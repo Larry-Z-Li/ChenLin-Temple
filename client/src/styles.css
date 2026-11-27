@@ -345,3 +345,5 @@ body:not(.touch) .merit-pop { font-size: 60px; } /* bigger on a computer */
 body.touch .quick-actions, body.touch .seatbar { flex-wrap: nowrap; width: calc(100vw - 16px); max-width: 560px; overflow: visible; justify-content: stretch; gap: 2px; padding: 4px; }
 body.touch .quick-actions .icon-btn, body.touch .seat-btn { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; flex: 1 1 0; min-width: 0; padding: 6px 2px 5px; gap: 3px; font: 500 10px/1.15 var(--sans); white-space: normal; text-align: center; overflow-wrap: anywhere; }
 body.touch .quick-actions .icon-btn .ico, body.touch .seat-btn .ico { flex: none; width: 18px; height: 18px; }
+/* Phones: the mala's ◀ ▶ side by side, close under the thumb */
+body.touch .bead-btns { gap: 10px; }

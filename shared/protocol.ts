@@ -6,7 +6,7 @@ export const PROTOCOL_VERSION = 13;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
-export const DEFAULT_TEMPLE_TZ = 'Asia/Taipei';
+export const DEFAULT_TEMPLE_TZ = 'America/Los_Angeles';
 
 /** Animation states sent over the wire (by index, to keep packets small). Append only. */
 export const ANIMS = [

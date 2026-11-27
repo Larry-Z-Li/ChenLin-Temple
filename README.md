@@ -77,7 +77,7 @@ Default is Traditional Chinese (`zh-Hant`), with English selectable. Every UI st
 
 ## Practice features
 
-- **Offerings:** pick fruit in the orchard (regrows after 10 min, carry up to 10). At any hall's table or the courtyard burner, one press offers incense (take, light, bow, plant; burns 30 min); offer your whole basket of fruit on the plates in one go. Offerings are shared and clear at midnight in `TEMPLE_TZ` (default Asia/Taipei).
+- **Offerings:** pick fruit in the orchard (regrows after 10 min, carry up to 10). At any hall's table or the courtyard burner, one press offers incense (take, light, bow, plant; burns 30 min); offer your whole basket of fruit on the plates in one go. Offerings are shared and clear at midnight in `TEMPLE_TZ` (default America/Los_Angeles).
 - **Prostrations:** on a cushion press 3: stand, palms to crown / mouth / heart, kneel, forehead to floor, palms up, rise; three times, then stay kneeling.
 - **Soundscape:** wind, the waterfall and stream (louder as you approach), birdsong, an occasional wind chime, footsteps by surface, and a temple bell on the hour. Synthesized by default; drop recordings into `client/public/assets/sfx/index.json` to replace any of them.
 - **Day & night:** the sky follows the temple's clock (`TEMPLE_TZ`): dawn and dusk glow, a moonlit night with stars, lanterns lit after dark, crickets instead of birds. ⚙ → *Always day* opts out.
