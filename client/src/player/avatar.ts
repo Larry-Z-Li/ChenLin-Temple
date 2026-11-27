@@ -145,6 +145,7 @@ function chestZ(x: number, y: number) {
 /** How big a carried lantern is by default (world scale): a wall lantern's size, so it doesn't change in your hands. */
 export const LANTERN_HELD = 0.9;
 const heldScale = new THREE.Vector3(), qHand = new THREE.Quaternion(), qRoot = new THREE.Quaternion();
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3(), _m = new THREE.Matrix4();
 
 /** The colour someone glows after walking round the stupa (see setGlow). */
 const GLOW = new THREE.Color(1, 0.78, 0.45);
@@ -393,6 +394,7 @@ export class Avatar {
   private lantern: { g: THREE.Group; mat: THREE.MeshStandardMaterial; halo: THREE.Sprite; kind: 'lantern' | 'chalice' } | null = null;
 
   private props: { book: THREE.Group; mala: THREE.Group } | null = null;
+  private bookOnRight = false;
   /** The sutra book and the mala in the hands for the pose `a` (null or any other pose: neither). */
   private showProps(a: Anim | null) {
     const both = a === 'read' || a === 'sitRead' || a === 'crossRead' || a === 'standRead';
@@ -404,10 +406,7 @@ export class Avatar {
     }
     const { book, mala } = this.props;
     book.visible = both || withBeads;
-    if (book.visible) {
-      book.position.x = both ? 0 : 0.23;
-      book.scale.x = both ? 1 : 0.55;
-    }
+    this.bookOnRight = withBeads; // (on the right palm; with both hands, on both)
     mala.visible = beads || withBeads;
     if (mala.visible) {
       const hand = withBeads ? this.joints.lHand : this.joints.rHand;
@@ -421,29 +420,59 @@ export class Avatar {
       mesh.castShadow = true;
       return mesh;
     };
-    // a folded sutra: cream leaves between two dark blue covers, held open before the face between the two hands
+    // a sutra lying open: two halves (dark blue cover, cream leaves) opening upward in a shallow V from the spine; it
+    // rests on the palm and faces the eyes (see placeProps)
     const cover = new THREE.MeshStandardMaterial({ color: 0x24305a, roughness: 0.8 }), leaf = new THREE.MeshStandardMaterial({ color: 0xf0e6c8, roughness: 0.9 });
     const book = new THREE.Group();
-    book.add(mk(new THREE.BoxGeometry(0.4, 0.014, 0.16), cover), mk(new THREE.BoxGeometry(0.38, 0.03, 0.15).translate(0, 0.02, 0), leaf), mk(new THREE.BoxGeometry(0.4, 0.014, 0.16).translate(0, 0.04, 0), cover));
-    book.position.set(0, 0.34, -0.44); // between the hands, before the chest (torso space)
-    book.rotation.x = -0.45; // tipped back toward the eyes
+    for (const side of [-1, 1]) {
+      const half = new THREE.Group();
+      half.add(mk(new THREE.BoxGeometry(0.2, 0.012, 0.16).translate(side * 0.1, 0.006, 0), cover), mk(new THREE.BoxGeometry(0.19, 0.016, 0.148).translate(side * 0.097, 0.02, 0), leaf));
+      half.rotation.z = side * 0.2;
+      book.add(half);
+    }
+    book.visible = false;
     this.torso.add(book);
-    // a mala: a ring of wooden beads round the fingers, a gold marker, a guru bead and a short red tassel
+    // a mala: a long loop of wooden beads from round the fingers, hanging down (whatever the hand does), a gold
+    // marker every so often, and at the bottom the guru bead and a red tassel
     const wood = new THREE.MeshStandardMaterial({ color: 0x6b2f1a, roughness: 0.45 }), gold = new THREE.MeshStandardMaterial({ color: 0xd9b45a, roughness: 0.4, metalness: 0.4 });
-    const mala = new THREE.Group();
-    const N = 18, R = 0.058;
+    const mala = new THREE.Group(), L = 0.24, W = 0.042, loop: THREE.Vector3[] = [];
+    for (let i = 0; i < 240; i++) { // (a teardrop: narrow round the fingers, widest a third of the way down, closing at the bottom)
+      const u = (i / 240) * Math.PI * 2, d = (1 - Math.cos(u)) / 2;
+      loop.push(new THREE.Vector3(Math.sin(u) * W * (0.55 + 0.9 * d) * (1 - 0.75 * d * d), -L * d, 0));
+    }
+    const curve = new THREE.CatmullRomCurve3(loop, true), N = 30, beadGeo = new THREE.SphereGeometry(0.0105, 8, 6), markGeo = new THREE.SphereGeometry(0.013, 8, 6);
     for (let i = 0; i < N; i++) {
-      const a = (i / N) * Math.PI * 2, b = mk(new THREE.SphereGeometry(i % 6 === 0 ? 0.016 : 0.012, 8, 6), i % 6 === 0 && i ? gold : wood);
-      b.position.set(Math.cos(a) * R * 0.7, 0, Math.sin(a) * R);
+      if (i === N / 2) continue; // (the guru bead's place, at the bottom)
+      const b = mk(i % 7 === 3 ? markGeo : beadGeo, i % 7 === 3 ? gold : wood);
+      b.position.copy(curve.getPointAt(i / N));
       mala.add(b);
     }
-    const tassel = mk(new THREE.ConeGeometry(0.01, 0.07, 6).translate(0, -0.035, 0), new THREE.MeshStandardMaterial({ color: 0x9e1b1b, roughness: 0.9 }));
-    tassel.position.set(0, -0.01, R);
-    mala.add(tassel);
+    const guru = mk(new THREE.SphereGeometry(0.017, 10, 8), wood);
+    guru.position.set(0, -L - 0.008, 0);
+    const tassel = mk(new THREE.ConeGeometry(0.012, 0.08, 6).translate(0, -0.04, 0), new THREE.MeshStandardMaterial({ color: 0x9e1b1b, roughness: 0.9 }));
+    tassel.position.set(0, -L - 0.022, 0);
+    mala.add(guru, tassel);
     mala.position.set(0, -0.085, 0); // round the fingers
     mala.visible = false;
     this.joints.rHand.add(mala);
     return { book, mala };
+  }
+
+  /** The book on the palm (or both), opening toward the eyes; the beads hanging straight down from the fingers. */
+  private placeProps() {
+    if (!this.props) return;
+    const { book, mala } = this.props, j = this.joints;
+    if (!book.visible && !mala.visible) return;
+    this.root.updateMatrixWorld(true);
+    if (book.visible) {
+      const r = j.rHand.localToWorld(_v1.set(0, -0.05, 0)), at = this.bookOnRight ? r : r.add(j.lHand.localToWorld(_v2.set(0, -0.05, 0))).multiplyScalar(0.5);
+      this.torso.worldToLocal(at);
+      const eye = this.torso.worldToLocal(this.head.getWorldPosition(_v2)).sub(at).normalize();
+      const n = _v3.set(0, 1, 0).lerp(eye, 0.65).normalize(), x = _v4.set(1, 0, 0).addScaledVector(n, -n.x).normalize(), z = _v5.crossVectors(x, n);
+      book.quaternion.setFromRotationMatrix(_m.makeBasis(x, n, z));
+      book.position.copy(at).addScaledVector(n, 0.03); // (on the hand, not in it)
+    }
+    if (mala.visible) mala.quaternion.copy(mala.parent!.getWorldQuaternion(qHand).invert().multiply(this.root.getWorldQuaternion(qRoot)));
   }
 
   /** Hide name tags beyond a distance to reduce clutter. */
@@ -501,6 +530,7 @@ export class Avatar {
     // Beads / a sutra in the hands, while the arms are in their holding pose (and not reaching, carrying, hiding in sleeves)
     const held = wheeling || carrying || (this.clasp && moving) ? null : holding ? this.hold : this.anim;
     this.showProps(held);
+    this.placeProps();
     if (carrying) { // the lantern hangs straight down from the hands, however the arms are bent
       j.rHand.updateWorldMatrix(true, false);
       this.lantern!.g.quaternion.copy(j.rHand.getWorldQuaternion(qHand).invert().multiply(this.root.getWorldQuaternion(qRoot)));
