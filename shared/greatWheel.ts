@@ -2,6 +2,11 @@
 // The "openings" are only eight places round the wheel (45° apart) where a rider can stand; the wheel itself is one plain cylinder.
 // No outside dependencies.
 
+/** The great wheels (the server keeps one sim for each; their places are in the client's layout). */
+export const GW_IDS = ['west', 'east', 'north-west', 'north-east'] as const;
+export type GreatWheelId = (typeof GW_IDS)[number];
+export const isGwId = (v: unknown): v is GreatWheelId => (GW_IDS as readonly unknown[]).includes(v);
+
 /** Openings round the wheel, and stairs to the pavilion (N, E, S, W = 0, 1, 2, 3). */
 export const GW_OPENINGS = 8;
 export const GW_STAIRS = 4;

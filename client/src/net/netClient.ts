@@ -24,14 +24,16 @@ export interface NetEvents {
   seat: (seat: string, by: string | null) => void;
   seatDenied: (seat: string) => void;
   push: (wheel: string, by: string, speed: number) => void;
-  gw: (state: GreatWheelState) => void;
-  gwDo: (ev: 'board' | 'exit' | 'denied', opening: number, stair: number) => void;
+  gw: (wheel: string, state: GreatWheelState) => void;
+  gwDo: (wheel: string, ev: 'board' | 'exit' | 'denied', opening: number, stair: number) => void;
   picked: (fruit: string, by: string) => void;
   strike: (inst: string, by: string) => void;
   wishAdded: (wish: Wish) => void;
   wishRemoved: (id: string) => void;
   blessing: (id: string, by: string | null, spot: number, prayers?: number) => void;
   wishDenied: (reason: WishDenyReason) => void;
+  /** A prayer flag given to Garuda, and where it will hang. */
+  flag: (line: number, slot: number, color: number, by: string) => void;
   fed: (deer: string, by: string, fruit: Fruit) => void;
   pickDenied: (fruit: string, reason: 'gone' | 'full') => void;
   offered: (hall: string, offering: Offering, by: string) => void;
@@ -122,14 +124,15 @@ export class NetClient {
       case 'seat': return this.emit('seat', msg.seat, msg.by);
       case 'seatDenied': return this.emit('seatDenied', msg.seat);
       case 'push': return this.emit('push', msg.wheel, msg.by, msg.speed);
-      case 'gw': { const { t: _t, ...st } = msg; return this.emit('gw', st); }
-      case 'gwDo': return this.emit('gwDo', msg.ev, msg.ev === 'board' ? msg.opening : -1, msg.ev === 'board' ? msg.stair : -1);
+      case 'gw': { const { t: _t, wheel, ...st } = msg; return this.emit('gw', wheel, st); }
+      case 'gwDo': return this.emit('gwDo', msg.wheel, msg.ev, msg.ev === 'board' ? msg.opening : -1, msg.ev === 'board' ? msg.stair : -1);
       case 'picked': return this.emit('picked', msg.fruit, msg.by);
       case 'strike': return this.emit('strike', msg.inst, msg.by);
       case 'wishAdded': return this.emit('wishAdded', msg.wish);
       case 'wishRemoved': return this.emit('wishRemoved', msg.id);
       case 'blessing': return this.emit('blessing', msg.id, msg.by, msg.spot, msg.prayers);
       case 'wishDenied': return this.emit('wishDenied', msg.reason);
+      case 'flag': return this.emit('flag', msg.line, msg.slot, msg.color, msg.by);
       case 'fed': return this.emit('fed', msg.deer, msg.by, msg.fruit);
       case 'pickDenied': return this.emit('pickDenied', msg.fruit, msg.reason);
       case 'offered': return this.emit('offered', msg.hall, msg.offering, msg.by);
@@ -165,16 +168,21 @@ export class NetClient {
   }
 
   /** The great prayer wheel: false when offline (the caller then runs the wheel itself). */
-  gwJoin(stair: number) {
-    return this.send({ t: 'gw', op: 'join', stair });
+  /** Give a prayer flag to Garuda (false when offline: the caller places it itself). */
+  flagHang(color: number) {
+    return this.send({ t: 'flagHang', color });
   }
 
-  gwPress() {
-    return this.send({ t: 'gw', op: 'press' });
+  gwJoin(wheel: string, stair: number) {
+    return this.send({ t: 'gw', wheel, op: 'join', stair });
   }
 
-  gwLeave() {
-    return this.send({ t: 'gw', op: 'leave' });
+  gwPress(wheel: string) {
+    return this.send({ t: 'gw', wheel, op: 'press' });
+  }
+
+  gwLeave(wheel: string) {
+    return this.send({ t: 'gw', wheel, op: 'leave' });
   }
 
   /** Already played locally; the server relays it to everyone else. */

@@ -9,11 +9,12 @@ export class Ground {
   private pads: Pad[] = [];
   private ramps: Ramp[] = [];
   private rampsX: { minZ: number; maxZ: number; x0: number; x1: number; h0: number; h1: number }[] = [];
-  private surfaces: { minX: number; maxX: number; minZ: number; maxZ: number; f: (x: number, z: number) => number | null }[] = [];
+  private surfaces: { minX: number; maxX: number; minZ: number; maxZ: number; f: (x: number, z: number) => number | null; override?: boolean }[] = [];
 
   /** Any walkable shape within a box: `f` gives the height there, or null where it has none. */
-  addSurface(minX: number, maxX: number, minZ: number, maxZ: number, f: (x: number, z: number) => number | null) {
-    this.surfaces.push({ minX, maxX, minZ, maxZ, f });
+  /** A floor given by `f` (null: none here). `override`: it replaces the ground (e.g. below it) rather than rising above it. */
+  addSurface(minX: number, maxX: number, minZ: number, maxZ: number, f: (x: number, z: number) => number | null, override = false) {
+    this.surfaces.push({ minX, maxX, minZ, maxZ, f, override });
   }
 
   addPad(minX: number, maxX: number, minZ: number, maxZ: number, h: number) {
@@ -30,6 +31,7 @@ export class Ground {
   }
 
   heightAt(x: number, z: number) {
+    for (const s of this.surfaces) if (s.override && x >= s.minX && x <= s.maxX && z >= s.minZ && z <= s.maxZ) { const v = s.f(x, z); if (v !== null) return v; }
     let h = terrainHeight(x, z);
     for (const p of this.pads) if (x >= p.minX && x <= p.maxX && z >= p.minZ && z <= p.maxZ) h = Math.max(h, p.h);
     for (const r of this.ramps) {
@@ -46,7 +48,7 @@ export class Ground {
     for (const s of this.surfaces) {
       if (x < s.minX || x > s.maxX || z < s.minZ || z > s.maxZ) continue;
       const v = s.f(x, z);
-      if (v !== null) h = Math.max(h, v);
+      if (v !== null && !s.override) h = Math.max(h, v);
     }
     return h;
   }

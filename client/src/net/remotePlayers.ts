@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { LightTrail } from '../world/lightTrail';
-import { ANIMS, FLAG_CLOUD, FLAG_GLOW_SHIFT, FLAG_TRAIL_SHIFT, FLAG_WHEEL, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LANTERN, FLAG_LISTENING, type PlayerInfo, type Transform } from '../../../shared/protocol';
+import { ANIMS, FLAG_CIRCLE, FLAG_CLOUD, FLAG_GLOW_SHIFT, FLAG_TRAIL_SHIFT, FLAG_WHEEL, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LANTERN, FLAG_LISTENING, type PlayerInfo, type Transform } from '../../../shared/protocol';
 import { BLESS_GLOW } from '../activities/lanternBlessing';
 import { damp, dampAngle } from '../core/math';
 import { Avatar } from '../player/avatar';
@@ -12,6 +12,7 @@ interface Remote {
   yaw: number;
   speed: number;
   trail?: LightTrail;
+  circling?: boolean;
 }
 
 /** Other players: smooth toward the latest snapshot. */
@@ -80,6 +81,7 @@ export class RemotePlayers {
       r.avatar.setIncense(flags & FLAG_INCENSE ? (flags & FLAG_INCENSE_LIT ? 2 : 1) : 0);
       r.avatar.setCloud((flags & FLAG_CLOUD) !== 0);
       r.avatar.wheelArm = (flags & FLAG_WHEEL) !== 0;
+      r.circling = (flags & FLAG_CIRCLE) !== 0;
       r.avatar.holdLantern(flags & FLAG_LANTERN ? (this.lanternOf(id) ?? 0xffc46a) : null, 1 + ((flags >> FLAG_GLOW_SHIFT) & 3) * ((BLESS_GLOW - 1) / 3), undefined, flags & FLAG_LANTERN ? this.lampKindOf(id) : 'lantern');
       const trail = (flags >> FLAG_TRAIL_SHIFT) & 7; // their trail of light from walking round the stupa
       if (trail && !r.trail) r.trail = new LightTrail(this.scene);
@@ -88,6 +90,11 @@ export class RemotePlayers {
       r.avatar.setTagVisible(camera.position.distanceTo(p) < 28);
       r.avatar.update(dt, r.speed);
     }
+  }
+
+  /** Where the people circling the great stupa on autopilot are. */
+  circlers() {
+    return [...this.map.values()].filter((r) => r.circling).map((r) => r.avatar.root.position);
   }
 
   positions() {

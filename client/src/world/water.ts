@@ -87,7 +87,7 @@ export function buildPond(ctx: WorldContext) {
   const haloPos: number[] = [], haloCol: number[] = [];
   for (let i = 0; i < flowerCount; i++) {
     const p = padPos[i * 2].clone().add(new THREE.Vector3(0, 0.03, 0));
-    const s = range(rng, 1.4, 2.0);
+    const s = range(rng, 2.0, 2.7);
     m.compose(p, q.setFromAxisAngle(up, rng() * 6), new THREE.Vector3(s, s, s));
     flowers.setMatrixAt(i, m);
     pods.setMatrixAt(i, m);
@@ -377,16 +377,16 @@ export function buildStream(ctx: WorldContext) {
   // Lily pads in clusters by the edges of quiet water (never in the white water), a lotus on a few.
   function lilies(S: { s: number; x: number; z: number; nx: number; nz: number; half: number; y: number; foam: number }[], L: number, end0: boolean, end1: boolean) {
     const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), step = L / (S.length - 1);
-    for (let s = end0 ? 15 : 6; s < L - (end1 ? 15 : 6); s += 5 + rng() * 7) {
+    for (let s = end0 ? 15 : 6; s < L - (end1 ? 15 : 6); s += 3 + rng() * 4.5) {
       const o = S[Math.round(s / step)];
-      if (rng() > 0.85 || o.foam > 0.02 || Math.hypot(o.x - BASIN.x, o.z - BASIN.z) > PLAY_RADIUS + 15 || bridges.some(([bx, bz]) => Math.hypot(o.x - bx, o.z - bz) < 7)) continue;
-      const side = rng() < 0.5 ? -1 : 1, n = 3 + Math.floor(rng() * 4), flower = rng() < 0.3;
+      if (rng() > 0.92 || o.foam > 0.02 || Math.hypot(o.x - BASIN.x, o.z - BASIN.z) > PLAY_RADIUS + 15 || bridges.some(([bx, bz]) => Math.hypot(o.x - bx, o.z - bz) < 7)) continue;
+      const side = rng() < 0.5 ? -1 : 1, n = 3 + Math.floor(rng() * 4), flowers = rng() < 0.7 ? 1 + Math.floor(rng() * 2) : 0;
       for (let k = 0; k < n; k++) {
-        const d = side * o.half * (0.4 + rng() * 0.45), along = (rng() - 0.5) * 2.2, sc = 0.7 + rng() * 0.55;
+        const d = side * o.half * (0.4 + rng() * 0.45), along = (rng() - 0.5) * 2.2, sc = 0.9 + rng() * 0.6;
         const p = new THREE.Vector3(o.x + o.nx * d - o.nz * along, o.y + 0.04, o.z + o.nz * d + o.nx * along); // (clear of the water's surface)
         lilyPads.push(new THREE.Matrix4().compose(p, q.setFromAxisAngle(up, rng() * 6), new THREE.Vector3(sc, 1, sc)));
-        if (flower && k === 0) {
-          const fs = 1.2 + rng() * 0.4;
+        if (k < flowers) {
+          const fs = 1.9 + rng() * 0.6;
           lotuses.push({ m: new THREE.Matrix4().compose(p.clone().setY(p.y + 0.02), q.setFromAxisAngle(up, rng() * 6), new THREE.Vector3(fs, fs, fs)), c: rng() < 0.65 ? lotusKit().pink : lotusKit().white, p });
         }
       }

@@ -434,7 +434,7 @@ function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: numb
   for (let r = 0; r < rows; r++)
     for (let side = -1; side <= 1; side += 2)
       for (let c = 0; c < cols; c++, i++) {
-        const x = hx + side * xs[c], z = startZ + r * sz;
+        const x = hx + side * xs[c], z = startZ + 0.46 + r * sz; // (half a yard back from the altar: room to lie flat in 大禮拜)
         body.setMatrixAt(i, m.makeTranslation(x, y, z));
         top.setMatrixAt(i, m.makeTranslation(x, y + 0.222, z));
         const id = `${def.id}-c${i}`;

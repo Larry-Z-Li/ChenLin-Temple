@@ -25,19 +25,19 @@ const SEAT_KINDS: Record<Seat['kind'], { focuses: Focus[]; anim: Record<Focus, A
 };
 
 /**
- * One full prostration: stand, palms together at the crown, mouth and heart, kneel upright,
- * forehead to the floor with palms down beside the head, turn the palms up, rise.
- * Done three times; after the third the practitioner stays kneeling.
+ * One full prostration (大禮拜): palms joined at the heart, raised to the crown, the forehead, the mouth, back to the heart;
+ * kneel, lie full length face down with the arms stretched ahead, bend the arms back to join the palms above the head,
+ * push up to kneeling, stand. Done three times; seated, the practitioner then sits again.
  */
 const PROSTRATION: [Anim, number][] = [
-  ['idle', 1.0], ['pCrown', 1.0], ['pMouth', 0.8], ['pHeart', 0.9],
-  ['pKneelUp', 1.1], ['pDown', 1.8], ['pUp', 1.3], ['pKneelUp', 1.0],
+  ['pHeart', 1.0], ['pCrown', 1.0], ['pForehead', 1.0], ['pMouth', 1.0], ['pHeart', 1.0],
+  ['pKneelUp', 1.4], ['pFlat', 2.2], ['pFlatHands', 1.8], ['pPush', 1.3], ['pRise', 1.3], ['pKneelUp', 1.4], ['idle', 1.2],
 ];
 const PROSTRATION_REPS = 3;
 
 /** On your feet with beads or a sutra (no seat): you can walk with them; press it again or Esc to put them away. */
 const STANDING = {
-  focuses: ['beads', 'sutra'] as Focus[],
+  focuses: ['beads', 'sutra', 'prostrate'] as Focus[],
   anim: { none: 'idle', beads: 'standBeads', sutra: 'standRead', prostrate: 'idle' } as Record<Focus, Anim>,
   readBeads: 'standReadBeads' as Anim,
   bow: 'bow' as Anim,
@@ -64,6 +64,8 @@ export class SeatSession {
   private beads = false;
   private reading = false;
   private standing = false;
+  /** Prostrating on your feet (held in place for them). */
+  private standProst = false;
   private pending: string | null = null;
   private prost: { rep: number; step: number; t: number } | null = null;
   private bowLeft = 0;
@@ -106,13 +108,20 @@ export class SeatSession {
     return this.standing ? STANDING : SEAT_KINDS[this.seat?.kind ?? 'cushion'];
   }
 
-  /** Beads or a sutra on your feet: stay where you are; the same button again stops. Seated, it's the seat's. */
-  standAction(f: 'beads' | 'sutra') {
+  /**
+   * Beads or a sutra on your feet: stay where you are; the same button again stops. Prostrations (大禮拜) on your feet:
+   * made right where you stand, held in place till they're done (or stopped). Seated, it's the seat's.
+   */
+  standAction(f: 'beads' | 'sutra' | 'prostrate') {
     if (this.seat) return this.setFocus(f);
     const { player } = this.d;
     if (!this.standing) {
       if (player.mode !== 'free') return;
       this.standing = true;
+    }
+    if (f === 'prostrate' && this.focus !== 'prostrate') {
+      player.anchor(player.pos.x, player.pos.y, player.pos.z, player.yaw, 'ritual', 'idle');
+      this.standProst = true;
     }
     this.setFocus(f);
   }
@@ -198,6 +207,7 @@ export class SeatSession {
     else if (!prostrate) hud.setInfo(null);
     hud.setSeatState([this.beads && 'beads', this.reading && 'sutra', prostrate && 'prostrate'].filter(Boolean) as Focus[]);
     if (this.standing) { // free to walk: just what's in hand, and ← → for the beads
+      if (this.standProst && !prostrate) (this.standProst = false), player.release(); // (prostrations done or stopped: on your way)
       if (this.focus === 'none') this.standing = false;
       player.holdAnim = this.standing ? this.pose() : null;
       player.arrowsForBeads = this.standing && this.beads;

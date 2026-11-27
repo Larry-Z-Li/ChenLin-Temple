@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, FLAG_TRAIL_SHIFT, FLAG_WHEEL, SNAPSHOT_HZ } from '../../shared/protocol';
+import { FLAG_CIRCLE, FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, FLAG_TRAIL_SHIFT, FLAG_WHEEL, SNAPSHOT_HZ } from '../../shared/protocol';
 import { Circumambulation } from './activities/circumambulation';
+import { CircleWalk } from './activities/circleWalk';
 import { LightTrail } from './world/lightTrail';
 import { ChantPanel } from './activities/chantPanel';
 import { Mala } from './activities/beads';
@@ -26,12 +27,15 @@ import { buildHuts } from './buildings/hut';
 import { buildPagodas } from './buildings/pagodas';
 import { buildMapBoard } from './buildings/mapBoard';
 import { PrayerWheels } from './buildings/prayerWheels';
-import { GreatWheel } from './buildings/greatWheel';
+import { GreatWheels } from './buildings/greatWheel';
 import { buildStupas } from './buildings/stupas';
-import { BASIN, BODHI_TREE, CHERRY_GROVE, HALLS, hallHalf, PLAZA, SPAWN, TRAVEL_SPOTS } from './config/layout';
+import { BASIN, BODHI_TREE, CHERRY_GROVE, GREAT_STUPA, HALLS, hallHalf, PAGODAS, PLAZA, SPAWN, TRAVEL_SPOTS } from './config/layout';
 import { graphicsLevel, isTouchDevice, saveSettings, settings } from './config/settings';
 import { loadModelMap, loadThangkas } from './content/manifest';
 import { buildModelGallery } from './world/modelGallery';
+import { buildCourtLights } from './world/courtLights';
+import { buildFlagRing } from './world/flagRing';
+import { GarudaFlags } from './activities/garudaFlags';
 import { CollisionWorld } from './core/collisions';
 import type { WorldContext } from './core/context';
 import { Ground } from './core/ground';
@@ -55,7 +59,7 @@ import { buildSky, setDebugHours, setTempleTimeZone } from './world/sky';
 import { buildTerrain } from './world/terrain';
 import { farCulled, updateFarCull } from './core/farCull';
 import { mergeRigid, mergeStatic } from './core/staticMerge';
-import { assignInteriors, interiorLayer, updateInteriors } from './core/interiorCull';
+import { assignInteriors, hallAt, interiorLayer, updateInteriors } from './core/interiorCull';
 import { buildSandGarden } from './world/sandGarden';
 import { buildVegetation } from './world/vegetation';
 import { Wildlife } from './world/wildlife';
@@ -86,6 +90,10 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   // Near plane at 0.15 m (the rig keeps 0.3 m from walls and 0.4 m from your head): three times the depth
   // precision of 0.05, so thin layers (rugs, frames, plaques) don't flicker against what they lie on.
   const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.15, 3000);
+  // (the start screen looks at everything from far off: a farther near plane there, for the depth to be sharp enough
+  // that the halls' foundations don't flicker against the ground; back to 0.15 m once you're in)
+  camera.near = 1.5;
+  camera.updateProjectionMatrix();
   scene.add(camera); // camera children (prayer beads) need to be in the scene graph
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -127,9 +135,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   buildRiverColliders(ctx);
   const stupas = buildStupas(ctx);
   buildPrayerFlags(ctx, stupas);
+  const flagRing = buildFlagRing(ctx); // (the ring of lines round the temples Garuda hangs flags on)
   staticBuild(() => buildDecorations(ctx, stupas));
   staticBuild(() => buildLanterns(ctx));
   staticBuild(() => buildGardens(ctx, models));
+  buildCourtLights(ctx); // (the stupa court's ground lights: on its paving, which the gardens lay)
   const ridge = staticBuild(() => buildRidgePath(ctx));
   staticBuild(() => buildPagodas(ctx));
   staticBuild(() => buildHuts(ctx));
@@ -194,12 +204,13 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const hud: Hud = new Hud(uiEl, {
     onMusic: (on) => ambient.setOn(on),
     onSeatAction: (a) => seat.action(a),
-    onStandAction: (a) => phase === 'play' && !landing && !cloud.riding && !bodhiBell.active && seat.standAction(a),
+    onStandAction: (a) => phase === 'play' && !circle.active && !landing && !cloud.riding && !bodhiBell.active && seat.standAction(a),
     onChants: () => chantPanel.show(!chantPanel.isOpen),
-    onFastTravel: () => (insideHall() ? hud.toast(t('travel.inside')) : (seat.endStanding(), bigMap.toggle(true))),
+    onFastTravel: () => (insideHall() ? hud.toast(t('travel.inside')) : (circle.stop(), seat.endStanding(), bigMap.toggle(true))),
     onMap: () => bigMap.toggle(),
-    onPrompt: () => (gw.controlling ? gw.pressE() : !seat.seated && ctx.interactions.trigger()),
-    onWheelOff: () => gw.getOff(),
+    onPrompt: () => (circle.active ? circle.pressE() : gw.controlling ? gw.pressE() : !seat.seated && ctx.interactions.trigger()),
+    onWheelOff: () => (circle.active ? circle.stop() : gw.getOff()),
+    onCircle: () => startCircle(),
     onBow: () => bow(),
     onBeadStep: (dir) => mala.step(dir),
     onGraphics: () => applyGraphics(),
@@ -237,7 +248,12 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   // echoes everyone's pushes with the authoritative speed.
   const wheels = new PrayerWheels(ctx, (w) => net.pushWheel(w.id));
   // The great prayer wheel (大轉經輪): queue at a stair, ride an opening round, E to get off. The server turns it.
-  const gw = new GreatWheel(ctx, net, player, rig);
+  const gw = new GreatWheels(ctx, net, player, rig);
+  gw.onPress = () => hud.bumpMash(); // (the mash button bounces with each press)
+  const garudaFlags = new GarudaFlags(ctx, net, player, hud, flagRing);
+  garudaFlags.onHung = () => addMerit(10);
+  net.on('welcome', (msg) => msg.flags?.forEach(([line, slot, color]) => flagRing.hang(line, slot, color)));
+  gw.onSpin = () => addMerit(10); // 功德 for every full turn of the great wheel you help turn
   net.on('push', (id, by, speed) => wheels.setSpeed(id, speed, false, by === net.id ? 'self' : by)); // whoever pushed last owns its turns
   // 功德: 1 for every 5 turns of a wheel you set going; incense 10, a fruit offered 1, a deer fed 1,
   // a great prostration (大禮拜) 10, hanging a lantern 100, praying for one 20
@@ -250,8 +266,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   let wheelTurns = 0;
   // 繞塔: each clockwise lap of the stupa inside its walls, 10; from the first lap on, a trail of light
   const circ = new Circumambulation();
-  circ.onLap = (n) => {
-    addMerit(20);
+  circ.onLap = (n, auto) => {
+    if (auto) addMerit(20); // (only a lap walked on autopilot earns merit; on foot, just the trail of light)
     hud.toast(t('circ.lap', { n }));
   };
   const myTrail = new LightTrail(scene);
@@ -268,7 +284,34 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   });
 
   const seat: SeatSession = new SeatSession({ ctx, net, player, rig, hud, mala, sutra });
-  seat.onProstration = () => addMerit(10);
+  // 大禮拜 earns 功德 only toward the holy: facing (within 30°) a buddha's or bodhisattva's statue in the hall you're in,
+  // or out of doors within a little way of one, of the great stupa or of a pagoda
+  let holy: { x: number; z: number; hall: number; reach: number }[] | null = null;
+  const facingHoly = () => {
+    if (!holy) {
+      holy = [];
+      const v = new THREE.Vector3();
+      scene.traverse((o) => { if (o.name.startsWith('statue-')) { o.getWorldPosition(v); holy!.push({ x: v.x, z: v.z, hall: hallAt(v.x, v.z), reach: 18 }); } });
+      holy.push({ x: GREAT_STUPA.x, z: GREAT_STUPA.z, hall: 0, reach: 40 });
+      for (const pg of PAGODAS) holy.push({ x: pg.x, z: pg.z, hall: 0, reach: 22 });
+    }
+    const p = player.pos, fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), here = hallAt(p.x, p.z);
+    return holy.some((h) => {
+      const dx = h.x - p.x, dz = h.z - p.z, d = Math.hypot(dx, dz);
+      if (d < 0.3 || (h.hall ? h.hall !== here : d > h.reach)) return false;
+      return (dx * fx + dz * fz) / d > Math.cos(Math.PI / 6);
+    });
+  };
+  seat.onProstration = () => (facingHoly() ? addMerit(5) : hud.toast(t('prostrate.faceHoly')));
+  gw.onJoin = () => seat.endStanding(); // on the great wheel, everything is put away
+  // 繞塔 on autopilot (Q in the court; E mashes for pace; Q again or walking by hand ends it)
+  const circle = new CircleWalk(ctx, player, rig, () => remotes.circlers());
+  circle.onStart = () => seat.endStanding();
+  circle.onPress = () => hud.bumpMash();
+  const startCircle = () => {
+    if (phase !== 'play' || landing || bodhiBell.active || cloud.riding || gw.controlling || seat.seated || offerings.busy || blessing.active) return;
+    circle.canStart && circle.start();
+  };
   sutra.onClose = () => seat.setFocus('sutra'); // the reader's ✕: put the sutra away (seated or standing; beads stay)
   const offerings = new Offerings(ctx, net, hud, orchard, player);
   offerings.onOffered = (kind) => addMerit(kind === 'incense' ? 5 : 1); // a fruit: 1 each
@@ -337,10 +380,12 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   input.onKey((e) => {
     if (phase !== 'play' || landing || bodhiBell.active) return false; // the entry screen, the flight down, the bell
     if (e.code === 'KeyE') {
-      if (!e.repeat) gw.controlling ? gw.pressE() : ctx.interactions.trigger(); // each tap counts; holding doesn't auto-push
+      if (!e.repeat) circle.active ? circle.pressE() : gw.controlling ? gw.pressE() : ctx.interactions.trigger(); // each tap counts; holding doesn't auto-push
       return true;
     }
+    if (e.code === 'KeyQ' && circle.active) return !e.repeat && circle.stop(), true;
     if (e.code === 'KeyQ' && gw.controlling) return !e.repeat && gw.getOff(), true;
+    if (e.code === 'KeyQ' && !player.flying && circle.canStart) return !e.repeat && startCircle(), true;
     if (e.code === 'KeyB') return !e.repeat && bow(), true;
     // Standing: 2 beads, 3 sutra (seated, the seat bar handles the number keys).
     // Dev preview only: F toggles flying (never in the live build).
@@ -433,15 +478,24 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     lights.update(dt, player.pos);
     updateFarCull(dt, camera.position, graphicsLevel() === 'low' ? 1 : 2);
     updateInteriors(camera, graphicsLevel() === 'low' ? 1 : 2);
-    if (!bodhiBell.active && !gw.controlling) player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground); // stand still while the bell rings
+    if (cloud.riding || bodhiBell.active || gw.controlling || seat.seated) circle.stop();
+    circle.update(dt, input);
+    if (!bodhiBell.active && !gw.controlling && !circle.active && !garudaFlags.active) player.update(dt, input, rig.yaw, ctx.collisions, ctx.ground); // stand still while the bell rings
     if (devXYZ) devXYZ.textContent = `x ${player.pos.x.toFixed(1)}  y ${player.pos.y.toFixed(1)}  z ${player.pos.z.toFixed(1)}`;
 
-    document.body.classList.toggle('cinematic', bodhiBell.active); // the bell's camera: bottom buttons out of the way
-    hud.setWheelOff(gw.canLeave);
-    if (bodhiBell.active) hud.setPrompt(null);
-    else if (gw.controlling) {
+    document.body.classList.toggle('cinematic', bodhiBell.active || garudaFlags.active); // the bell's camera: bottom buttons out of the way
+    hud.setWheelOff(gw.canLeave || circle.active, circle.active ? 'prompt.circleOff' : 'prompt.gwOff');
+    hud.setCircleHint(phase === 'play' && !landing && !circle.active && !gw.controlling && !seat.seated && !cloud.riding && !bodhiBell.active && !offerings.busy && !blessing.active && circle.canStart);
+    garudaFlags.update(dt);
+    if (bodhiBell.active || garudaFlags.active) hud.setPrompt(null);
+    else if (circle.active) {
+      const p = circle.prompt();
+      hud.setPrompt(p.text, p.busy, true);
+      hud.setMash(circle.mashLevel);
+    } else if (gw.controlling) {
       const p = gw.prompt();
-      hud.setPrompt(p?.text ?? null, p?.busy);
+      hud.setPrompt(p?.text ?? null, p?.busy, p?.mash);
+      if (p?.mash) hud.setMash(gw.mashLevel);
     }
     else if (!seat.seated && !cloud.riding && !offerings.busy && !blessing.active) {
       const it = ctx.interactions.update(player.pos.x, player.pos.z);
@@ -463,19 +517,20 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     ambient.update(dt);
     chants.update(dt);
     soundscape.update(dt, player.pos, rig.yaw, player.mode === 'free' ? player.avatar.steps : -1);
-    if (player.mode === 'free' && !cloud.riding) circ.update(dt, player.pos.x, player.pos.z);
+    if (player.mode === 'free' && !cloud.riding) circ.update(dt, player.pos.x, player.pos.z, circle.active);
     myTrail.update(dt, player.pos, circ.strength);
     player.avatar.setGlow(myTrail.glow * 0.8);
 
     rig.update(dt, player.pos, seat.seated ? 1.0 : 1.55, ctx.cameraBlockers, ctx.ground);
     bodhiBell.applyCamera(camera);
+    garudaFlags.applyCamera(camera, dt); // (Garuda's cinematic, when one is running)
     sky.update(dt);
     sky.follow(player.pos, camera.getWorldDirection(lookDir));
 
     sendAcc += dt;
     if (sendAcc >= 1 / SNAPSHOT_HZ) {
       sendAcc = 0;
-      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0) | (cloud.riding ? FLAG_CLOUD : 0) | (gw.turning ? FLAG_WHEEL : 0) | blessing.flags | (circ.strength << FLAG_TRAIL_SHIFT);
+      const flags = (chants.playing ? FLAG_LISTENING : 0) | (offerings.incense ? FLAG_INCENSE : 0) | (offerings.incense === 2 ? FLAG_INCENSE_LIT : 0) | (cloud.riding ? FLAG_CLOUD : 0) | (gw.turning ? FLAG_WHEEL : 0) | (circle.active ? FLAG_CIRCLE : 0) | blessing.flags | (circ.strength << FLAG_TRAIL_SHIFT);
       const tr = player.transform(flags), key = tr.join(',');
       if (key !== lastSent && net.sendMove(tr)) lastSent = key; // (not before the server's welcome: it would be lost)
     }
@@ -518,6 +573,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     /** Enter: fly the monk down from the mountain to the gate (or a hall) by cloud, then go online. */
     enter(name: string, color: string, hallId?: string) {
       unlockAudio();
+      camera.near = 0.15;
+      camera.updateProjectionMatrix();
       ambient.setOn(settings.musicOn);
       player.avatar.setColor(color);
       player.avatar.clasp = false;
@@ -528,8 +585,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       const test = name.trim().toLowerCase(); // the test names (see makeXYZ)
       tester = test === 'flytest' ? 'fly' : test === 'model' ? 'model' : null;
       if (tester) devXYZ ??= makeXYZ();
-      if (tester === 'model') { // straight to the model gallery, high over the valley
-        const at = buildModelGallery(ctx, models, () => player.pos.y > 200);
+      if (tester === 'model') { // straight to the model gallery, deep under the valley
+        const at = buildModelGallery(ctx, models, () => player.pos.y < -200);
         player.pos.set(at.x, at.y, at.z);
         player.yaw = at.yaw;
         rig.lookAlong(at.yaw, 0.12, 6);

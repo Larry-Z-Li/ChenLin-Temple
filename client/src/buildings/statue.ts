@@ -4,6 +4,7 @@ import { DEITIES, type DeityId } from '../config/deities';
 import { THEME } from '../config/theme';
 import { assetUrl } from '../content/manifest';
 import { box, mat } from './materials';
+import { interiorLayer } from '../core/interiorCull';
 
 const loader = new GLTFLoader();
 
@@ -39,7 +40,8 @@ export function buildStatueSlot(id: DeityId, x: number, y: number, z: number, mo
           if ((o as THREE.Mesh).isMesh) o.castShadow = o.receiveShadow = true;
         });
         g.add(model);
-        if (haloFile) addHalo(g, model, haloFile);
+        toHallLayer(model);
+        if (haloFile) addHalo(g, model, haloFile, HALO_NUDGE[id]);
       },
       undefined,
       (err) => console.warn(`[statue] could not load ${modelFile}`, err),
@@ -50,9 +52,12 @@ export function buildStatueSlot(id: DeityId, x: number, y: number, z: number, mo
 
 /**
  * A halo (its own model, a disc facing +Z) hung behind the statue's head: the head found as the highest point near the
- * statue's centre line (so a staff held out to one side doesn't count), the halo about a third the statue's height.
+ * statue's centre line (so a staff held out to one side doesn't count), the halo centred near the top of the head and
+ * almost half the statue's height across.
  */
-function addHalo(g: THREE.Group, model: THREE.Object3D, haloFile: string) {
+/** Small per-statue shifts to a halo (m, in the statue's own frame: +x is its left, +y up, +z toward you). */
+const HALO_NUDGE: Partial<Record<DeityId, [number, number, number]>> = { ksitigarbha: [0.076, 0.076, 0] }; // (3 inches to his left, 3 up)
+function addHalo(g: THREE.Group, model: THREE.Object3D, haloFile: string, nudge: [number, number, number] = [0, 0, 0]) {
   g.updateMatrixWorld(true);
   const toG = new THREE.Matrix4(), inv = g.matrixWorld.clone().invert(), v = new THREE.Vector3(), pts: THREE.Vector3[] = [];
   const box = new THREE.Box3();
@@ -72,15 +77,25 @@ function addHalo(g: THREE.Group, model: THREE.Object3D, haloFile: string) {
     assetUrl('models', haloFile),
     (gltf) => {
       const halo = gltf.scene, hb = new THREE.Box3().setFromObject(halo), hs = hb.getSize(new THREE.Vector3());
-      const k = (0.34 * H) / Math.max(hs.y, 1e-3);
+      const k = (0.44 * H) / Math.max(hs.y, 1e-3);
       halo.scale.setScalar(k);
       hb.setFromObject(halo);
       const hc = hb.getCenter(new THREE.Vector3());
-      halo.position.set(cx - hc.x, top - 0.08 * H - hc.y, back - 0.02 * H - hb.max.z);
+      halo.position.set(cx - hc.x + nudge[0], top - 0.02 * H - hc.y + nudge[1], back - 0.02 * H - hb.max.z + nudge[2]);
       halo.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = o.receiveShadow = true; });
       g.add(halo);
+      toHallLayer(halo);
     },
     undefined,
     (err) => console.warn(`[statue] could not load ${haloFile}`, err),
   );
+}
+
+/**
+ * A model that arrives after the world was built: onto the render layer of the hall it stands in (if any), like the
+ * rest of that hall's inside, so it is only drawn when you're near or in the hall (see core/interiorCull).
+ */
+function toHallLayer(o: THREE.Object3D) {
+  o.updateWorldMatrix(true, true);
+  o.traverse((c) => { const k = interiorLayer(c); if (k) c.layers.set(k); });
 }

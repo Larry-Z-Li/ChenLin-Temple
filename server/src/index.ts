@@ -41,7 +41,8 @@ import {
   type ServerMsg,
   type Transform,
 } from '../../shared/protocol';
-import { GW_MAX_PRESS_HZ, GreatWheelSim } from '../../shared/greatWheel';
+import { GW_IDS, GW_MAX_PRESS_HZ, GreatWheelSim, isGwId, type GreatWheelState } from '../../shared/greatWheel';
+import { FLAG_COLOURS, FLAG_LINES_N, FLAG_ORDER, flagSlots } from '../../shared/flagRing';
 import { isBlocked } from '../../shared/moderation';
 import { openStore } from './store';
 
@@ -152,6 +153,7 @@ interface Client {
   lastGwPress: number;
   lastOffer: number;
   lastStrike: number;
+  lastFlag: number;
   lastWish: number;
   lastFeed: number;
   /** Fruit this person picked and hasn't offered yet (server-authoritative). */
@@ -236,6 +238,34 @@ function pruneWishes(now = Date.now()) {
 }
 setInterval(pruneWishes, 10 * 60 * 1000);
 
+// ---------- Prayer flags, hung by Garuda on the ring of lines round the temples (kept in the store like the lanterns).
+// Only each flag's colour and place are kept: what its giver wrote on it stays with them. ----------
+const hungFlags: [number, number, number][] = []; // [line, slot, colour]
+const flagsOn = new Array<number>(FLAG_LINES_N).fill(0), flagTaken = new Set<string>();
+let flagsLoaded = false;
+try {
+  for (const f of JSON.parse((await store.load('flags.json')) ?? '[]') as [number, number, number][]) {
+    if (!Array.isArray(f) || f[0] >= FLAG_LINES_N || f[1] >= flagSlots(f[0]) || flagTaken.has(`${f[0]}:${f[1]}`)) continue; // (a line made shorter by a moved pole drops its extras)
+    hungFlags.push(f), flagTaken.add(`${f[0]}:${f[1]}`), flagsOn[f[0]]++;
+  }
+  flagsLoaded = true;
+  console.log(`Loaded ${hungFlags.length} prayer flags`);
+} catch (e) {
+  console.warn('[flags] load failed: new ones will not be saved', (e as Error).message);
+}
+let flagSaveTimer: NodeJS.Timeout | null = null;
+function saveFlags() {
+  if (!flagsLoaded) return;
+  flagSaveTimer ??= setTimeout(() => {
+    flagSaveTimer = null;
+    store.save('flags.json', JSON.stringify(hungFlags)).catch((e) => console.warn('[flags] save failed', (e as Error).message));
+  }, 2000);
+}
+/** Where the next flag goes: a line chosen at random among those with room (so they scatter round the ring), filled from its middle out. */
+function freeFlagSlot(): [number, number] | null {
+  return FLAG_ORDER.find(([line, slot]) => !flagTaken.has(`${line}:${slot}`)) ?? null; // (nearest the table hut first, then further)
+}
+
 /** The salt that keeps the address hashes from being reversed; kept beside the lanterns so limits survive restarts. */
 const SALT = await (async () => {
   try {
@@ -313,27 +343,37 @@ function broadcast(msg: ServerMsg, except?: string) {
   }
 }
 
-/** The great prayer wheel: the server turns it and decides who is in which opening; clients only draw it and walk their own person. */
-const greatWheel = new GreatWheelSim({
-  board: (id, opening, stair) => {
-    const c = clients.get(id);
-    if (c) send(c, { t: 'gwDo', ev: 'board', opening, stair });
-  },
-  exit: (id) => {
-    const c = clients.get(id);
-    if (c) send(c, { t: 'gwDo', ev: 'exit' });
-  },
-});
-let gwSent = -1, gwSentAt = 0, gwLast = Date.now();
+/** The great prayer wheels: the server turns each (its own riders, queues, speed) and decides who is in which opening; clients only draw them and walk their own person. */
+const greatWheels = new Map(GW_IDS.map((wheel) => [wheel, {
+  sim: new GreatWheelSim({
+    board: (id, opening, stair) => {
+      const c = clients.get(id);
+      if (c) send(c, { t: 'gwDo', wheel, ev: 'board', opening, stair });
+    },
+    exit: (id) => {
+      const c = clients.get(id);
+      if (c) send(c, { t: 'gwDo', wheel, ev: 'exit' });
+    },
+  }),
+  sent: -1,
+  sentAt: 0,
+}]));
+/** The wheel a person is on or queued at (one at a time). */
+const wheelOf = (id: string) => [...greatWheels.values()].find((w) => w.sim.has(id));
+const greatWheelStates = () => Object.fromEntries([...greatWheels].map(([id, w]) => [id, w.sim.state()])) as Record<string, GreatWheelState>;
+let gwLast = Date.now();
 setInterval(() => {
   const now = Date.now();
-  greatWheel.step(Math.min(0.25, (now - gwLast) / 1000));
+  const dt = Math.min(0.25, (now - gwLast) / 1000);
   gwLast = now;
-  // on every change, and ten times a second while it turns (clients carry the angle on between, and correct themselves)
-  if (greatWheel.version !== gwSent || (greatWheel.moving && now - gwSentAt > 100)) {
-    gwSent = greatWheel.version;
-    gwSentAt = now;
-    broadcast({ t: 'gw', ...greatWheel.state() });
+  for (const [wheel, w] of greatWheels) {
+    w.sim.step(dt);
+    // on every change, and ten times a second while it turns (clients carry the angle on between, and correct themselves)
+    if (w.sim.version !== w.sent || (w.sim.moving && now - w.sentAt > 100)) {
+      w.sent = w.sim.version;
+      w.sentAt = now;
+      broadcast({ t: 'gw', wheel, ...w.sim.state() });
+    }
   }
 }, 50);
 
@@ -371,11 +411,12 @@ function handle(c: Client, msg: ClientMsg) {
       players: others,
       seats: Object.fromEntries(seats),
       wheels: turningWheels(now),
-      gw: greatWheel.state(),
+      gw: greatWheelStates(),
       picked: pickedAgo,
       offerings: liveOfferings(now),
       wishes: [...wishes.values()].map(pub),
       blessings: Object.fromEntries([...blessings].map(([id, b]) => [id, { by: b.by, spot: b.spot }])),
+      flags: hungFlags,
     });
     return; // others hear of them with their first position (see 'move')
   }
@@ -414,14 +455,16 @@ function handle(c: Client, msg: ClientMsg) {
       break;
     }
     case 'gw': {
+      if (!isGwId(msg.wheel)) return;
+      const w = greatWheels.get(msg.wheel)!;
       if (msg.op === 'join') {
-        if (!c.placed || !greatWheel.join(c.id, msg.stair)) send(c, { t: 'gwDo', ev: 'denied' });
-      } else if (msg.op === 'leave') greatWheel.leave(c.id);
+        if (!c.placed || wheelOf(c.id) || !w.sim.join(c.id, msg.stair)) send(c, { t: 'gwDo', wheel: msg.wheel, ev: 'denied' });
+      } else if (msg.op === 'leave') w.sim.leave(c.id);
       else if (msg.op === 'press') {
-        const now = Date.now();
+        const now = Date.now(); // (the limit is per person, across wheels)
         if (now - c.lastGwPress >= 1000 / GW_MAX_PRESS_HZ - 2) {
           c.lastGwPress = now;
-          greatWheel.press(c.id);
+          w.sim.press(c.id);
         }
       }
       break;
@@ -432,6 +475,17 @@ function handle(c: Client, msg: ClientMsg) {
       if (now - c.lastStrike < 300) return;
       c.lastStrike = now;
       broadcast({ t: 'strike', inst: msg.inst, by: c.id }, c.id);
+      break;
+    }
+    case 'flagHang': {
+      const now = Date.now();
+      if (!Number.isInteger(msg.color) || msg.color < 0 || msg.color >= FLAG_COLOURS.length || now - c.lastFlag < 20000) return;
+      const at = freeFlagSlot();
+      if (!at) return;
+      c.lastFlag = now;
+      hungFlags.push([at[0], at[1], msg.color]), flagTaken.add(`${at[0]}:${at[1]}`), flagsOn[at[0]]++;
+      saveFlags();
+      broadcast({ t: 'flag', line: at[0], slot: at[1], color: msg.color, by: c.id });
       break;
     }
     case 'wish': {
@@ -578,6 +632,7 @@ wss.on('connection', (ws, req) => {
     lastGwPress: 0,
     lastOffer: 0,
     lastStrike: 0,
+    lastFlag: 0,
     lastWish: 0,
     lastFeed: 0,
     inventory: {},
@@ -610,7 +665,7 @@ wss.on('connection', (ws, req) => {
     if (n > 0) connsByIp.set(c.ip, n);
     else connsByIp.delete(c.ip);
     releaseSeat(c);
-    greatWheel.remove(c.id);
+    for (const w of greatWheels.values()) w.sim.remove(c.id);
     clients.delete(c.id);
     if (c.info && c.placed) broadcast({ t: 'leave', id: c.id });
   });

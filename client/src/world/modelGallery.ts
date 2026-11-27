@@ -7,8 +7,8 @@ import { t } from '../i18n';
 import { buildGaruda } from './garuda';
 import { addLamp } from './lightPool';
 
-/** Where the gallery floats: high over the valley (built only on the screen of whoever asks for it). */
-const G = { x: BASIN.x, y: 300, z: BASIN.z };
+/** Where the gallery is: deep under the valley, out of everyone's sight (built only on the screen of whoever asks for it). */
+const G = { x: BASIN.x, y: -300, z: BASIN.z };
 
 /**
  * A test gallery of the models (entered with the name "model"): a walled platform high in the sky with every deity's
@@ -31,7 +31,7 @@ export function buildModelGallery(ctx: WorldContext, models: Record<string, stri
     ctx.collisions.addBoxCentered(G.x + x, G.z + z, w + 0.3, d + 0.3, true);
   }
   // (its floor only while you're up there: the valley's ground below stays as it is)
-  ctx.ground.addSurface(G.x - W / 2, G.x + W / 2, G.z - D / 2, G.z + D / 2, () => (up() ? G.y : null));
+  ctx.ground.addSurface(G.x - W / 2, G.x + W / 2, G.z - D / 2, G.z + D / 2, () => (up() ? G.y : null), true);
 
   const label = (text: string, x: number, y: number, z: number) => {
     const c = document.createElement('canvas');

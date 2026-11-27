@@ -1,4 +1,4 @@
-import { hallHalf, GREAT_WHEEL, ABBOT, BASIN, BENCHES, BODHI_BELL, BODHI_TREE, DORM, DRAGON_POOL, DRAGON_SPRING, FOOT_BRIDGES, FOOTPATHS, MAP_BOARD, PAGODAS, PICNIC_TABLES, POND_PAVILION, TABLE_HUT, STUPA_COURT, SAND_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WHEEL_ROWS, caveFallsLocal, type Rect } from '../config/layout';
+import { hallHalf, GREAT_WHEELS, ABBOT, BASIN, BENCHES, BODHI_BELL, BODHI_TREE, DORM, DRAGON_POOL, DRAGON_SPRING, FOOT_BRIDGES, FOOTPATHS, MAP_BOARD, PAGODAS, PICNIC_TABLES, POND_PAVILION, TABLE_HUT, STUPA_COURT, SAND_GARDEN, BRIDGE, FLAG_LINES, HALLS, INCENSE_BURNER, LANTERN_CANOPY, MOUNTAIN_GATE, ORCHARD, PAVED, POND, STELE, STONE_LANTERNS, WHEEL_ROWS, caveFallsLocal, type Rect } from '../config/layout';
 import { occupied } from './caveFalls';
 import { smoothstep } from '../core/math';
 import { onRidgeTerrace } from './ridgeWalk';
@@ -49,7 +49,7 @@ export function isReserved(x: number, z: number, margin = 1.5, includeOrchard = 
   if (inRect(x, z, { minX: -c.x - 0.5, maxX: c.x + 0.5, minZ: c.z0 - 0.5, maxZ: c.z1 + 0.5 }, margin)) return true;
   if (Math.hypot(x - INCENSE_BURNER.x, z - INCENSE_BURNER.z) < 3 + margin || Math.hypot(x - STELE.x, z - STELE.z) < 1.5 + margin) return true;
   if (nearestRiver(x, z).d < 2.8 + margin) return true;
-  if (Math.abs(x - GREAT_WHEEL.x) < GREAT_WHEEL.reach + margin && Math.abs(z - GREAT_WHEEL.z) < GREAT_WHEEL.reach + margin) return true;
+  for (const w of GREAT_WHEELS) if (Math.abs(x - w.x) < w.reach + margin && Math.abs(z - w.z) < w.reach + margin) return true;
   for (const w of WHEEL_ROWS) {
     const z1 = w.zStart + (w.count - 1) * w.spacing;
     if (inRect(x, z, { minX: w.x - 1.5, maxX: w.x + 1.5, minZ: w.zStart - 1, maxZ: z1 + 1 }, margin)) return true;

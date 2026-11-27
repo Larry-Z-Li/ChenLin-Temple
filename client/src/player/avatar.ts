@@ -8,6 +8,8 @@ import { CLOUD_TOP, makeCloud } from '../world/cloud';
 /** Joint targets (radians, except hipY in metres). Limbs hang along -Y; +x rotation swings them forward. */
 export interface Pose {
   hipY: number;
+  /** Whole body pitched forward about the hips (π/2 = lying face down, the legs trailing behind), and the hips' shift forward (−Z) with it. */
+  pitch: number; hipZ: number;
   torso: number;
   lThigh: number; rThigh: number;
   lShin: number; rShin: number;
@@ -17,12 +19,14 @@ export interface Pose {
   lArm: number; rArm: number;
   lArmZ: number; rArmZ: number;
   lFore: number; rFore: number;
+  /** Sideways bend of the forearm (inward positive on the left, negative on the right), to bring joined hands to the midline. */
+  lForeZ: number; rForeZ: number;
   /** Hand twist about the forearm: 0 = palms facing the body; ±π/2 turns them down/up. */
   lPalm: number; rPalm: number;
   head: number;
 }
 
-const STAND: Pose = { hipY: 0.92, torso: 0, lThigh: 0, rThigh: 0, lShin: 0, rShin: 0, lThighZ: 0, rThighZ: 0, lShinZ: 0, rShinZ: 0, lArm: 0.05, rArm: 0.05, lArmZ: -0.08, rArmZ: 0.08, lFore: 0.15, rFore: 0.15, lPalm: 0, rPalm: 0, head: 0 };
+const STAND: Pose = { hipY: 0.92, pitch: 0, hipZ: 0, torso: 0, lThigh: 0, rThigh: 0, lShin: 0, rShin: 0, lThighZ: 0, rThighZ: 0, lShinZ: 0, rShinZ: 0, lArm: 0.05, rArm: 0.05, lArmZ: -0.08, rArmZ: 0.08, lFore: 0.15, rFore: 0.15, lForeZ: 0, rForeZ: 0, lPalm: 0, rPalm: 0, head: 0 };
 // Seiza: knees forward on the cushion, shins folded back underneath, hands resting in the lap.
 const KNEEL: Pose = { ...STAND, hipY: 0.42, torso: 0.04, lThigh: 1.2, rThigh: 1.2, lShin: -2.7, rShin: -2.7, lArm: 0.35, rArm: 0.35, lArmZ: -0.1, rArmZ: 0.1, lFore: 1.25, rFore: 1.25, head: 0.08 };
 
@@ -38,7 +42,8 @@ const CROSS: Pose = {
 };
 
 // Palms pressed together at the heart (合掌).
-const HEART = { lArm: 0.6, rArm: 0.6, lArmZ: 0.45, rArmZ: -0.45, lFore: 1.5, rFore: 1.5 };
+// (hands upright, the palms' heels on the breastbone)
+const HEART = { lArm: 0.22, rArm: 0.22, lArmZ: 0.21, rArmZ: -0.21, lFore: 2.28, rFore: 2.28, lForeZ: 0.63, rForeZ: -0.63 };
 const H = Math.PI / 2;
 // Prostration: forehead to the floor, hips raised, hands flat on the floor beside the head.
 const P_DOWN: Pose = { ...STAND, hipY: 0.5, torso: 2.0, head: 0.35, lThigh: 0.3, rThigh: 0.3, lShin: -1.87, rShin: -1.87, lArm: 3.15, rArm: 3.15, lArmZ: -0.35, rArmZ: 0.35, lFore: 0.2, rFore: 0.2, lPalm: -H, rPalm: H };
@@ -55,6 +60,11 @@ const CARRY_BOW: Pose = { ...STAND, ...CARRY_ARMS, torso: 0.55, head: 0.25 };
 /** Standing, the right arm out to the side and a little forward, the hand at rail height (the great prayer wheel). */
 const WHEEL_ARM: Pose = { ...STAND, torso: 0.04, rArm: 0.3, rArmZ: 0.95, rFore: 0.1, rPalm: 0, head: 0 };
 
+// Prostration (大禮拜), after the palms at crown / forehead / mouth / heart: kneel, lie full length, arms back, rise.
+const PK = { hipY: 0.5, lShin: -1.57, rShin: -1.57 }; // kneeling upright on the knees
+// (both arms straight ahead along the ground, the hands side by side, palms flat down)
+const FLAT: Pose = { ...STAND, hipY: 0.16, pitch: H, hipZ: -0.6, head: -0.25, lArm: 2.82, rArm: 2.82, lArmZ: 0.48, rArmZ: -0.48, lFore: 0.18, rFore: 0.18, lForeZ: 0.24 * -1, rForeZ: 0.24, lPalm: -H, rPalm: H };
+
 export const POSES: Record<Anim, Pose> = {
   idle: STAND,
   walk: STAND,
@@ -69,13 +79,24 @@ export const POSES: Record<Anim, Pose> = {
   kneelBow: { ...KNEEL, ...HEART, torso: 0.6, head: 0.25 },
   sitBow: { ...SIT, ...HEART, torso: 0.45, head: 0.25 },
   // Prostration keyframes: palms together at crown → mouth → heart, kneel upright, forehead down, palms up.
-  pCrown: { ...STAND, lArm: 2.75, rArm: 2.75, lArmZ: 0.45, rArmZ: -0.45, lFore: 0.6, rFore: 0.6, head: -0.05 },
-  pMouth: { ...STAND, lArm: 1.3, rArm: 1.3, lArmZ: 0.45, rArmZ: -0.45, lFore: 1.5, rFore: 1.5 },
+  pCrown: { ...STAND, lArm: 2.48, rArm: 2.48, lArmZ: 0.47, rArmZ: -0.47, lFore: 0.98, rFore: 0.98, lForeZ: 0.02, rForeZ: -0.02, head: -0.05 },
+  pMouth: { ...STAND, lArm: 1.32, rArm: 1.32, lArmZ: 0.21, rArmZ: -0.21, lFore: 1.97, rFore: 1.97, lForeZ: 0.53, rForeZ: -0.53 },
   pHeart: { ...STAND, ...HEART },
   pKneelUp: { ...STAND, ...HEART, hipY: 0.5, lShin: -1.57, rShin: -1.57 },
   pDown: P_DOWN,
+  // forehead: the joined palms at the brow
+  pForehead: { ...STAND, lArm: 1.87, rArm: 1.87, lArmZ: 0.21, rArmZ: -0.21, lFore: 1.48, rFore: 1.48, lForeZ: 0.45, rForeZ: -0.45, head: 0.04 },
+  // lying flat on the face, the arms stretched out ahead along the ground
+  pFlat: FLAT,
+  // …then the elbows bend back and the joined palms come to rest above the head
+  pFlatHands: { ...FLAT, lArm: 2.62, rArm: 2.62, lArmZ: 0.67, rArmZ: -0.67, lFore: 1.46, rFore: 1.46, lForeZ: 0.1, rForeZ: -0.1, lPalm: 0, rPalm: 0 },
+  // pushing up: the hands planted by the chest, the arms straightening, the chest and hips lifting off the ground
+  pPush: { ...STAND, hipY: 0.43, pitch: 1.1, hipZ: -0.5, head: -0.4, lArm: 1.1, rArm: 1.1, lArmZ: -0.1, rArmZ: 0.1, lFore: 0.02, rFore: 0.02, lPalm: -H, rPalm: H },
+  // …then back onto the knees, still leaning on the hands
+  pRise: { ...STAND, ...PK, hipZ: -0.15, pitch: 0.2, torso: 0.9, head: 0.1, lThigh: 0.2, rThigh: 0.2, lArm: 1.05, rArm: 1.05, lArmZ: -0.1, rArmZ: 0.1, lFore: 0.1, rFore: 0.1, lPalm: -H, rPalm: H },
   pUp: { ...P_DOWN, lPalm: H, rPalm: -H },
   reach: { ...STAND, torso: 0.15, head: 0.2, rArm: 1.0, rArmZ: 0.05, rFore: 0.35 },
+  offerUp: { ...STAND, torso: -0.08, head: -0.35, rArm: 2.75, rArmZ: 0.18, rFore: 0.2, lArm: 0.35, lArmZ: -0.12, lFore: 0.6 }, // (a flag held up high, looking up)
   cross: CROSS,
   crossBeads: { ...CROSS, rArm: 0.5, rArmZ: 0.05, rFore: 1.7, head: 0.18 },
   standBeads: { ...STAND, rArm: 0.5, rArmZ: 0.05, rFore: 1.7, head: 0.18 },
@@ -149,6 +170,10 @@ export class Avatar {
   clasp = false;
   /** Walking with the right hand out on the great prayer wheel's rail (the legs keep walking). */
   wheelArm = false;
+  /** The right hand (to hold something in it, e.g. a prayer flag). */
+  get rightHand() {
+    return this.joints.rHand;
+  }
 
   private robeMat: THREE.MeshStandardMaterial;
   private underMat: THREE.MeshStandardMaterial;
@@ -367,6 +392,60 @@ export class Avatar {
   }
   private lantern: { g: THREE.Group; mat: THREE.MeshStandardMaterial; halo: THREE.Sprite; kind: 'lantern' | 'chalice' } | null = null;
 
+  private props: { book: THREE.Group; mala: THREE.Group } | null = null;
+  /** The sutra book and the mala in the hands for the pose `a` (null or any other pose: neither). */
+  private showProps(a: Anim | null) {
+    const both = a === 'read' || a === 'sitRead' || a === 'crossRead' || a === 'standRead';
+    const withBeads = a === 'crossReadBeads' || a === 'sitReadBeads' || a === 'standReadBeads'; // sutra right, beads left
+    const beads = a === 'beads' || a === 'sitBeads' || a === 'crossBeads' || a === 'standBeads';
+    if (!this.props) {
+      if (!both && !withBeads && !beads) return;
+      this.props = this.makeProps();
+    }
+    const { book, mala } = this.props;
+    book.visible = both || withBeads;
+    if (book.visible) {
+      book.position.x = both ? 0 : 0.23;
+      book.scale.x = both ? 1 : 0.55;
+    }
+    mala.visible = beads || withBeads;
+    if (mala.visible) {
+      const hand = withBeads ? this.joints.lHand : this.joints.rHand;
+      if (mala.parent !== hand) hand.add(mala);
+    }
+  }
+
+  private makeProps() {
+    const mk = (geo: THREE.BufferGeometry, m: THREE.Material | THREE.Material[]) => {
+      const mesh = new THREE.Mesh(geo, m);
+      mesh.castShadow = true;
+      return mesh;
+    };
+    // a folded sutra: cream leaves between two dark blue covers, held open before the face between the two hands
+    const cover = new THREE.MeshStandardMaterial({ color: 0x24305a, roughness: 0.8 }), leaf = new THREE.MeshStandardMaterial({ color: 0xf0e6c8, roughness: 0.9 });
+    const book = new THREE.Group();
+    book.add(mk(new THREE.BoxGeometry(0.4, 0.014, 0.16), cover), mk(new THREE.BoxGeometry(0.38, 0.03, 0.15).translate(0, 0.02, 0), leaf), mk(new THREE.BoxGeometry(0.4, 0.014, 0.16).translate(0, 0.04, 0), cover));
+    book.position.set(0, 0.34, -0.44); // between the hands, before the chest (torso space)
+    book.rotation.x = -0.45; // tipped back toward the eyes
+    this.torso.add(book);
+    // a mala: a ring of wooden beads round the fingers, a gold marker, a guru bead and a short red tassel
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6b2f1a, roughness: 0.45 }), gold = new THREE.MeshStandardMaterial({ color: 0xd9b45a, roughness: 0.4, metalness: 0.4 });
+    const mala = new THREE.Group();
+    const N = 18, R = 0.058;
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2, b = mk(new THREE.SphereGeometry(i % 6 === 0 ? 0.016 : 0.012, 8, 6), i % 6 === 0 && i ? gold : wood);
+      b.position.set(Math.cos(a) * R * 0.7, 0, Math.sin(a) * R);
+      mala.add(b);
+    }
+    const tassel = mk(new THREE.ConeGeometry(0.01, 0.07, 6).translate(0, -0.035, 0), new THREE.MeshStandardMaterial({ color: 0x9e1b1b, roughness: 0.9 }));
+    tassel.position.set(0, -0.01, R);
+    mala.add(tassel);
+    mala.position.set(0, -0.085, 0); // round the fingers
+    mala.visible = false;
+    this.joints.rHand.add(mala);
+    return { book, mala };
+  }
+
   /** Hide name tags beyond a distance to reduce clutter. */
   setTagVisible(v: boolean) {
     if (this.tag) this.tag.visible = v;
@@ -395,6 +474,8 @@ export class Avatar {
 
     const j = this.joints;
     this.hips.position.y = p.hipY + bob;
+    this.hips.position.z = p.hipZ;
+    this.hips.rotation.x = -p.pitch;
     this.torso.rotation.x = -p.torso;
     this.head.rotation.x = -p.head;
     j.lThigh.rotation.x = p.lThigh + swing;
@@ -413,8 +494,13 @@ export class Avatar {
     j.rArm.rotation.z = p.rArmZ;
     j.lFore.rotation.x = p.lFore;
     j.rFore.rotation.x = p.rFore;
+    j.lFore.rotation.z = p.lForeZ;
+    j.rFore.rotation.z = p.rForeZ;
     j.lHand.rotation.y = p.lPalm;
     j.rHand.rotation.y = p.rPalm;
+    // Beads / a sutra in the hands, while the arms are in their holding pose (and not reaching, carrying, hiding in sleeves)
+    const held = wheeling || carrying || (this.clasp && moving) ? null : holding ? this.hold : this.anim;
+    this.showProps(held);
     if (carrying) { // the lantern hangs straight down from the hands, however the arms are bent
       j.rHand.updateWorldMatrix(true, false);
       this.lantern!.g.quaternion.copy(j.rHand.getWorldQuaternion(qHand).invert().multiply(this.root.getWorldQuaternion(qRoot)));

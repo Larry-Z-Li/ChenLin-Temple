@@ -14,7 +14,7 @@ export interface HudCallbacks {
   onMusic(on: boolean): void;
   onSeatAction(action: SeatAction): void;
   /** Beads or a sutra while standing. */
-  onStandAction(action: 'beads' | 'sutra'): void;
+  onStandAction(action: 'beads' | 'sutra' | 'prostrate'): void;
   onChants(): void;
   onFastTravel(): void;
   onMap(): void;
@@ -22,6 +22,8 @@ export interface HudCallbacks {
   onPrompt(): void;
   /** The great prayer wheel's "get off" button (Q on a keyboard). */
   onWheelOff(): void;
+  /** The "Q · Circle the stupa" hint, tapped. */
+  onCircle?(): void;
   onBow(): void;
   onBeadStep(dir: 1 | -1): void;
   onGraphics(): void;
@@ -32,6 +34,7 @@ export class Hud {
   private status: HTMLElement;
   private prompt: HTMLElement;
   private wheelOff: HTMLElement;
+  private circleHint: HTMLElement;
   private info: HTMLElement;
   private toasts: HTMLElement;
   private seatBar: HTMLElement;
@@ -57,7 +60,7 @@ export class Hud {
       'div',
       { class: 'panel help hidden' },
       h('div', { class: 'panel-head' }, h('div', { class: 'panel-title', i18n: 'help.title' }), close(() => this.toggleHelp(false))),
-      h('ul', { class: 'help-list' }, ...(['help.move', 'help.run', 'help.look', 'help.interact', 'help.chants', 'help.bow', 'help.map', 'help.leave', 'help.seated', 'help.beads', 'help.touch'] as I18nKey[]).map((k) => h('li', { i18n: k }))),
+      h('ul', { class: 'help-list' }, ...(['help.move', 'help.run', 'help.look', 'help.touch'] as I18nKey[]).map((k) => h('li', { i18n: k }))),
     );
 
     // Settings: graphics, volumes, language.
@@ -131,7 +134,8 @@ export class Hud {
 
     this.info = h('div', { class: 'info hidden' });
     this.prompt = h('button', { class: 'prompt hidden', onclick: () => cb.onPrompt() });
-    this.wheelOff = h('button', { class: 'prompt wheel-off hidden', onclick: () => cb.onWheelOff() }, h('kbd', {}, 'Q'), h('span', { i18n: 'prompt.gwOff' }));
+    this.wheelOff = h('button', { class: 'prompt wheel-off hidden', onclick: () => cb.onWheelOff() }, h('kbd', {}, 'Q'), h('span', { i18n: 'prompt.gwOff' })); // (red: the way off, apart from the gold "mash E")
+    this.circleHint = h('button', { class: 'prompt circle-hint hidden', onclick: () => cb.onCircle?.() }, h('kbd', {}, 'Q'), h('span', { i18n: 'prompt.circle' })); // (a small hint in the stupa court; E stays the incense's)
     this.toasts = h('div', { class: 'toasts' });
 
     // a line icon over its label (by mouse or touch: no number keys)
@@ -140,10 +144,11 @@ export class Hud {
       this.seatBtns[action] = b;
       return b;
     };
-    // Seated: prostrations, beads, chants, sutras, stand up.
+    // Seated: a bow, prostrations, beads, chants, sutras, stand up (in the standing bar's order).
     this.seatBar = h(
       'nav',
       { class: 'seatbar hidden' },
+      h('button', { class: 'seat-btn', onclick: () => cb.onBow() }, icon('bow') as unknown as Node, h('span', { i18n: 'bow.button' })),
       mk('prostrate', 'seat.prostrate'),
       mk('beads', 'seat.beads'),
       (this.chantBtns[0] = h('button', { class: 'seat-btn', onclick: () => cb.onChants() }, icon('chant') as unknown as Node, h('span', { i18n: 'hud.chants' })) as HTMLButtonElement),
@@ -157,15 +162,17 @@ export class Hud {
       h('button', { class: 'icon-btn big', i18nTitle: 'beads.next', onclick: () => cb.onBeadStep(1) }, '▶'),
     );
     this.inventory = h('div', { class: 'inventory hidden' });
-    // Standing: bow, beads, chants, sutras, fast travel.
+    // Standing: bow, prostrations, beads, chants, sutras, fast travel.
     // each with a line icon over its label (the label a span of its own: a locale change rewrites only that)
     const act = (name: string, key: I18nKey, onclick: () => void) => h('button', { class: 'icon-btn', onclick }, icon(name) as unknown as Node, h('span', { i18n: key })) as HTMLButtonElement;
+    this.standBtns.prostrate = act('prostrate', 'seat.prostrate', () => cb.onStandAction('prostrate'));
     this.standBtns.beads = act('beads', 'seat.beads', () => cb.onStandAction('beads'));
     this.standBtns.sutra = act('sutra', 'seat.sutras', () => cb.onStandAction('sutra'));
     const quick = h(
       'div',
       { class: 'quick-actions' },
       act('bow', 'bow.button', () => cb.onBow()),
+      this.standBtns.prostrate,
       this.standBtns.beads,
       (this.chantBtns[1] = act('chant', 'hud.chants', () => cb.onChants())),
       this.standBtns.sutra,
@@ -189,7 +196,7 @@ export class Hud {
       ),
     );
 
-    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.wheelOff, this.seatBar, this.beadBtns, this.inventory, quick, this.toasts, this.help, this.settingsPanel);
+    this.root = h('div', { class: 'hud' }, top, this.info, this.prompt, this.wheelOff, this.circleHint, this.seatBar, this.beadBtns, this.inventory, quick, this.toasts, this.help, this.settingsPanel);
     parent.append(this.root, this.merit); // the drawer outside the HUD layer, so it can sit over the menus' backdrops
     this.renderMusic();
     this.renderFps();
@@ -304,18 +311,38 @@ export class Hud {
     this.renderMusic();
   }
 
-  setPrompt(text: string | null, busy = false) {
+  setPrompt(text: string | null, busy = false, mash = false) {
     if (!text) return this.prompt.classList.add('hidden');
     this.prompt.classList.remove('hidden');
     this.prompt.classList.toggle('busy', busy);
+    this.prompt.classList.toggle('mash', mash); // (the great wheel's: gold)
     if (this.prompt.dataset.text === `${busy}|${text}`) return; // avoid rebuilding every frame (keeps taps reliable)
     this.prompt.dataset.text = `${busy}|${text}`;
     this.prompt.replaceChildren(...(busy ? [] : [h('kbd', {}, 'E')]), h('span', {}, text));
   }
 
-  /** The great prayer wheel: a button to get off (or leave the queue), for phones. */
-  setWheelOff(on: boolean) {
+  /** The great wheel's "mash" button: glowing brighter the faster you press (0 … 1). */
+  setMash(level: number) {
+    this.prompt.style.setProperty('--mash', level.toFixed(2));
+  }
+
+  /** …and a bounce for each press. */
+  bumpMash() {
+    this.prompt.classList.remove('bump');
+    void this.prompt.offsetWidth; // (restart the animation)
+    this.prompt.classList.add('bump');
+  }
+
+  /** The great prayer wheel: a button to get off (or leave the queue), Q on a keyboard. */
+  setWheelOff(on: boolean, key: 'prompt.gwOff' | 'prompt.circleOff' = 'prompt.gwOff') {
     this.wheelOff.classList.toggle('hidden', !on);
+    const s = this.wheelOff.querySelector('span');
+    if (s && s.dataset.i18n !== key) (s.dataset.i18n = key), (s.textContent = t(key));
+  }
+
+  /** The court's "Q · Circle the stupa" hint. */
+  setCircleHint(on: boolean) {
+    this.circleHint.classList.toggle('hidden', !on);
   }
 
   setInfo(text: string | null) {

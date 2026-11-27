@@ -13,6 +13,7 @@
  * Coordinates below are written in the plan's proportions; `at()` / `moved()` / `P()` spread them
  * SPREAD× apart around the great stupa (sizes stay the same) so the grounds have room to breathe.
  */
+import type { GreatWheelId } from '../../../shared/greatWheel';
 import type { DeityId } from './deities';
 import type { CatCoat, CatPose } from '../world/cat';
 
@@ -99,7 +100,7 @@ export const HALLS: HallDef[] = [
   gateHall('dongmi', 39.5, 9, ['bhaisajyaguru', 'akshobhya', 'vajrapani']), // 傷門 E · 藥師佛, 阿閦佛, 金剛手菩薩
   gateHall('dizang', -39.5, 45, ['ksitigarbha']), // 死門 SW · 地藏王菩薩
   gateHall('guoxue', 0, 45, ['maitreya'], { depth: 21, backDoor: true }), // 景門 S · 彌勒菩薩 (a back door from the stupa court)
-  gateHall('wenshu', 39.5, 45, ['manjushri']), // 杜門 SE · 文殊菩薩
+  gateHall('wenshu', 39.5, 45, ['manjushri', 'marici']), // 杜門 SE · 文殊菩薩, 摩利支天
   {
     id: 'chengjiu', kind: 'hall', nameKey: 'hall.chengjiu', ...at(0, -58), width: 32, depth: 24, wallHeight: 7.5,
     deities: ['amoghasiddhi'], frontDoor: true, backDoor: false, seats: 30, thangkas: 3, roofTiers: 2,
@@ -245,7 +246,14 @@ export const WHEEL_ROWS: WheelRowDef[] = [
  * `half`: half the plinth's side; `plinth`: its height (4 steps); `reach`: how far its stairs and the head of each queue
  * extend from the centre (kept clear of trees, rocks and paths). Its rules are in shared/greatWheel.ts.
  */
-export const GREAT_WHEEL = { x: -34, z: 76, half: 7.5, plinth: 1.0, reach: 14 };
+export interface GreatWheelDef { id: GreatWheelId; x: number; z: number; half: number; plinth: number; reach: number }
+/** Four, in two pairs mirrored across the temple's centre line (x = 0): by 地藏 and 文殊 in the south, and in the north-west and north-east. Each is its own wheel on the server. */
+export const GREAT_WHEELS: GreatWheelDef[] = [
+  { id: 'west', x: -34, z: 76, half: 7.5, plinth: 1.0, reach: 14 },
+  { id: 'east', x: 34, z: 76, half: 7.5, plinth: 1.0, reach: 14 },
+  { id: 'north-west', x: -43, z: -63, half: 7.5, plinth: 1.0, reach: 14 }, // (a metre in from -44, to keep clear of 觀音's hall)
+  { id: 'north-east', x: 43, z: -63, half: 7.5, plinth: 1.0, reach: 14 },
+];
 
 /** 櫻花樹林: cherry trees all round the wish garden. */
 export const CHERRY_GROVE = { ...at(0, -98), r: 27 };
@@ -370,7 +378,7 @@ export const PATH_LIGHT_RUNS: { from: [number, number]; to: [number, number]; st
 export const POND_LIGHT_RING = { radius: POND.radius + 2.2, count: 22 };
 
 /** Map board (告示牌) on the grass just right of the walk up to Baosheng Court, parallel to it (facing the walk). */
-export const MAP_BOARD = { x: 4.4, z: hall('baosheng').z + hall('baosheng').depth / 2 + STAIRS + 6, yaw: -Math.PI / 2 };
+export const MAP_BOARD = { x: 5, z: 154, yaw: -Math.PI / 2 }; // (by the way in, near the flag table hut)
 
 /** Pavilion (亭) out on the release pond, reached by a covered walkway from the east. */
 export const POND_PAVILION = { x: POND.x + 6.6, z: POND.z, r: 2.6, walkX0: POND.x + 9, walkX1: POND.x + 15.6, walkZ0: POND.z - 1.4, walkZ1: POND.z + 1.4 };
@@ -518,6 +526,15 @@ export const PICNIC_TABLES = [
   { ...at(98, 36), yaw: 0 }, // below the orchard
   { ...at(-60, -4), yaw: 0.4 }, // by the pond
   { ...at(-22, -96), yaw: 0.3 }, { ...at(22, -96), yaw: -0.3 }, // cherry grove
+  // scattered over the rest of the park (open, level grass, clear of paths, buildings, rivers and the flag lines)
+  { x: 176, z: -100, yaw: 0.5 }, { x: 48, z: -16, yaw: 0 }, { x: -156, z: -132, yaw: -0.4 }, { x: -52, z: 80, yaw: Math.PI / 2 },
+  { x: -32, z: -84, yaw: 0.2 }, { x: 52, z: 80, yaw: Math.PI / 2 }, { x: 84, z: -104, yaw: -0.6 }, { x: -196, z: -44, yaw: 1.2 },
+  { x: -72, z: 172, yaw: 0.35 }, { x: 136, z: -20, yaw: 0 }, { x: 92, z: 160, yaw: -0.3 }, { x: 120, z: -168, yaw: 0.7 },
+  { x: -84, z: -132, yaw: 0.3 }, { x: 112, z: 44, yaw: -0.5 }, { x: -48, z: 0, yaw: Math.PI / 2 }, { x: 196, z: -40, yaw: 0.8 },
+  { x: -104, z: 48, yaw: 0 }, { x: -132, z: -76, yaw: -0.25 }, { x: 0, z: -144, yaw: 0.45 }, { x: -176, z: 12, yaw: 1.1 },
+  { x: 28, z: -84, yaw: -0.7 }, { x: -104, z: 108, yaw: 0.2 }, { x: -28, z: 132, yaw: -0.4 }, { x: -8, z: -36, yaw: Math.PI / 2 },
+  { x: 128, z: -72, yaw: 0.6 }, { x: -8, z: 52, yaw: 0 }, { x: 116, z: 96, yaw: -0.9 }, { x: -92, z: -184, yaw: 0.35 },
+  { x: 52, z: 132, yaw: 0.15 }, { x: -80, z: -76, yaw: -0.3 }, { x: 8, z: 100, yaw: Math.PI / 2 }, { x: 48, z: -136, yaw: 0.5 },
 ];
 
 /** 茶亭: a small open-fronted hut with a table and seats, on the meadow just west of the walk from Baosheng Court to the plaza. Faces `yaw` (a multiple of π/2; π/2 = east, onto the walk). The plinth is 4.8 m wide × 5.2 deep (local), centred 0.2 m in front of the centre. */

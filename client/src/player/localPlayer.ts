@@ -137,11 +137,11 @@ export class LocalPlayer {
   }
 
   /** Steer the character directly (the entry screen's pacing monk), moving at `speed` m/s (0: standing still). */
-  puppet(dt: number, x: number, y: number, z: number, yaw: number, speed: number) {
+  puppet(dt: number, x: number, y: number, z: number, yaw: number, speed: number, run = false, still: Anim = 'idle') {
     this.speed = speed; // the legs keep pace with it
     this.pos.set(x, y, z);
     this.yaw = yaw;
-    this.avatar.anim = speed > 0 ? 'walk' : 'idle';
+    this.avatar.anim = speed > 0 ? (run ? 'run' : 'walk') : still; // (`still`: the pose when not moving)
     this.sync(dt);
   }
 

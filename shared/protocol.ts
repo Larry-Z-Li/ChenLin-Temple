@@ -21,6 +21,10 @@ export const ANIMS = [
   'standBeads', 'standRead',
   // reading with the beads in the other hand: seated cross-legged, on a bench, standing
   'crossReadBeads', 'sitReadBeads', 'standReadBeads',
+  // prostration, the long form: palms at the forehead, lying flat (arms ahead / palms joined at the head), pushing up
+  'pForehead', 'pFlat', 'pFlatHands', 'pRise', 'pPush',
+  // holding a prayer flag up high for Garuda to take
+  'offerUp',
 ] as const;
 export type Anim = (typeof ANIMS)[number];
 
@@ -35,6 +39,7 @@ export const FLAG_CLOUD = 8; // riding a cloud
 export const FLAG_LANTERN = 16; // carrying a lantern to bless it…
 export const FLAG_GLOW_SHIFT = 5; // …and how brightly it glows: 2 bits (0–3) from here
 export const FLAG_WHEEL = 1024; // turning the great prayer wheel: right hand out on its rail
+export const FLAG_CIRCLE = 2048; // circling the great stupa on autopilot (its lane is told from where they stand)
 export const FLAG_TRAIL_SHIFT = 7; // the trail of light from walking round the stupa: 3 bits (0–4) from here
 /** Places before a hall's altar where people bless lanterns (more than this share). */
 export const BLESS_SPOTS = 6;
@@ -122,10 +127,10 @@ export type ClientMsg =
   | { t: 'seat'; seat: string | null }
   | { t: 'push'; wheel: string }
   /** The great prayer wheel: join the queue at a stair (0–3 = N E S W), or (queued) leave or (riding) get off at once. */
-  | { t: 'gw'; op: 'join'; stair: number }
-  | { t: 'gw'; op: 'leave' }
+  | { t: 'gw'; wheel: string; op: 'join'; stair: number }
+  | { t: 'gw'; wheel: string; op: 'leave' }
   /** A rider's press of E: all riders' presses are pooled to turn the wheel. */
-  | { t: 'gw'; op: 'press' }
+  | { t: 'gw'; wheel: string; op: 'press' }
   | { t: 'pick'; fruit: string }
   /** Strike a hall instrument (bell, drum, singing bowl, wooden fish). */
   | { t: 'strike'; inst: string }
@@ -135,6 +140,8 @@ export type ClientMsg =
   | { t: 'bless'; id: string; done?: boolean }
   /** Flag a lantern as unkind; enough different people and it comes down. */
   | { t: 'report'; id: string }
+  /** Give a prayer flag (of one of the five colours) to Garuda, to hang on the ring of lines round the temples. */
+  | { t: 'flagHang'; color: number }
   /** Give one fruit from your basket to a deer (they eat any kind). */
   | { t: 'feed'; deer: string; fruit: Fruit }
   | { t: 'offer'; hall: string; kind: 'incense' }
@@ -152,7 +159,7 @@ export type ServerMsg =
       /** wheelId -> current speed (rev/s), only wheels still turning */
       wheels: Record<string, number>;
       /** The great prayer wheel: its angle, who is in its openings and in its queues. */
-      gw?: GreatWheelState;
+      gw?: Record<string, GreatWheelState>;
       /** fruitId -> ms since it was picked (still regrowing) */
       picked: Record<string, number>;
       /** hallId -> today's offerings */
@@ -160,7 +167,11 @@ export type ServerMsg =
       wishes: Wish[];
       /** Lanterns off their walls being blessed: wish id → who has it, and at which spot. */
       blessings: Record<string, { by: string; spot: number }>;
+      /** The prayer flags hung on the ring round the temples: [line, slot, colour]. */
+      flags?: [number, number, number][];
     }
+  /** A prayer flag given to Garuda: where it will hang (`by` gave it). */
+  | { t: 'flag'; line: number; slot: number; color: number; by: string }
   | { t: 'join'; player: PlayerInfo & { tr: Transform } }
   | { t: 'leave'; id: string }
   | { t: 'snap'; tr: Record<string, Transform> }
@@ -169,11 +180,11 @@ export type ServerMsg =
   /** A push landed; `speed` is the wheel's authoritative speed right after it. */
   | { t: 'push'; wheel: string; by: string; speed: number }
   /** The great prayer wheel's state: sent on every change, and about twice a second while it turns. */
-  | ({ t: 'gw' } & GreatWheelState)
+  | ({ t: 'gw'; wheel: string } & GreatWheelState)
   /** To one person: walk into opening `opening`; step out at `stair`; or the request was refused. */
-  | { t: 'gwDo'; ev: 'board'; opening: number; stair: number }
-  | { t: 'gwDo'; ev: 'exit' }
-  | { t: 'gwDo'; ev: 'denied' }
+  | { t: 'gwDo'; wheel: string; ev: 'board'; opening: number; stair: number }
+  | { t: 'gwDo'; wheel: string; ev: 'exit' }
+  | { t: 'gwDo'; wheel: string; ev: 'denied' }
   | { t: 'picked'; fruit: string; by: string }
   | { t: 'strike'; inst: string; by: string }
   | { t: 'wishAdded'; wish: Wish }
@@ -226,6 +237,6 @@ export function isTransform(v: unknown): v is Transform {
     v[4] < ANIMS.length &&
     Number.isInteger(v[5]) &&
     v[5] >= 0 &&
-    v[5] < 2048
+    v[5] < 4096
   );
 }

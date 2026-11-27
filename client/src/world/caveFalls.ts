@@ -54,6 +54,8 @@ const edgeR = (phi: number) => { const a = Math.abs(phi); return 14 + 6 * (a / 1
 const FACE_Z = C.z - edgeR(0);
 /** The recess behind the fall (an ellipse in plan, its floor the ledge), and the rock that roofs it. */
 const ALC = { x: XC, z: FACE_Z - 4, rx: 6, rz: 5.5 };
+/** The recess behind the fall, for what's set in it (its floor's centre and half sizes, in this frame). */
+export const CAVE_RECESS = { x: ALC.x, z: ALC.z, rx: ALC.rx, rz: ALC.rz, floor: FLOOR_Y };
 /** The stream: its level (climbing back from the lip toward the spring), its line (winding up on the hill) and half width. */
 const LIP_Z = FACE_Z + 1.2, SY = HC - 6, SPRING_Z = LIP_Z - 32;
 const streamY = (z: number) => SY + Math.max(0, LIP_Z - z) * 0.2;
@@ -440,10 +442,10 @@ export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; plac
     group.add(mesh);
   }
 
-  // --- spray: drops falling with the water from the lip and scattering as they go, bursting up and out where they hit
-  // the pool and falling back, and a slow drift of fine mist ---
+  // --- spray: only where the water hits the pool, bursting up and out and falling back, and a slow drift of fine mist
+  // (none down the face of the fall itself) ---
   {
-    const N = 760, seed = new Float32Array(N * 4);
+    const N = 480, seed = new Float32Array(N * 4);
     for (let i = 0; i < N; i++) seed.set([rng(), rng(), rng(), rng()], i * 4);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
@@ -460,22 +462,14 @@ export function buildCaveFalls(opts: { sky?: THREE.Color; ground?: boolean; plac
         void main() {
           float r1 = fract(aSeed.x * 7.31), r2 = fract(aSeed.y * 5.17), r3 = fract(aSeed.z * 3.73);
           vec3 p; float size, a;
-          if (aSeed.w < 0.42) {                                    // falling with the water, scattering as it goes
-            float life = ${F(T_FALL)}, tau = mod(uTime * (0.9 + 0.2 * r3) + aSeed.x * 17.0, life), k = tau / life;
-            vec3 p0 = vec3(${F(XC)} + (aSeed.y - 0.5) * ${F(HW * 1.9)}, ${F(SY)} - 0.2, ${F(LIP_Z)} + 0.1);
-            p = p0 + vec3((r1 - 0.5) * 1.6 * tau, -0.5 * ${F(G)} * tau * tau, ${F(V)} * (0.96 + 0.08 * r2) * tau + (r3 - 0.3) * 0.5 * tau);
-            size = mix(0.14, 0.3, r2) * (1.0 + k);
-            a = smoothstep(0.0, 0.08, k) * (1.0 - smoothstep(0.92, 1.0, k)) * 0.5;
-          } else {
-            float fine = step(0.8, aSeed.w);                       // (two in ten: fine mist, slow, drifting)
-            float life = mix(1.0, 1.8, aSeed.z) * (1.0 + fine * 1.6), tau = mod(uTime + aSeed.x * 17.0, life);
-            vec3 p0 = vec3(${F(XC)} + (aSeed.y - 0.5) * ${F(HW * 1.8)}, ${F(POOL_Y)}, ${F(LAND_Z)} + (aSeed.z - 0.5) * 1.4);
-            vec3 v = vec3((r1 - 0.5) * 2.6, mix(2.2, 5.5, r2), mix(-0.6, 2.8, r3));
-            p = p0 + v * tau * mix(1.0, 0.45, fine) - vec3(0.0, 0.5 * mix(9.8, 1.0, fine) * tau * tau, 0.0);
-            p.y = max(p.y, ${F(POOL_Y)});
-            size = mix(mix(0.12, 0.26, r2), mix(1.3, 2.4, r2), fine);
-            a = sin(3.14159 * tau / life) * mix(0.6, 0.2, fine);
-          }
+          float fine = step(0.66, aSeed.w);                        // (a third: fine mist, slow, drifting)
+          float life = mix(1.0, 1.8, aSeed.z) * (1.0 + fine * 1.6), tau = mod(uTime + aSeed.x * 17.0, life);
+          vec3 p0 = vec3(${F(XC)} + (aSeed.y - 0.5) * ${F(HW * 1.8)}, ${F(POOL_Y)}, ${F(LAND_Z)} + (aSeed.z - 0.5) * 1.4);
+          vec3 v = vec3((r1 - 0.5) * 2.6, mix(2.2, 5.5, r2), mix(-0.6, 2.8, r3));
+          p = p0 + v * tau * mix(1.0, 0.45, fine) - vec3(0.0, 0.5 * mix(9.8, 1.0, fine) * tau * tau, 0.0);
+          p.y = max(p.y, ${F(POOL_Y)});
+          size = mix(mix(0.12, 0.26, r2), mix(1.3, 2.4, r2), fine);
+          a = sin(3.14159 * tau / life) * mix(0.6, 0.2, fine);
           vA = a;
           vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mvPosition;

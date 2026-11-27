@@ -15,6 +15,12 @@ const zones = HALLS.map((h, i) => {
 });
 /** Walls are 0.4 m thick and centred on the hall's edge; anything past their inner face is outside. */
 const INNER = 0.25;
+
+/** The hall (its layer number) whose inside the point (x, z) is in, or 0. */
+export function hallAt(x: number, z: number) {
+  for (const h of zones) if (Math.abs(x - h.x) < h.ex - INNER && Math.abs(z - h.z) < h.ez - INNER) return h.layer;
+  return 0;
+}
 /** Interiors show within this distance of a hall's walls (doubled on high graphics). */
 const NEAR = 28;
 
@@ -34,6 +40,7 @@ export function interiorLayer(o: THREE.Object3D): number {
     if (!g.boundingBox) g.computeBoundingBox();
     box.copy(g.boundingBox!).applyMatrix4(o.matrixWorld);
   } else return 0;
+  if (box.isEmpty()) return 0; // (nothing in it yet, e.g. an instanced mesh still to be filled: an empty box is "inside" every hall)
   for (const z of zones) {
     const ix = z.ex - INNER, iz = z.ez - INNER;
     if (box.max.y <= z.top && box.min.x >= z.x - ix && box.max.x <= z.x + ix && box.min.z >= z.z - iz && box.max.z <= z.z + iz) return z.layer;

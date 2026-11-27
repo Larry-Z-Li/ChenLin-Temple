@@ -9,12 +9,13 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
  *   root › hips › spine › chest › neck › head
  *   chest › shoulder.L/R › upperArm › forearm › hand · chest › wing1.L/R › wing2 › wing3
  *   hips › thigh.L/R › shin › foot · hips › tail
- * `update(dt, 'idle' | 'flap')` animates the wings, chest and head by itself; 'none' leaves every bone to you.
+ * `update(dt, 'idle' | 'flap', level)` animates the wings, chest and head by itself ('flap' with `level` 1 beats them
+ * for a body pitched forward flat in flight, 0 for an upright hover); 'none' leaves every bone to you.
  */
 export interface Garuda {
   root: THREE.Group;
   bones: Record<string, THREE.Bone>;
-  update(dt: number, mode?: 'idle' | 'flap' | 'none'): void;
+  update(dt: number, mode?: 'idle' | 'flap' | 'none', level?: number): void;
 }
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -224,12 +225,17 @@ export function buildGaruda(): Garuda {
 
   // ---------- its own motion: a slow idle, or a wingbeat ----------
   let t = 0;
-  const update = (dt: number, mode: 'idle' | 'flap' | 'none' = 'idle') => {
+  const update = (dt: number, mode: 'idle' | 'flap' | 'none' = 'idle', level = 0) => {
     if (mode === 'none') return;
     t += dt;
     const flap = mode === 'flap', w = flap ? (Math.PI * 2) / 1.4 : (Math.PI * 2) / 3, amp = flap ? [0.4, 0.2, 0.17] : [0.05, 0.03, 0.03];
+    const lv = flap ? level : 0, big = 1 + 0.6 * lv; // (in flight the beat is about the spine, so the tips go up and down)
     for (const [s, k] of [[1, 'L'], [-1, 'R']] as const)
-      for (let i = 0; i < 3; i++) bones[`wing${i + 1}.${k}`].rotation.z = s * amp[i] * Math.cos(w * t - i * 0.45);
+      for (let i = 0; i < 3; i++) {
+        const b = bones[`wing${i + 1}.${k}`], a = s * amp[i] * big * Math.cos(w * t - i * 0.45);
+        b.rotation.z = a * (1 - lv);
+        b.rotation.y = a * lv;
+      }
     bones.chest.rotation.x = (flap ? 0.03 : 0.02) * Math.sin(w * t);
     if (!flap) bones.head.rotation.y = 0.05 * Math.sin(w * t * 0.5);
   };

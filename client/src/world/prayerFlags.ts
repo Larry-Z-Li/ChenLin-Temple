@@ -6,6 +6,9 @@ import type { WorldContext } from '../core/context';
 import { mulberry32 } from '../core/math';
 import type { Ground } from '../core/ground';
 import { assetUrl } from '../content/manifest';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { addLamp } from './lightPool';
+import { haloPoints, nightGlow } from './nightGlow';
 
 /** Traditional order: blue (sky), white (air), red (fire), green (water), yellow (earth). */
 const COLORS = [0x2a6fd6, 0xf4f1e8, 0xc8302c, 0x2f9e4f, 0xf2c230].map((c) => new THREE.Color(c));
@@ -64,6 +67,38 @@ export function buildPrayerFlags(ctx: WorldContext, stupas: StupaSpot[]) {
       Y.crossVectors(Z, X);
       base.push({ p: at(t), q: new THREE.Quaternion().setFromRotationMatrix(m.makeBasis(X, Y, Z)), s: scale, phase: rng() * Math.PI * 2 });
     }
+  }
+
+  // Red lanterns hung along the strings from the great stupa's spire (the court's): the great wheels' own (same body,
+  // gold caps, tassel, glow and light), each on a short cord, glowing after dark and lighting the ground under it
+  const lanterns: THREE.BufferGeometry[] = [], caps: THREE.BufferGeometry[] = [], cords: THREE.BufferGeometry[] = [], tassels: THREE.BufferGeometry[] = [], halo: number[] = [], haloCol: number[] = [];
+  FLAG_LINES.forEach(([fa], li) => {
+    if (fa.h < 20) return; // (only the lines from the stupa's spire)
+    const { a, b } = lines[li], len = a.distanceTo(b), sag = Math.max(0.3, len * 0.07);
+    const at = (t: number) => new THREE.Vector3().lerpVectors(a, b, t).setY(a.y + (b.y - a.y) * t - sag * 4 * t * (1 - t));
+    const n = Math.floor(len / 4.6);
+    for (let j = 1; j < n; j++) {
+      const t = j / n;
+      if (t < 0.15) continue; // (not up by the spire)
+      const s = at(t), p = s.clone().add(new THREE.Vector3(0, -0.95, 0)), cl = s.y - (p.y + 0.58);
+      lanterns.push(new THREE.SphereGeometry(0.42, 14, 10).scale(1, 1.25, 1).translate(p.x, p.y, p.z));
+      caps.push(new THREE.CylinderGeometry(0.2, 0.2, 0.1, 12).translate(p.x, p.y + 0.53, p.z), new THREE.CylinderGeometry(0.2, 0.2, 0.1, 12).translate(p.x, p.y - 0.53, p.z));
+      cords.push(new THREE.CylinderGeometry(0.02, 0.02, cl, 4).translate(p.x, p.y + 0.58 + cl / 2, p.z));
+      tassels.push(new THREE.CylinderGeometry(0.05, 0.02, 0.5, 6).translate(p.x, p.y - 0.83, p.z));
+      halo.push(p.x, p.y, p.z);
+      haloCol.push(1, 0.48, 0.25);
+      addLamp({ x: p.x, y: p.y, z: p.z, color: 0xff8a50, intensity: 5, range: 15, decay: 1.1 });
+    }
+  });
+  if (lanterns.length) {
+    const cord = new THREE.MeshStandardMaterial({ color: 0x2a1a12, roughness: 0.9 }), tassel = new THREE.MeshStandardMaterial({ color: 0xb3261e, roughness: 0.8 });
+    ctx.scene.add(
+      new THREE.Mesh(mergeGeometries(lanterns), nightGlow.lanternBody),
+      new THREE.Mesh(mergeGeometries(caps), capMat),
+      new THREE.Mesh(mergeGeometries(cords), cord),
+      new THREE.Mesh(mergeGeometries(tassels), tassel),
+      haloPoints(halo, haloCol, 2.4, 0.55),
+    );
   }
 
   const strings = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(linePts, 3)), new THREE.LineBasicMaterial({ color: 0xd8d0c0 }));

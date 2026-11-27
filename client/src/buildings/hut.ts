@@ -4,6 +4,7 @@ import { THEME } from '../config/theme';
 import type { WorldContext } from '../core/context';
 import { mulberry32, range } from '../core/math';
 import { canvasTexture } from '../core/textures';
+import { inscription, onLocaleChange, t } from '../i18n';
 import { buildRedLantern } from './hall';
 import { box, cylinder, mat } from './materials';
 import { irimoyaRoof, roofTexture, shojiTexture } from './japaneseRoof';
@@ -231,7 +232,7 @@ function buildTableHut(ctx: WorldContext) {
   g.rotation.y = yaw;
   ctx.scene.add(g);
   const stone = mat(THEME.platformStone, { roughness: 0.95 });
-  const dark = mat(HOJO_DARK, { roughness: 0.7 }), wood = mat(HOJO_WOOD, { roughness: 0.8 });
+  const dark = mat(HOJO_DARK, { roughness: 0.7 });
   const furn = mat(0x8a6038, { roughness: 0.8 }); // the picnic tables' wood
   const Hh = 2.6, half = 2;
 
@@ -239,16 +240,7 @@ function buildTableHut(ctx: WorldContext) {
   g.add(box(4.8, PLH + (hi - lo), 5.2, stone, 0, -(hi - lo), 0.2));
   g.add(box(2.4, PLH * 0.5, 0.5, stone, 0, 0, 3.05));
   g.add(box(3.8, 0.03, 3.8, mat(0x8a5a36, { roughness: 0.85 }), 0, PLH, 0)); // timber floor (the picnic tables' deck wood tone)
-  // Walls: back and sides (white over a wood band, dark cap), lattice windows on the sides
-  const wall = mat(THEME.wall, { roughness: 0.9 });
-  g.add(box(4, Hh, 0.2, wall, 0, PLH, -half + 0.1), box(4.06, 0.6, 0.26, wood, 0, PLH, -half + 0.1));
-  for (const sx of [-1, 1]) {
-    g.add(box(0.2, Hh, 3.8, wall, sx * (half - 0.1), PLH, 0), box(0.26, 0.6, 3.86, wood, sx * (half - 0.1), PLH, 0));
-    const win = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.0), new THREE.MeshStandardMaterial({ map: latticeTex(), roughness: 0.8, side: THREE.DoubleSide }));
-    win.position.set(sx * (half + 0.015), PLH + 1.45, 0.1);
-    win.rotation.y = sx * Math.PI / 2;
-    g.add(win);
-  }
+  // Open on all sides: just its four posts, the beams round the top and the roof
   g.add(box(4.5, 0.32, 0.3, dark, 0, PLH + Hh - 0.32, -half + 0.1)); // beams round the top
   g.add(box(0.3, 0.32, 4.3, dark, -half, PLH + Hh - 0.32, 0), box(0.3, 0.32, 4.3, dark, half, PLH + Hh - 0.32, 0));
   g.add(box(4.5, 0.32, 0.3, dark, 0, PLH + Hh - 0.32, half)); // the front lintel: open below it
@@ -266,6 +258,60 @@ function buildTableHut(ctx: WorldContext) {
     g.add(cylinder(0.2, 0.2, 0.06, furn, sx * 1.35, PLH + 0.4, tz, 12));
     for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.add(box(0.05, 0.4, 0.05, furn, sx * 1.35 + dx * 0.11, PLH, tz + dz * 0.11));
   }
+  // On the table: folded prayer flags in stacks (blue, white, red, green, yellow, as they're strung), a short string
+  // of them laid out, and pens (a cup of them and two lying loose)
+  const top = PLH + 0.79, FLAG = [0x2a5ad8, 0xf2f2f2, 0xd8322a, 0x2f9a4a, 0xf2c524].map((c) => mat(c, { roughness: 0.9 }));
+  for (const [sx, sz, n] of [[-0.62, tz - 0.12, 3], [-0.3, tz - 0.16, 2]] as const)
+    for (let r = 0; r < n; r++) for (let k = 0; k < 5; k++) { const f = box(0.22, 0.012, 0.16, FLAG[k], sx + (r % 2 ? 0.004 : -0.004), top + (r * 5 + k) * 0.012, sz); f.rotation.y = 0.08 * (k - 2); g.add(f); }
+  for (let k = 0; k < 9; k++) { // the string, laid across the table
+    const fx = -0.05 + k * 0.1, fz = tz + 0.12 + Math.sin(k * 0.9) * 0.03;
+    g.add(box(0.085, 0.004, 0.11, FLAG[k % 5], fx, top, fz));
+  }
+  g.add(box(0.9, 0.003, 0.006, mat(0xd8d0c0, { roughness: 0.9 }), 0.35, top + 0.004, tz + 0.07));
+  const penBody = [mat(0x1d2433, { roughness: 0.5 }), mat(0x9a1f1a, { roughness: 0.5 }), mat(0x1f4fa0, { roughness: 0.5 })], penCap = mat(0xd9a520, { metalness: 0.7, roughness: 0.35 });
+  g.add(cylinder(0.045, 0.04, 0.1, mat(0x6b4a2a, { roughness: 0.8 }), 0.72, top, tz - 0.18, 12)); // the pen cup
+  [[-0.02, 0.012], [0.015, -0.01], [0.0, 0.02]].forEach(([dx, dz], k) => {
+    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.15, 6), penBody[k]);
+    pen.position.set(0.72 + dx, top + 0.11, tz - 0.18 + dz);
+    pen.rotation.set(dz * 6, 0, -dx * 6);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.03, 6), penCap);
+    cap.position.y = 0.065;
+    pen.add(cap);
+    g.add(pen);
+  });
+  for (const [px, pz, ry, k] of [[0.45, tz + 0.28, 0.4, 0], [0.62, tz + 0.3, -0.25, 2]] as const) { // two lying loose
+    const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.15, 6).rotateZ(Math.PI / 2), penBody[k]);
+    pen.position.set(px, top + 0.006, pz);
+    pen.rotation.y = ry;
+    g.add(pen);
+  }
+  // A big signboard along the hut's left side (as you face it), post to post, hung just under the side beam and
+  // facing out: 掛風馬旗
+  const face = new THREE.MeshStandardMaterial({ roughness: 0.7 });
+  const bw = 2 * half - 0.3, bh = 0.8, cord = 0.06, by = PLH + Hh - 0.32 - cord - bh / 2, bx = -half - 0.2;
+  g.add(box(0.05, bh + 0.1, bw + 0.1, dark, bx + 0.03, by - (bh + 0.1) / 2, 0));
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh).rotateY(-Math.PI / 2), face);
+  board.position.set(bx, by, 0);
+  g.add(board);
+  for (const sz of [-1, 1]) g.add(cylinder(0.01, 0.01, cord + 0.05, mat(0x2a1a12, { roughness: 0.9 }), bx + 0.03, by + bh / 2 + 0.04, sz * bw * 0.4, 4));
+  const draw = () => {
+    face.map?.dispose();
+    face.map = canvasTexture(1024, 220, (c) => {
+      c.fillStyle = '#efe3c8';
+      c.fillRect(0, 0, 1024, 220);
+      c.strokeStyle = '#7a1f16';
+      c.lineWidth = 12;
+      c.strokeRect(10, 10, 1004, 200);
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillStyle = '#7a1f16';
+      c.font = '700 132px "Noto Serif TC", "Songti TC", serif';
+      c.fillText(inscription(t('sign.flagHut')), 512, 116, 940);
+    });
+    face.needsUpdate = true;
+  };
+  draw();
+  onLocaleChange(draw);
   g.traverse((o) => (o.castShadow = o.receiveShadow = true));
 
   // Ground: the floor and a ramp up the step
@@ -274,10 +320,10 @@ function buildTableHut(ctx: WorldContext) {
   const st = aabb(-1.2, 1.2, 2.7, 3.5);
   if (s === 0) ctx.ground.addRamp(st.minX, st.maxX, c > 0 ? st.minZ : st.maxZ, c > 0 ? st.maxZ : st.minZ, y0, hi);
   else ctx.ground.addRampX(st.minZ, st.maxZ, s > 0 ? st.minX : st.maxX, s > 0 ? st.maxX : st.minX, y0, hi);
-  // Collision: the three walls (the front stays open), the table and the seats
+  // Collision: the four posts (open between them), the table and the seats
   const wallBox = (x0: number, x1: number, z0: number, z1: number) => { const b = aabb(x0, x1, z0, z1); ctx.collisions.addBox(b.minX, b.maxX, b.minZ, b.maxZ); };
-  wallBox(-half - 0.15, half + 0.15, -half - 0.05, -half + 0.25);
-  for (const sx of [-1, 1]) wallBox(sx * half - 0.15, sx * half + 0.15, -half, half);
+  for (const [px, pz] of [[-half, -half], [half, -half], [-half, half], [half, half]]) { const [wx, wz] = toWorld(px, pz); ctx.collisions.addCircle(wx, wz, 0.2); }
+  wallBox(-half - 0.25, -half + 0.05, -half, half); // (the sign closes the left side)
   wallBox(-0.98, 0.98, tz - 0.45, tz + 0.45);
   wallBox(-0.98, 0.98, tz + 0.64, tz + 1.0);
   for (const sx of [-1, 1]) { const [wx, wz] = toWorld(sx * 1.35, tz); ctx.collisions.addCircle(wx, wz, 0.28); }
@@ -286,7 +332,5 @@ function buildTableHut(ctx: WorldContext) {
     const [wx, wz] = toWorld(lx, lz), [ex, ez] = [exitLx * c + exitLz * s, -exitLx * s + exitLz * c];
     ctx.seats.set(id, { id, kind: 'bench', x: wx, y: y0, z: wz, yaw: yaw + faceLocal + Math.PI, exit: [ex * 0.8, ez * 0.8], occupiedBy: null });
   };
-  [-0.45, 0.45].forEach((lx, k) => seat(`teahut-b${k}`, lx, tz + 0.8, Math.PI, 0, 1));
-  seat('teahut-sL', -1.35, tz, Math.PI / 2, -1, 0);
-  seat('teahut-sR', 1.35, tz, -Math.PI / 2, 1, 0);
+  void seat; // (no sitting here: the table is for writing prayer flags)
 }

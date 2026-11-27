@@ -40,7 +40,7 @@ export class CollisionWorld {
 
   /** Push a circle of `radius` at (x,z) out of all colliders. Mutates and returns `p`. */
   resolve(p: { x: number; z: number; y?: number }, radius: number) {
-    const sky = (p.y ?? 0) > SKY_Y;
+    const sky = Math.abs(p.y ?? 0) > SKY_Y; // (the model gallery: far above, or below, the valley)
     for (let iter = 0; iter < 3; iter++) {
       const list = this.grid.get(this.key(Math.floor(p.x / CELL), Math.floor(p.z / CELL)));
       const seen = new Set<Collider>();

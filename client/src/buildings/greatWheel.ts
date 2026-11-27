@@ -3,7 +3,7 @@ import {
   GW_BOARD_S, GW_MAX_PRESS_HZ, GW_MAX_QUEUE, GW_OPENINGS, GW_QUEUE_GAP, GW_QUEUE_R0, GW_RIDER_R, GW_STAIRS, GW_WALK,
   GreatWheelSim, openingAzimuth, type GreatWheelState,
 } from '../../../shared/greatWheel';
-import { GREAT_WHEEL } from '../config/layout';
+import { GREAT_WHEELS, type GreatWheelDef } from '../config/layout';
 import type { WorldContext } from '../core/context';
 import { clamp, damp, smoothstep } from '../core/math';
 import { t } from '../i18n';
@@ -34,6 +34,8 @@ const dirOf = (psi: number): [number, number] => [Math.sin(psi), -Math.cos(psi)]
 export class GreatWheel {
   /** Our character is in the wheel's hands (queueing, riding, stepping out): the game must not walk it. */
   controlling = false;
+  /** We've joined the queue: put away whatever is in hand (beads, a sutra, a prostration). */
+  onJoin: () => void = () => {};
   /** Riding, right hand out on the rail. */
   get turning() {
     return this.phase === 'riding';
@@ -54,18 +56,18 @@ export class GreatWheel {
   private pathLen = 0;
   private yCur = 0;
 
-  constructor(private ctx: WorldContext, private net: NetClient, private player: LocalPlayer, private rig: CameraRig) {
-    const c = GREAT_WHEEL;
+  constructor(private ctx: WorldContext, private net: NetClient, private player: LocalPlayer, private rig: CameraRig, private def: GreatWheelDef) {
+    const c = def;
     this.base = ctx.ground.heightAt(c.x, c.z);
     this.sim = this.makeSim();
     this.build();
     ctx.updaters.push((dt) => this.update(dt));
-    net.on('gw', (s) => this.onState(s));
+    net.on('gw', (id, s) => id === def.id && this.onState(s));
     net.on('welcome', (m) => {
       this.sim = this.makeSim(); // (anything we ran alone is over: the server's wheel is the wheel)
-      this.onState(m.gw ?? EMPTY);
+      this.onState(m.gw?.[def.id] ?? EMPTY);
     });
-    net.on('gwDo', (ev, opening, stair) => (ev === 'board' ? this.board(opening, stair) : ev === 'exit' ? this.exit() : this.denied()));
+    net.on('gwDo', (id, ev, opening, stair) => id !== def.id ? undefined : (ev === 'board' ? this.board(opening, stair) : ev === 'exit' ? this.exit() : this.denied()));
     if (import.meta.env.DEV && Math.abs(GW_WALK - 3.8) > 1e-9) console.warn('GW_WALK differs from the player walk speed');
   }
 
@@ -82,9 +84,9 @@ export class GreatWheel {
 
   // ---------------------------------------------------------------- geometry
   private build() {
-    const c = GREAT_WHEEL, H = c.half, P = c.plinth;
+    const c = this.def, H = c.half, P = c.plinth;
     const g = this.root;
-    g.name = 'great-wheel';
+    g.name = `great-wheel-${c.id}`;
     g.position.set(c.x, this.base, c.z);
     this.ctx.scene.add(g);
     g.add(this.wheel);
@@ -99,7 +101,7 @@ export class GreatWheel {
       // E at the foot of a stair
       const [fx, fz] = this.at(s, GW_QUEUE_R0 - 1);
       this.ctx.interactions.add({
-        id: `great-wheel-${s}`, x: fx, z: fz, radius: 3,
+        id: `great-wheel-${c.id}-${s}`, x: fx, z: fz, radius: 3,
         prompt: () => (this.phase !== 'free' || this.player.mode !== 'free' ? null : this.snap.queues[s].length >= GW_MAX_QUEUE ? { text: t('prompt.gwFull'), busy: true } : { text: t('prompt.gwJoin') }),
         onInteract: () => this.join(s),
       });
@@ -109,12 +111,12 @@ export class GreatWheel {
   /** The point on stair `s`'s axis, `r` metres from the axle. */
   private at(s: number, r: number, lateral = 0): [number, number] {
     const [dx, dz] = dirOf(s * Math.PI / 2);
-    return [GREAT_WHEEL.x + dx * r - dz * lateral, GREAT_WHEEL.z + dz * r + dx * lateral];
+    return [this.def.x + dx * r - dz * lateral, this.def.z + dz * r + dx * lateral];
   }
 
   /** Height of the floor, stairs and ground round the pavilion. */
   private floorAt(x: number, z: number) {
-    const c = GREAT_WHEEL, ax = Math.abs(x - c.x), az = Math.abs(z - c.z), along = Math.max(ax, az), lat = Math.min(ax, az);
+    const c = this.def, ax = Math.abs(x - c.x), az = Math.abs(z - c.z), along = Math.max(ax, az), lat = Math.min(ax, az);
     if (along <= c.half) return this.base + c.plinth;
     if (lat <= STAIR_W / 2 && along < c.half + STEP_D * 3) return this.base + c.plinth - STEP_H * (1 + Math.floor((along - c.half) / STEP_D));
     return this.ctx.ground.heightAt(x, z);
@@ -130,6 +132,24 @@ export class GreatWheel {
     return s.stop !== null ? Math.min(a, s.stop) : a;
   }
 
+  /**
+   * The angle as shown: it runs on at the wheel's speed and eases out each correction from the server over about a
+   * tenth of a second (snapping only if far out), so the drum and its riders turn smoothly instead of jumping.
+   */
+  private shown: number | null = null;
+  private lastRaw = 0;
+  private smoothAngle(dt: number) {
+    const raw = this.angle();
+    if (this.shown === null || dt <= 0) return (this.lastRaw = raw), (this.shown = raw);
+    const s = this.snap, omega = this.online ? (s.moving ? s.omega : 0) : (raw - this.lastRaw) / dt;
+    this.lastRaw = raw;
+    let a = this.shown + omega * dt;
+    const err = raw - a;
+    a = Math.abs(err) > 0.5 ? raw : a + err * (1 - Math.exp(-dt * 9));
+    if (this.online && s.stop !== null) a = Math.min(a, s.stop);
+    return (this.shown = a);
+  }
+
   private onState(s: GreatWheelState) {
     this.snap = s;
     this.snapAt = performance.now();
@@ -142,11 +162,12 @@ export class GreatWheel {
   private join(stair: number) {
     if (this.phase !== 'free' || this.player.mode !== 'free' || this.player.flying) return;
     if (this.online) {
-      if (!this.net.gwJoin(stair)) return;
+      if (!this.net.gwJoin(this.def.id, stair)) return;
       this.waitUntil = performance.now() + 2500; // until the server's list shows us
     } else if (!this.sim.join(this.net.id, stair)) return;
     this.phase = 'queued';
     this.stair = stair;
+    this.onJoin();
     this.take();
   }
 
@@ -159,7 +180,7 @@ export class GreatWheel {
   /** Give the character back. `home`: stand at the foot of the nearest stair (the wheel was reset under us). */
   private release(home = false) {
     if (home || this.phase === 'riding' || this.phase === 'boarding') {
-      const p = this.player.pos, c = GREAT_WHEEL, s = Math.round(Math.atan2(p.x - c.x, -(p.z - c.z)) / (Math.PI / 2) + 4) % 4;
+      const p = this.player.pos, c = this.def, s = Math.round(Math.atan2(p.x - c.x, -(p.z - c.z)) / (Math.PI / 2) + 4) % 4;
       const [x, z] = this.at(s, GW_QUEUE_R0 + 1, SIDE_STEP);
       p.set(x, this.ctx.ground.heightAt(x, z), z);
     }
@@ -187,7 +208,7 @@ export class GreatWheel {
   private exit() {
     if (this.phase !== 'riding' && this.phase !== 'boarding') return;
     this.phase = 'exiting';
-    const c = GREAT_WHEEL, p = this.player.pos, TAU = Math.PI * 2;
+    const c = this.def, p = this.player.pos, TAU = Math.PI * 2;
     const psi = Math.atan2(p.x - c.x, -(p.z - c.z)), stair = ((Math.round(psi / (Math.PI / 2)) % GW_STAIRS) + GW_STAIRS) % GW_STAIRS;
     this.stair = stair;
     let delta = stair * (Math.PI / 2) - psi;
@@ -207,24 +228,39 @@ export class GreatWheel {
   }
 
   private lastPress = 0;
+  /** Our own recent presses (for the button's glow), and a hook for each one (its bounce). */
+  private myPresses: number[] = [];
+  onPress: () => void = () => {};
+  /** Each full turn of the wheel while we ride it (for merit). */
+  onSpin: () => void = () => {};
+  private spun = 0;
+  private spinFrom: number | null = null;
+  /** How fast we're mashing, 0 … 1 (ten presses a second or more is 1). */
+  get mashLevel() {
+    const now = performance.now();
+    while (this.myPresses.length && now - this.myPresses[0] > 1200) this.myPresses.shift();
+    return Math.min(1, this.myPresses.length / 1.2 / 10);
+  }
 
   /** E while riding: one press of the pooled mashing that turns the wheel (the server counts at most GW_MAX_PRESS_HZ a second from us). */
   pressE() {
     const now = performance.now();
     if (this.phase !== 'riding' || now - this.lastPress < 1000 / GW_MAX_PRESS_HZ) return;
     this.lastPress = now;
-    if (this.online) this.net.gwPress();
+    this.myPresses.push(now);
+    this.onPress();
+    if (this.online) this.net.gwPress(this.def.id);
     else this.sim.press(this.net.id);
   }
 
   /** Q: leave the queue, or let go of the wheel at once and walk to the nearest stair. */
   getOff() {
     if (this.phase === 'queued') {
-      if (this.online) this.net.gwLeave();
+      if (this.online) this.net.gwLeave(this.def.id);
       else this.sim.leave(this.net.id);
       this.release();
     } else if (this.phase === 'riding') {
-      if (this.online) this.net.gwLeave(); // (the server's word starts the walk)
+      if (this.online) this.net.gwLeave(this.def.id); // (the server's word starts the walk)
       else this.sim.leave(this.net.id);
     }
   }
@@ -234,10 +270,13 @@ export class GreatWheel {
     return this.phase === 'queued' || this.phase === 'riding';
   }
 
-  /** The prompt while we're in the wheel's hands (no E badge: the keys are in the words). */
-  prompt(): { text: string; busy: boolean } | null {
+  /**
+   * The prompt while we're in the wheel's hands. Riding: "mash E to turn" (gold, its own button; tapping it counts too),
+   * with getting off a separate red button beside it (see hud.setWheelOff). Queued: just the way out of the queue.
+   */
+  prompt(): { text: string; busy: boolean; mash?: boolean } | null {
     if (this.phase === 'queued') return { text: t('prompt.gwLeaveQueue'), busy: true };
-    if (this.phase === 'riding') return { text: t('prompt.gwGetOff'), busy: true };
+    if (this.phase === 'riding') return { text: t('prompt.gwMash'), busy: false, mash: true };
     return null;
   }
 
@@ -247,10 +286,17 @@ export class GreatWheel {
       this.sim.step(dt);
       this.snap = this.sim.state();
     }
-    this.wheel.rotation.y = -this.angle();
+    const ang = this.smoothAngle(dt);
+    this.wheel.rotation.y = -ang;
     this.player.avatar.wheelArm = this.phase === 'riding';
+    // a full turn of the wheel with us on it: merit (onSpin)
+    if (this.phase === 'riding' && this.spinFrom !== null) {
+      this.spun += Math.min(0.5, Math.abs(ang - this.spinFrom)); // (a correction from the server never counts as turning)
+      while (this.spun >= Math.PI * 2) (this.spun -= Math.PI * 2), this.onSpin();
+    } else this.spun = 0;
+    this.spinFrom = this.phase === 'riding' ? ang : null;
     if (this.phase === 'free') return;
-    const p = this.player, c = GREAT_WHEEL, now = performance.now();
+    const p = this.player, c = this.def, now = performance.now();
     let x = p.pos.x, z = p.pos.z, yaw = p.yaw, speed = 0, y = this.yCur;
     const walk = (tx: number, tz: number) => {
       const dx = tx - x, dz = tz - z, d = Math.hypot(dx, dz), step = Math.min(d, GW_WALK * dt);
@@ -279,7 +325,7 @@ export class GreatWheel {
     }
     if (this.phase === 'riding') {
       [x, z] = this.niche();
-      const psi = openingAzimuth(this.angle(), this.opening);
+      const psi = openingAzimuth(this.shown ?? this.angle(), this.opening);
       yaw = Math.atan2(-Math.cos(psi), -Math.sin(psi)); // along the way it turns
       speed = (this.online ? this.snap.omega : this.sim.omega) * GW_RIDER_R; // the legs keep pace with the wheel
       this.rig.lookAlong(yaw); // the camera turns with the rider, staying behind them
@@ -310,7 +356,49 @@ export class GreatWheel {
 
   /** Where opening `this.opening` is now. */
   private niche(): [number, number] {
-    const [dx, dz] = dirOf(openingAzimuth(this.angle(), this.opening));
-    return [GREAT_WHEEL.x + dx * GW_RIDER_R, GREAT_WHEEL.z + dz * GW_RIDER_R];
+    const [dx, dz] = dirOf(openingAzimuth(this.shown ?? this.angle(), this.opening));
+    return [this.def.x + dx * GW_RIDER_R, this.def.z + dz * GW_RIDER_R];
+  }
+}
+
+/** All the great wheels, for the game: you are on at most one, and E, Q, the buttons and the camera go to that one. */
+export class GreatWheels {
+  readonly wheels: GreatWheel[];
+  constructor(ctx: WorldContext, net: NetClient, player: LocalPlayer, rig: CameraRig) {
+    this.wheels = GREAT_WHEELS.map((def) => new GreatWheel(ctx, net, player, rig, def));
+  }
+  /** The wheel our character is in the hands of, if any. */
+  private get mine() {
+    return this.wheels.find((w) => w.controlling);
+  }
+  get controlling() {
+    return !!this.mine;
+  }
+  get turning() {
+    return this.wheels.some((w) => w.turning);
+  }
+  get canLeave() {
+    return this.wheels.some((w) => w.canLeave);
+  }
+  get mashLevel() {
+    return this.mine?.mashLevel ?? 0;
+  }
+  pressE() {
+    this.mine?.pressE();
+  }
+  getOff() {
+    this.mine?.getOff();
+  }
+  prompt() {
+    return this.mine?.prompt() ?? null;
+  }
+  set onPress(fn: () => void) {
+    for (const w of this.wheels) w.onPress = fn;
+  }
+  set onSpin(fn: () => void) {
+    for (const w of this.wheels) w.onSpin = fn;
+  }
+  set onJoin(fn: () => void) {
+    for (const w of this.wheels) w.onJoin = fn;
   }
 }
