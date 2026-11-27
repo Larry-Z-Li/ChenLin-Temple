@@ -9,7 +9,7 @@ export class Minimap {
   readonly el: HTMLCanvasElement;
   private g: CanvasRenderingContext2D;
   private size = 200;
-  private dpr = Math.min(2, window.devicePixelRatio || 1);
+  private dpr = Math.min(3, window.devicePixelRatio || 1);
 
   constructor(parent: HTMLElement, onClick: () => void) {
     this.el = h('canvas', { class: 'minimap', onclick: onClick }) as HTMLCanvasElement;
@@ -91,7 +91,7 @@ export class BigMap {
   draw(me: THREE.Vector3, myYaw: number, others: THREE.Vector3[]) {
     if (!this.isOpen) return;
     const css = Math.floor(Math.min(window.innerHeight * 0.8, window.innerWidth * 0.9 - 32));
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = Math.min(3, window.devicePixelRatio || 1); // (phones are 3×: draw at their full sharpness)
     if (this.canvas.width !== css * dpr) {
       this.canvas.width = this.canvas.height = css * dpr;
       this.canvas.style.width = this.canvas.style.height = `${css}px`;

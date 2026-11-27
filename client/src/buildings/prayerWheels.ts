@@ -176,7 +176,8 @@ export class PrayerWheels {
       ctx.scene.add(glow);
       const wheel: Wheel = { id: `wheel-${hw.id}`, x: hw.x, z: hw.z, drum, drumMat, glow, speed: 0, charge: 0, emitAcc: 0, spinner: null, turns: 0, size: M };
       this.wheels.set(wheel.id, wheel);
-      ctx.interactions.add({ id: wheel.id, x: hw.x, z: hw.z + MR + 0.75, radius: 1.3, prompt: () => ({ text: t('prompt.gwMash'), mash: true }), onInteract: () => this.push(wheel) }); // (the gold tap-fast button, as at the great wheels)
+      ctx.interactions.add({ id: wheel.id, x: hw.x, z: hw.z, radius: MR + 1.5, // (from any side: the drum's collider keeps you at arm's length)
+         prompt: () => ({ text: t('prompt.gwMash'), mash: true }), onInteract: () => this.push(wheel) }); // (the gold tap-fast button, as at the great wheels)
     }
 
     // Shared light-mote particle system

@@ -62,7 +62,6 @@ kbd { display: inline-grid; place-items: center; min-width: 1.7em; height: 1.7em
 .prompt.mash kbd { background: #3a2604; color: #ffe7a6; border-color: #3a2604; }
 .prompt.wheel-off { background: rgba(150, 34, 26, 0.92); color: #fff; border-color: rgba(255, 210, 200, 0.5); font-weight: 600; }
 .prompt.wheel-off kbd { background: #fff; color: #8e1d17; border-color: #fff; }
-body.touch .prompt.mash kbd, body.touch .prompt.wheel-off kbd, body.touch .prompt.circle-hint kbd { display: none; } /* (no keys on a phone: just the buttons) */
 body.touch .prompt.wheel-off, body.touch .prompt.circle-hint { bottom: 290px; }
 @media (max-height: 500px) { body.touch .prompt.wheel-off, body.touch .prompt.circle-hint { bottom: 120px; } }
 .prompt.busy { opacity: 0.7; font-style: italic; }

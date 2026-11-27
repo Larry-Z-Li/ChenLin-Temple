@@ -39,13 +39,16 @@ export function mapProjector(S: number) {
 const bases = new Map<string, HTMLCanvasElement>();
 if (typeof document !== 'undefined') void document.fonts?.ready.then(() => bases.clear());
 onLocaleChange(() => bases.clear());
-function base(S: number, labels: boolean) {
-  const key = `${S}|${labels}|${getLocale()}`;
+/** The map's still part, drawn once at `r` device pixels per CSS pixel (so it's as sharp as the screen it goes on). */
+function base(S: number, labels: boolean, r: number) {
+  const key = `${S}|${labels}|${r}|${getLocale()}`;
   let c = bases.get(key);
   if (!c) {
     c = document.createElement('canvas');
-    c.width = c.height = S;
-    drawStyledMap(c.getContext('2d')!, S, 'garden', { labels });
+    c.width = c.height = Math.round(S * r);
+    const cg = c.getContext('2d')!;
+    cg.scale(r, r);
+    drawStyledMap(cg, S, 'garden', { labels });
     bases.set(key, c);
   }
   return c;
@@ -62,7 +65,7 @@ export function drawTempleMap(g: CanvasRenderingContext2D, S: number, marks: Map
     g.arc(x, y, r, 0, Math.PI * 2);
     g.fill();
   };
-  g.drawImage(base(S, !!marks.labels), 0, 0);
+  g.drawImage(base(S, !!marks.labels, Math.max(1, g.getTransform().a)), 0, 0, S, S); // (at the screen's own sharpness)
 
   g.fillStyle = '#fff';
   g.strokeStyle = 'rgba(60,40,20,0.8)';
