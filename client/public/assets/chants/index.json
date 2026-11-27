@@ -1,7 +1,11 @@
 {
   "items": [
     {"id": "om-mani-padme-hum", "title": {"en": "Six-Syllable Mantra · Oṃ Maṇi Padme Hūṃ", "zh-Hant": "六字大明咒"}, "file": "om-mani-padme-hum.m4a"},
+    {"id": "marici", "title": {"en": "Mārīcī Heart Mantra", "zh-Hant": "摩利支天菩薩心咒"}, "file": "marici.m4a"},
     {"id": "shengmen-mahakala", "title": {"en": "Qimen Life Gate: Gate of Wealth · Mahākāla Mantra", "zh-Hant": "奇門遁甲生門：財富之門，開運招福　大黑天財神真言"}, "file": "shengmen-mahakala.mp3"},
-    {"id": "jingmen-akashagarbha", "title": {"en": "Qimen View Gate: Gate of Wisdom · Ākāśagarbha Mantra", "zh-Hant": "奇門遁甲景門：智慧之門，潛能寶藏　虛空藏菩薩真言"}, "file": "jingmen-akashagarbha.mp3"}
+    {"id": "jingmen-akashagarbha", "title": {"en": "Qimen View Gate: Gate of Wisdom · Ākāśagarbha Mantra", "zh-Hant": "奇門遁甲景門：智慧之門，潛能寶藏　虛空藏菩薩真言"}, "file": "jingmen-akashagarbha.mp3"},
+    {"id": "yaoshi-bhaisajyaguru", "title": {"en": "Tangmi Medicine Buddha Mantra · Bhaisajyaguru", "zh-Hant": "唐密藥師如來真言"}, "file": "yaoshi-bhaisajyaguru.m4a"},
+    {"id": "changshou-amitayus", "title": {"en": "Amitāyus Heart Mantra · Buddha of Infinite Life", "zh-Hant": "長壽佛心咒"}, "file": "changshou-amitayus.m4a"},
+    {"id": "kukai-henjo-kongo", "title": {"en": "Homage to Kūkai · Henjō Kongō", "zh-Hant": "南無大師遍照金剛御寶號"}, "file": "kukai-henjo-kongo.m4a"}
   ]
 }
