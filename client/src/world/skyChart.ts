@@ -125,6 +125,12 @@ function drawSymbols(g: CanvasRenderingContext2D, images: HTMLImageElement[]) {
  * Stars as small soft round points that twinkle (each at its own pace), instead of square dots or painted
  * blobs. `size` in CSS pixels; `amp` how deep the twinkle dips (0 none … 1 out).
  */
+/**
+ * The drawing resolution (device pixels per CSS pixel) the scene is actually rendered at, which the game lowers on a
+ * struggling phone: every star field sizes its points by it, so a star is the same size on screen on every device.
+ */
+export const SKY_PX = { value: 1 };
+
 export function twinkleStars(pos: number[], tint: number[], size: number[], amp: number, glisten = 0) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -132,7 +138,7 @@ export function twinkleStars(pos: number[], tint: number[], size: number[], amp:
   geo.setAttribute('size', new THREE.Float32BufferAttribute(size, 1));
   geo.setAttribute('phase', new THREE.Float32BufferAttribute(size.map(() => Math.random()), 1));
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uPx: { value: Math.min(2, window.devicePixelRatio || 1) }, uAmp: { value: amp }, uGlint: { value: glisten } },
+    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uPx: SKY_PX, uAmp: { value: amp }, uGlint: { value: glisten } },
     vertexShader: /* glsl */ `
       attribute vec3 tint; attribute float size, phase;
       uniform float uTime, uOpacity, uPx, uAmp, uGlint;

@@ -74,5 +74,5 @@ export function saveSettings() {
 export const isTouchDevice = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
 export function graphicsLevel(): 'high' | 'low' {
-  return settings.graphics === 'auto' ? (isTouchDevice || settings.autoLow ? 'low' : 'high') : settings.graphics;
+  return settings.graphics === 'auto' ? (settings.autoLow ? 'low' : 'high') : settings.graphics; // (phones too start high: 'auto' steps down by itself if one can't keep up)
 }

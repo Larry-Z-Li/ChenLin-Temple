@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SKY_PX } from './world/skyChart';
 import { FLAG_CIRCLE, FLAG_CLOUD, FLAG_INCENSE, FLAG_INCENSE_LIT, FLAG_LISTENING, FLAG_TRAIL_SHIFT, FLAG_WHEEL, SNAPSHOT_HZ, WHEEL_MAX } from '../../shared/protocol';
 import { Circumambulation } from './activities/circumambulation';
 import { CircleWalk } from './activities/circleWalk';
@@ -155,12 +156,13 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   // High / low graphics: pixel ratio, shadows, grass & flowers, how many lamps really light.
   // On high the resolution adapts (see measure): sharpness gives way first, before shadows or lights.
   const SCALES = [2, 1.75, 1.5, 1.25, 1];
-  let scaleStep = 0;
-  const pixelRatio = () => Math.min(window.devicePixelRatio, graphicsLevel() === 'low' ? 1 : SCALES[scaleStep]);
+  // (phones, on low graphics, start at 1.5× and find their own level like everyone else: no longer stuck at a soft 1×)
+  let scaleStep = isTouchDevice ? 2 : 0;
+  const pixelRatio = () => Math.min(window.devicePixelRatio, SCALES[scaleStep]);
   const applyGraphics = () => {
     const low = graphicsLevel() === 'low';
     lights.setActive(low ? 4 : 8);
-    renderer.setPixelRatio(pixelRatio());
+    renderer.setPixelRatio(pixelRatio()), (SKY_PX.value = renderer.getPixelRatio());
     renderer.shadowMap.enabled = !low;
     sky.sun.castShadow = !low;
     for (const m of ctx.detailMeshes) m.visible = !low;
@@ -435,15 +437,15 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     fpsFrames = 0;
     fpsT = now;
     hud.setFps(fps, renderer.info.render.calls);
-    // High graphics: drop the render resolution a step when the frame rate sags, raise it again when
+    // Any graphics: drop the render resolution a step when the frame rate sags, raise it again when
     // there's room. Only once it's at 1× does 'auto' fall back to low graphics.
-    if (span <= 2 && graphicsLevel() === 'high') {
+    if (span <= 2) {
       sagFor = fps < 42 ? sagFor + span : 0;
       easyFor = fps > 57 ? easyFor + span : 0;
       const step = sagFor >= 1.5 && pixelRatio() > 1 ? 1 : easyFor >= easyNeed && scaleStep > 0 ? -1 : 0;
       if (step) {
         scaleStep += step;
-        renderer.setPixelRatio(pixelRatio());
+        renderer.setPixelRatio(pixelRatio()), (SKY_PX.value = renderer.getPixelRatio());
         sagFor = easyFor = 0;
         if (step > 0) easyNeed = Math.min(120, easyNeed * 2); // stepped up too soon: wait longer next time
         if (step > 0) return void (slowFor = 0);
