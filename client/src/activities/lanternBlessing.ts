@@ -176,7 +176,7 @@ export class LanternBlessing {
       }
       p.x += (dx / d) * step;
       p.z += (dz / d) * step;
-      this.player.anchor(p.x, this.ground(p), p.z, Math.atan2(-dx, -dz), 'ritual', 'walk');
+      this.player.anchor(p.x, this.ground(p), p.z, Math.atan2(-dx, -dz), 'ritual', 'walk', SPEED);
       return false;
     }
     return j.leg >= path.length;

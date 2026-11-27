@@ -34,13 +34,13 @@ export class LocalPlayer {
   }
 
   /** Pin to a spot (a cushion). */
-  anchor(x: number, y: number, z: number, yaw: number, mode: PlayerMode, anim: Anim) {
+  anchor(x: number, y: number, z: number, yaw: number, mode: PlayerMode, anim: Anim, speed = 0) {
     this.pos.set(x, y, z);
     this.yaw = yaw;
     this.mode = mode;
     this.anchorAnim = anim;
     this.vel.set(0, 0);
-    this.speed = 0;
+    this.speed = speed; // (walked by a ritual: the legs keep its pace)
   }
 
   setAnchorAnim(anim: Anim) {

@@ -13,7 +13,7 @@ const TURN_R = 0.35, TURN_V = 0.35;
 /** Seconds spent halfway round each turn, facing out over the valley. */
 const GAZE = 2.5;
 /** The stretch he paces: as long as the ground allows, within these (metres). */
-const MIN_LEN = 40, MAX_LEN = 80;
+const MIN_LEN = 30, MAX_LEN = 80;
 /** Spacing of the walk's centre line (metres). */
 const STEP = 0.5;
 
@@ -70,7 +70,7 @@ export class Intro {
   /**
    * Where along the ridge walk to pace (metres along the curve): the longest stretch that is gentle
    * (no steep pitch, no sharp bend), clear of the walk's ends and of anything to bump into, keeps him
-   * in the camera's view all along, and looks out most openly over the valley.
+   * in the camera's view all along, looks out most openly over the valley, and lies as near due west as it can.
    */
   private pickStretch(curve: THREE.CatmullRomCurve3): [number, number] {
     const g = this.ctx.ground, len = curve.getLength(), N = Math.max(2, Math.floor(len));
@@ -123,7 +123,9 @@ export class Intro {
           if (bad[k]) nBad++;
         }
         const gentle = maxSlope <= 0.25 && maxBend <= 0.035;
-        const cost = (nBad ? 100 + nBad : 0) + (gentle ? 0 : 10) + 4 * maxSlope + 20 * maxBend + (0.03 * sumView) / (w + 1) - 0.01 * w;
+        // (and as near due west of the temple as it can be: the cloud flies you in from the west)
+        const [mx, mz] = A[i + (w >> 1)], b = Math.atan2(mx - STUPA_COURT.x, mz - STUPA_COURT.z), west = Math.abs(Math.atan2(Math.sin(b + Math.PI / 2), Math.cos(b + Math.PI / 2)));
+        const cost = (nBad ? 100 + nBad : 0) + (gentle ? 0 : 10) + 4 * maxSlope + 20 * maxBend + (0.03 * sumView) / (w + 1) - 0.01 * w + 30 * west; // (west outweighs gentle: only something in the way, or out of shot, beats it)
         if (cost < bestCost) [best, bestCost] = [[i, i + w], cost];
       }
     return [(best[0] * len) / N, (best[1] * len) / N];

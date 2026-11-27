@@ -329,7 +329,7 @@ body.beads-sutra .info { left: 16px; transform: none; max-width: max(180px, calc
 
 
 /* 功德 earned: "+n" pops beside the drawer and slides into it, which glows as it lands */
-.merit-pop { position: fixed; left: 0; top: 0; z-index: 32; pointer-events: none; font: 700 32px var(--serif); color: #ffe7a3; text-shadow: 0 0 14px rgba(255, 196, 90, 0.85), 0 2px 6px rgba(0, 0, 0, 0.5); white-space: nowrap; }
-body:not(.touch) .merit-pop { font-size: 40px; } /* bigger on a computer */
+.merit-pop { position: fixed; left: 0; top: 0; z-index: 32; pointer-events: none; font: 700 48px var(--serif); color: #ffe7a3; text-shadow: 0 0 14px rgba(255, 196, 90, 0.85), 0 2px 6px rgba(0, 0, 0, 0.5); white-space: nowrap; }
+body:not(.touch) .merit-pop { font-size: 60px; } /* bigger on a computer */
 .merit.bump { animation: merit-bump 0.6s ease-out; }
 @keyframes merit-bump { 0% { box-shadow: 0 0 0 rgba(255, 210, 120, 0); } 30% { box-shadow: 0 0 22px rgba(255, 210, 120, 0.75); } 100% { box-shadow: 0 0 0 rgba(255, 210, 120, 0); } }

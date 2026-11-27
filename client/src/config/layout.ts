@@ -281,6 +281,16 @@ export const BENCHES: BenchDef[] = [
   ...ring(POND.x, POND.z, POND.radius + 3.5, [0.75, 2.3, 5.5]), // release pond
   { x: DRAGON_POOL.x - 7.5, z: DRAGON_POOL.z - 4.6, face: E }, { x: DRAGON_POOL.x + 7.5, z: DRAGON_POOL.z - 4.6, face: W }, // dragon pool (the brook and its outflow run in and out along its middle)
   { ...at(-10, -35), face: N }, // behind Yangsheng Court, facing Chengjiu
+  // along the footpaths, every 26 m or so on alternate sides, facing the path (where there's level, open ground)
+  { x: -47.9, z: -40.3, face: 3.142 }, { x: -21.9, z: -40.3, face: 3.142 }, { x: 4.1, z: -44.3, face: 0 }, { x: 30.1, z: -40.3, face: 3.142 },
+  { x: 56.1, z: -44.3, face: 0 }, { x: -47.9, z: 94.8, face: 3.142 }, { x: -21.9, z: 94.8, face: 3.142 }, { x: 30.1, z: 94.8, face: 3.142 },
+  { x: 56.1, z: 90.8, face: 0 }, { x: -60.6, z: -30.3, face: 1.571 }, { x: -45.8, z: 136, face: 2.161 }, { x: -28, z: 155.4, face: -0.981 },
+  { x: 60.6, z: -30.3, face: -1.571 }, { x: 45.8, z: 136, face: -2.161 }, { x: 28, z: 155.4, face: 0.981 }, { x: -49.1, z: 57.9, face: -2.356 },
+  { x: 49.1, z: 57.9, face: 2.356 }, { x: -24, z: -54.3, face: 1.571 }, { x: 24, z: -54.3, face: -1.571 }, { x: -24.6, z: -106.7, face: 1.621 },
+  { x: 24.6, z: -106.7, face: -1.621 }, { x: -85.9, z: -40.3, face: -3.142 }, { x: -98.9, z: -57.6, face: 2.099 }, { x: -145.7, z: -109.6, face: 0.165 },
+  { x: 85.9, z: -40.3, face: 3.142 }, { x: 96, z: -73.8, face: 1.304 }, { x: -70.8, z: 29.2, face: 0.096 }, { x: -96.2, z: 35.6, face: -3.045 },
+  { x: 70.6, z: -14.5, face: 3.12 }, { x: 96.6, z: -17.9, face: -0.022 }, { x: 129.9, z: -13.8, face: 3.142 }, { x: 70.8, z: 29.5, face: -0.125 },
+  { x: -83.6, z: 100.2, face: -2.66 }, { x: -99.7, z: 114.8, face: -2.159 }, { x: 83.6, z: 100.2, face: 2.66 }, { x: 101.5, z: 113.9, face: 2.322 },
 ];
 
 /**

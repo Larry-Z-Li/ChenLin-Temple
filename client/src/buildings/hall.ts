@@ -446,7 +446,7 @@ function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: numb
 }
 
 /** Red silk lantern hanging from a cord; origin at the top of the cord (pivot for swaying). */
-export function buildRedLantern(cord = 0.55) {
+export function buildRedLantern(cord = 0.55, tassel = true) {
   const g = new THREE.Group();
   const gold = mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 });
   g.add(cylinder(0.012, 0.012, cord, mat(0x2a1a10), 0, -cord, 0, 5));
@@ -459,7 +459,7 @@ export function buildRedLantern(cord = 0.55) {
   g.add(halo);
   g.add(cylinder(0.15, 0.15, 0.07, gold, 0, -cord - 0.05, 0, 14));
   g.add(cylinder(0.15, 0.15, 0.07, gold, 0, -cord - 0.78, 0, 14));
-  g.add(cylinder(0.025, 0.05, 0.32, mat(0xb81d18, { roughness: 0.9 }), 0, -cord - 1.12, 0, 8));
+  if (tassel) g.add(cylinder(0.025, 0.05, 0.32, mat(0xb81d18, { roughness: 0.9 }), 0, -cord - 1.12, 0, 8));
   return g;
 }
 

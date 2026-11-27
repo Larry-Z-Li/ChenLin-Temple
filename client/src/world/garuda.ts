@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { glowTexture } from '../core/textures';
 
 /**
  * Garuda: standing, hands joined at the chest, crowned, with great spread wings, a fan of tail feathers and taloned
@@ -210,10 +211,18 @@ export function buildGaruda(): Garuda {
 
   // ---------- one skinned mesh ----------
   const geo = mergeGeometries([mergeGeometries(buckets.body), mergeGeometries(buckets.gold), mergeGeometries(buckets.feather)], true);
+  // (glowing always, each part in its own colours: the emissive taken from the vertex colours)
+  const glowing = (m: THREE.MeshStandardMaterial, k: number) => {
+    m.emissive.setRGB(1, 1, 1);
+    m.emissiveIntensity = k;
+    m.onBeforeCompile = (sh) => (sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= vColor.rgb;'));
+    m.customProgramCacheKey = () => 'garuda-glow';
+    return m;
+  };
   const mesh = new THREE.SkinnedMesh(geo, [
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, flatShading: true }),
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.85, flatShading: true }),
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true, side: THREE.DoubleSide }),
+    glowing(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, flatShading: true }), 0.4),
+    glowing(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.85, flatShading: true }), 0.6),
+    glowing(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true, side: THREE.DoubleSide }), 0.45),
   ]);
   mesh.add(root);
   mesh.bind(new THREE.Skeleton(list));
@@ -222,6 +231,11 @@ export function buildGaruda(): Garuda {
   const group = new THREE.Group();
   group.name = 'Garuda';
   group.add(mesh);
+  // and a soft golden aura about him
+  const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffd27a, transparent: true, opacity: 0.42, depthWrite: false, blending: THREE.AdditiveBlending }));
+  aura.position.set(0, 1.5, 0);
+  aura.scale.setScalar(3.6);
+  group.add(aura);
 
   // ---------- its own motion: a slow idle, or a wingbeat ----------
   let t = 0;

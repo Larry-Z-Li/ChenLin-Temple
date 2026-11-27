@@ -58,9 +58,10 @@ export function ridgePlan(): RidgePlan {
     [s.nx, s.nz] = [-s.tz, s.tx];
     if (s.nx * (c.x - s.x) + s.nz * (c.z - s.z) < 0) [s.nx, s.nz] = [-s.nx, -s.nz];
   });
-  // Level the walk: a wide moving average, twice, so it rises and falls gently.
-  for (let pass = 0; pass < 2; pass++) {
-    const src = samples.map((s) => s.h), W = 10;
+  // Level the walk: a wide moving average (±40 m), three times over, so it rises and falls gently (the terrace is cut
+  // into the hill, or built up, to match).
+  for (let pass = 0; pass < 3; pass++) {
+    const src = samples.map((s) => s.h), W = 20;
     samples.forEach((s, i) => {
       let sum = 0, cnt = 0;
       for (let j = Math.max(0, i - W); j <= Math.min(samples.length - 1, i + W); j++) (sum += src[j]), cnt++;

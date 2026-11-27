@@ -6,6 +6,7 @@ import { mulberry32, range } from '../core/math';
 import { canvasTexture } from '../core/textures';
 import { inscription, onLocaleChange, t } from '../i18n';
 import { buildRedLantern } from './hall';
+import { addLamp } from '../world/lightPool';
 import { box, cylinder, mat } from './materials';
 import { irimoyaRoof, roofTexture, shojiTexture } from './japaneseRoof';
 
@@ -246,6 +247,15 @@ function buildTableHut(ctx: WorldContext) {
   g.add(box(4.5, 0.32, 0.3, dark, 0, PLH + Hh - 0.32, half)); // the front lintel: open below it
   for (const [px, pz] of [[-half, -half], [half, -half], [-half, half], [half, half]]) g.add(cylinder(0.12, 0.14, Hh, dark, px, PLH, pz, 10));
   hojoRoof(g, 6.4, 6.0, 1.9, PLH + Hh, 0);
+  // red lanterns hung at the four corners of the eave, lighting the floor and the grass round it after dark
+  for (const [lx, lz] of [[-2.55, 2.55], [2.55, 2.55], [-2.55, -2.55], [2.55, -2.55]]) {
+    const l = buildRedLantern(0.3, false); // (no tassel: just the round lantern)
+    l.scale.setScalar(0.75);
+    l.position.set(lx, PLH + Hh + 0.05, lz);
+    g.add(l);
+    const [wx, wz] = toWorld(lx, lz);
+    addLamp({ x: wx, y: hi + PLH + Hh - 0.75, z: wz, color: 0xff9a60, intensity: 1.6, range: 6.5, decay: 1.4 }); // (a soft glow round the hut, not a floodlight)
+  }
 
   // Furniture: a table against the back, a bench in front of it, a stool at each end
   const tz = -0.7;
