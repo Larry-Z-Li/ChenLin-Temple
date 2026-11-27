@@ -13,7 +13,9 @@ const WATER_Y = POND_LEVEL;
 let kit: ReturnType<typeof makeLotusKit> | null = null;
 function makeLotusKit() {
   const padGeo = new THREE.CircleGeometry(0.55, 14, 0.3, Math.PI * 2 - 0.45).rotateX(-Math.PI / 2); // a disc with a notch
-  const padMat = new THREE.MeshStandardMaterial({ color: 0x3f7f3a, roughness: 0.6, side: THREE.DoubleSide });
+  // (only centimetres over the water: from far off the depth buffer can't tell them apart and the water would draw
+  // over them, so the pads are always drawn a step nearer than they are)
+  const padMat = new THREE.MeshStandardMaterial({ color: 0x3f7f3a, roughness: 0.6, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 });
   const petals: THREE.BufferGeometry[] = []; // two rings of petals
   for (let ring = 0; ring < 2; ring++) {
     const count = ring ? 8 : 6, tilt = ring ? 0.9 : 0.45, len = ring ? 0.26 : 0.22;

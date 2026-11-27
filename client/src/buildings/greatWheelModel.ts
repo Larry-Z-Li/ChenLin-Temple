@@ -147,13 +147,13 @@ export function buildGreatWheelModel(root: THREE.Group, wheel: THREE.Group, half
     root.add(halo);
     root.updateMatrixWorld(true);
     const at = root.localToWorld(new THREE.Vector3(lx, ly, lz));
-    addLamp({ x: at.x, y: at.y, z: at.z, color: 0xff8a50, intensity: 5, range: 15, decay: 1.1 });
+    addLamp({ x: at.x, y: at.y, z: at.z, color: 0xff8a50, intensity: 3, range: 15, decay: 1.1 });
   }
   // the uplights: a spotlight on the floor between each pair of the riders' places, out past their circle, its
-  // bronze barrel on a yoke aimed up at the drum, its lens glowing, a faint beam to the drum after dark, and a real light
-  const lensMat = new THREE.MeshStandardMaterial({ color: 0xfff4dc, roughness: 0.15, emissive: 0xffd9a0, emissiveIntensity: 0.1 });
-  const beamMat = new THREE.MeshBasicMaterial({ color: 0xffdcaa, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
-  nightGlow.track((n) => { const k = smoothstep(0.15, 0.6, n); lensMat.emissiveIntensity = 0.1 + 1.4 * k; beamMat.opacity = 0.06 * k; });
+  // bronze barrel on a yoke aimed up at the drum, its lens glowing after dark, and a real light
+  // (the lens a few millimetres proud of the barrel's end, and drawn a step nearer, so the two never flicker)
+  const lensMat = new THREE.MeshStandardMaterial({ color: 0xfff4dc, roughness: 0.15, emissive: 0xffd9a0, emissiveIntensity: 0.1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+  nightGlow.track((n) => { const k = smoothstep(0.15, 0.6, n); lensMat.emissiveIntensity = 0.1 + 1.4 * k; });
   const tilt = 0.9, aim = new THREE.Vector3(0, Math.sin(tilt), -Math.cos(tilt)), headY = 0.32, SPOT_R = 6.8;
   const toAim = (from: THREE.Vector3) => new THREE.Quaternion().setFromUnitVectors(from, aim);
   const lensAt = aim.clone().multiplyScalar(0.19).add(new THREE.Vector3(0, headY, 0));
@@ -163,20 +163,15 @@ export function buildGreatWheelModel(root: THREE.Group, wheel: THREE.Group, half
     s.add(goldDark, new THREE.CylinderGeometry(0.2, 0.22, 0.05, 12), x, P + 0.025, z, ry);
     for (const side of [-1, 1]) s.add(goldDark, new THREE.BoxGeometry(0.03, 0.34, 0.06).translate(side * 0.18, 0.2, 0), x, P, z, ry);
     s.add(goldDark, new THREE.CylinderGeometry(0.13, 0.155, 0.38, 14).applyQuaternion(toAim(new THREE.Vector3(0, 1, 0))).translate(0, headY, 0), x, P, z, ry);
-    s.add(lensMat, new THREE.CircleGeometry(0.115, 18).applyQuaternion(toAim(new THREE.Vector3(0, 0, 1))).translate(lensAt.x, lensAt.y, lensAt.z), x, P, z, ry);
-    const beam = new THREE.Mesh(new THREE.ConeGeometry(1.1, 4.4, 18, 1, true).translate(0, -2.2, 0).applyQuaternion(toAim(new THREE.Vector3(0, -1, 0))).translate(lensAt.x, lensAt.y, lensAt.z), beamMat);
-    beam.position.set(x, P, z);
-    beam.rotation.y = ry;
-    beam.renderOrder = 2;
-    root.add(beam);
+    s.add(lensMat, new THREE.CircleGeometry(0.115, 18).applyQuaternion(toAim(new THREE.Vector3(0, 0, 1))).translate(lensAt.x + aim.x * 0.006, lensAt.y + aim.y * 0.006, lensAt.z + aim.z * 0.006), x, P, z, ry);
     // its light: a real one (from the pool given to the lamps nearest you), from the lens toward the drum
     const lens = new THREE.Vector3(lensAt.x, lensAt.y, lensAt.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), ry).add(new THREE.Vector3(x, P, z));
     const at = root.localToWorld(lens.addScaledVector(new THREE.Vector3(-Math.sin(a), 0.6, Math.cos(a)), 0.6));
-    addLamp({ x: at.x, y: at.y, z: at.z, color: 0xffd9a8, intensity: 5, range: 18, decay: 0.9, indoor: true });
+    addLamp({ x: at.x, y: at.y, z: at.z, color: 0xffd9a8, intensity: 2.8, range: 18, decay: 0.9, indoor: true });
     // …and, so the drum stays lit from across the valley (when the real lights have gone to nearer lamps), the light
     // where the beam lands painted into the night light map
     const hit = root.localToWorld(new THREE.Vector3(Math.sin(a) * (GW_WHEEL_R + 0.6), P + 1.6, -Math.cos(a) * (GW_WHEEL_R + 0.6)));
-    addLamp({ x: hit.x, y: hit.y, z: hit.z, color: 0xffd9a8, intensity: 3, range: 7, decay: 1.1 });
+    addLamp({ x: hit.x, y: hit.y, z: hit.z, color: 0xffd9a8, intensity: 1.8, range: 7, decay: 1.1 });
   }
   const roof = (W: number, h: number, y: number) => {
     s.add(dark, hipRoofGeometry(W, W, h).geometry, 0, y, 0);

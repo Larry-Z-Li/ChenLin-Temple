@@ -48,8 +48,10 @@ export async function buildNineSyllables(scene: THREE.Scene, groundAt: (x: numbe
   // the middle syllable: a big square carpet on the walk between the south gate and the incense burner, the character in gold on deep red
   const rug = new THREE.Group();
   rug.add(new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.03, 6.4).translate(0, 0.015, 0), new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.8 })));
-  rug.add(new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.05, 6.0).translate(0, 0.025, 0), new THREE.MeshStandardMaterial({ color: 0x6e1410, roughness: 0.95 })));
-  const top = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 5.4).rotateX(-Math.PI / 2).translate(0, 0.056, 0), new THREE.MeshStandardMaterial({ map: charTexture(MIDDLE), transparent: true, alphaTest: 0.2, roughness: 0.85 }));
+  // (the layers only centimetres apart: from far off the depth buffer can't tell them apart, so each is drawn a step
+  // nearer than the one under it, and they never flicker into each other)
+  rug.add(new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.05, 6.0).translate(0, 0.025, 0), new THREE.MeshStandardMaterial({ color: 0x6e1410, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 5.4).rotateX(-Math.PI / 2).translate(0, 0.056, 0), new THREE.MeshStandardMaterial({ map: charTexture(MIDDLE), transparent: true, alphaTest: 0.2, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
   rug.add(top);
   // on the court's paving (its slabs' top is 0.07 above the ground; see decor.ts); reads upright walking in from the south gate
   rug.scale.set(COURT_CARPET.scale, 1, COURT_CARPET.scale);

@@ -108,6 +108,7 @@ export class PrayerWheels {
           id: wheel.id, x: row.x + sign * 0.95, z, radius: 0.8,
           prompt: () => ({ text: t('prompt.spin') }),
           onInteract: () => this.push(wheel),
+          key: 'R', // (its own key: E is everything else's)
         });
       }
     }

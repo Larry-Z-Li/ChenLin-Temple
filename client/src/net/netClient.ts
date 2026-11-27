@@ -34,6 +34,7 @@ export interface NetEvents {
   wishDenied: (reason: WishDenyReason) => void;
   /** A prayer flag given to Garuda, and where it will hang. */
   flag: (line: number, slot: number, color: number, by: string) => void;
+  notice: (kind: 'update', inMs: number) => void;
   fed: (deer: string, by: string, fruit: Fruit) => void;
   pickDenied: (fruit: string, reason: 'gone' | 'full') => void;
   offered: (hall: string, offering: Offering, by: string) => void;
@@ -133,6 +134,7 @@ export class NetClient {
       case 'blessing': return this.emit('blessing', msg.id, msg.by, msg.spot, msg.prayers);
       case 'wishDenied': return this.emit('wishDenied', msg.reason);
       case 'flag': return this.emit('flag', msg.line, msg.slot, msg.color, msg.by);
+      case 'notice': return this.emit('notice', msg.kind, msg.in);
       case 'fed': return this.emit('fed', msg.deer, msg.by, msg.fruit);
       case 'pickDenied': return this.emit('pickDenied', msg.fruit, msg.reason);
       case 'offered': return this.emit('offered', msg.hall, msg.offering, msg.by);

@@ -17,6 +17,7 @@ const G = { x: BASIN.x, y: -300, z: BASIN.z };
 export function buildModelGallery(ctx: WorldContext, models: Record<string, string>, up: () => boolean) {
   const ids = Object.keys(DEITIES) as DeityId[], slots: (DeityId | 'garuda')[] = [...ids, 'garuda'];
   const K = 2, per = Math.ceil(slots.length / 2), GAP = 3.6 * K, W = per * GAP + 8, D = 15 * K; // (everything twice life on the altars, to see it well)
+  const FOOT_Y = 1.15, FOOT_OUT = 2.1; // (each name at its statue's feet, before the plinth, toward the aisle)
   const group = new THREE.Group();
   group.position.set(G.x, G.y, G.z);
   const stone = new THREE.MeshStandardMaterial({ color: 0xb9b2a5, roughness: 0.9 }), wallMat = new THREE.MeshStandardMaterial({ color: 0x8f877a, roughness: 0.9 });
@@ -60,13 +61,13 @@ export function buildModelGallery(ctx: WorldContext, models: Record<string, stri
       g.root.scale.setScalar(K);
       group.add(g.root);
       ctx.updaters.push((dt) => g.update(dt, 'idle'));
-      label('Garuda', x, 4.6 * K, z);
+      label('Garuda', x, FOOT_Y, z + (row ? -1 : 1) * FOOT_OUT);
     } else {
       const s = buildStatueSlot(id, x, 0, z, models[id], 1, models[`${id}.halo`]);
       s.rotation.y = face;
       s.scale.setScalar(K);
       group.add(s);
-      label(`${t(DEITIES[id].nameKey as Parameters<typeof t>[0])}${models[id] ? '' : '  (—)'}`, x, 4.6 * K, z);
+      label(`${t(DEITIES[id].nameKey as Parameters<typeof t>[0])}${models[id] ? '' : '  (—)'}`, x, FOOT_Y, z + (row ? -1 : 1) * FOOT_OUT);
     }
     ctx.collisions.addCircle(G.x + x, G.z + z, 1.2 * K, true);
   });

@@ -7,7 +7,7 @@ import { STUPA_COURT } from '../config/layout';
  * each), and the lap in progress starts again.
  */
 export class Circumambulation {
-  /** Laps walked (fractional while fading outside the walls). */
+  /** Laps circled on autopilot (fractional while fading outside the walls); laps walked on foot don't count. */
   laps = 0;
   /** A lap was completed: the new count. */
   onLap: (laps: number, auto: boolean) => void = () => {};
@@ -48,10 +48,11 @@ export class Circumambulation {
     if (auto) this.lapAuto += dt;
     if (this.turned >= Math.PI * 2) {
       this.turned -= Math.PI * 2;
-      this.laps = Math.floor(this.laps + 1e-6) + 1;
       const wholly = this.lapAuto >= this.lapTime * 0.9;
       this.lapTime = this.lapAuto = 0;
-      this.onLap(this.laps, wholly);
+      if (!wholly) return; // (a lap walked on foot counts for nothing: no merit, no light)
+      this.laps = Math.floor(this.laps + 1e-6) + 1;
+      this.onLap(this.laps, true);
     }
   }
 }

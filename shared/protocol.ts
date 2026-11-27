@@ -169,9 +169,13 @@ export type ServerMsg =
       blessings: Record<string, { by: string; spot: number }>;
       /** The prayer flags hung on the ring round the temples: [line, slot, colour]. */
       flags?: [number, number, number][];
+      /** An update announced and still to come. */
+      notice?: { kind: 'update'; in: number };
     }
   /** A prayer flag given to Garuda: where it will hang (`by` gave it). */
   | { t: 'flag'; line: number; slot: number; color: number; by: string }
+  /** An announcement for everyone: the temple is about to be updated (in `in` ms; everyone reconnects by themselves). */
+  | { t: 'notice'; kind: 'update'; in: number }
   | { t: 'join'; player: PlayerInfo & { tr: Transform } }
   | { t: 'leave'; id: string }
   | { t: 'snap'; tr: Record<string, Transform> }

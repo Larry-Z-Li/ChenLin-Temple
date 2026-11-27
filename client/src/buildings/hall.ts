@@ -343,7 +343,8 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
       c.position.set(sx, F + H - 0.9, altarZ - 0.2);
       g.add(c);
     }
-    // Name plate on the altar front
+    // Name plate, standing on the altar between the statue's plinth and the water bowls (up where it reads over the
+    // offering table)
     const plateMat = new THREE.MeshStandardMaterial({ roughness: 0.6 });
     const drawPlate = () => {
       plateMat.map?.dispose();
@@ -352,9 +353,10 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
     };
     drawPlate();
     onLocaleChange(drawPlate);
-    const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.375), plateMat);
-    plate.position.set(sx, F + altarH * 0.55, altarZ + altarD / 2 + 0.01);
-    g.add(plate);
+    const frame = mat(0x3a120c, { roughness: 0.6 }), pz = altarZ + 0.68, py = F + altarH + 0.1 + 0.08;
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.04).translate(0, 0.15, 0), [frame, frame, frame, frame, plateMat, frame]);
+    plate.position.set(sx, py, pz);
+    g.add(plate, box(0.9, 0.08, 0.14, frame, sx, py - 0.08, pz)); // (on a low stand)
   });
 
   g.add(bowlMesh, waterMesh);
@@ -430,11 +432,12 @@ function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: numb
   const top = new THREE.InstancedMesh(new THREE.TorusGeometry(0.3, 0.018, 6, 28).rotateX(Math.PI / 2), mat(THEME.cushionTop, { roughness: 0.7 }), seats);
   const m = new THREE.Matrix4();
   const y = F + 0.056; // on the rug
+  const z0 = startZ + 0.46; // (the first row half a yard back from the altar: room to lie flat in 大禮拜)
   let i = 0;
   for (let r = 0; r < rows; r++)
     for (let side = -1; side <= 1; side += 2)
       for (let c = 0; c < cols; c++, i++) {
-        const x = hx + side * xs[c], z = startZ + 0.46 + r * sz; // (half a yard back from the altar: room to lie flat in 大禮拜)
+        const x = hx + side * xs[c], z = z0 + r * sz;
         body.setMatrixAt(i, m.makeTranslation(x, y, z));
         top.setMatrixAt(i, m.makeTranslation(x, y + 0.222, z));
         const id = `${def.id}-c${i}`;
@@ -442,7 +445,7 @@ function buildCushions(ctx: WorldContext, g: THREE.Group, def: HallDef, hx: numb
       }
   body.receiveShadow = top.receiveShadow = true;
   g.add(body, top);
-  return { aisle, outer: xs[cols - 1] + CUSHION_R, z0: startZ, z1: startZ + (rows - 1) * sz };
+  return { aisle, outer: xs[cols - 1] + CUSHION_R, z0, z1: z0 + (rows - 1) * sz }; // (the rug follows them)
 }
 
 /** Red silk lantern hanging from a cord; origin at the top of the cord (pivot for swaying). */

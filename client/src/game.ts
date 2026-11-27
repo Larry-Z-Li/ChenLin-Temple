@@ -253,6 +253,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const garudaFlags = new GarudaFlags(ctx, net, player, hud, flagRing);
   garudaFlags.onHung = () => addMerit(10);
   net.on('welcome', (msg) => msg.flags?.forEach(([line, slot, color]) => flagRing.hang(line, slot, color)));
+  // an update announced to everyone: a banner up top, counting down (a fresh server, after it, has none)
+  net.on('notice', (_kind, inMs) => hud.setUpdateNotice(inMs));
+  net.on('welcome', (msg) => hud.setUpdateNotice(msg.notice?.in ?? null));
   gw.onSpin = () => addMerit(10); // 功德 for every full turn of the great wheel you help turn
   net.on('push', (id, by, speed) => wheels.setSpeed(id, speed, false, by === net.id ? 'self' : by)); // whoever pushed last owns its turns
   // 功德: 1 for every 5 turns of a wheel you set going; incense 10, a fruit offered 1, a deer fed 1,
@@ -264,10 +267,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     hud.meritPop(n, settings.merit); // "+n" floats over to the 功德 drawer
   };
   let wheelTurns = 0;
-  // 繞塔: each clockwise lap of the stupa inside its walls, 10; from the first lap on, a trail of light
+  // 繞塔: each clockwise lap of the stupa circled on autopilot (press Q there), 20 and, from the first on, a trail of
+  // light; laps walked on foot count for nothing
   const circ = new Circumambulation();
-  circ.onLap = (n, auto) => {
-    if (auto) addMerit(20); // (only a lap walked on autopilot earns merit; on foot, just the trail of light)
+  circ.onLap = (n) => {
+    addMerit(20);
     hud.toast(t('circ.lap', { n }));
   };
   const myTrail = new LightTrail(scene);
@@ -302,7 +306,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       return (dx * fx + dz * fz) / d > Math.cos(Math.PI / 6);
     });
   };
-  seat.onProstration = () => (facingHoly() ? addMerit(5) : hud.toast(t('prostrate.faceHoly')));
+  seat.onProstration = () => { if (facingHoly()) addMerit(5); }; // +5 for each one toward the holy (and no word otherwise)
   gw.onJoin = () => seat.endStanding(); // on the great wheel, everything is put away
   // 繞塔 on autopilot (Q in the court; E mashes for pace; Q again or walking by hand ends it)
   const circle = new CircleWalk(ctx, player, rig, () => remotes.circlers());
@@ -380,13 +384,14 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   input.onKey((e) => {
     if (phase !== 'play' || landing || bodhiBell.active) return false; // the entry screen, the flight down, the bell
     if (e.code === 'KeyE') {
-      if (!e.repeat) circle.active ? circle.pressE() : gw.controlling ? gw.pressE() : ctx.interactions.trigger(); // each tap counts; holding doesn't auto-push
+      if (!e.repeat) circle.active ? circle.pressE() : gw.controlling ? gw.pressE() : ctx.interactions.trigger('E'); // each tap counts; holding doesn't auto-push
       return true;
     }
     if (e.code === 'KeyQ' && circle.active) return !e.repeat && circle.stop(), true;
     if (e.code === 'KeyQ' && gw.controlling) return !e.repeat && gw.getOff(), true;
     if (e.code === 'KeyQ' && !player.flying && circle.canStart) return !e.repeat && startCircle(), true;
     if (e.code === 'KeyB') return !e.repeat && bow(), true;
+    if (e.code === 'KeyR') return !e.repeat && ctx.interactions.trigger('R'), true; // (the small prayer wheels: R to turn)
     // Standing: 2 beads, 3 sutra (seated, the seat bar handles the number keys).
     // Dev preview only: F toggles flying (never in the live build).
     if ((import.meta.env.DEV || tester) && e.code === 'KeyF' && !e.repeat && !seat.seated && !cloud.riding) {
@@ -395,6 +400,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       hud.toast(player.flying ? 'Flying (dev): WASD · Space up · Q down · Shift fast · F to land' : 'Landed');
       return true;
     }
+    if (e.code === 'KeyX' && hud.noticeOpen) return hud.setUpdateNotice(null), true; // (X closes the update banner)
     if (e.code === 'KeyM') return bigMap.toggle(), true;
     if (e.code === 'Escape' && bigMap.isOpen) return bigMap.show(false), true;
     if (e.code === 'Escape' && blessing.active) return blessing.cancel(), true;
@@ -500,7 +506,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     else if (!seat.seated && !cloud.riding && !offerings.busy && !blessing.active) {
       const it = ctx.interactions.update(player.pos.x, player.pos.z);
       const p = it?.prompt();
-      hud.setPrompt(p?.text ?? null, p?.busy);
+      hud.setPrompt(p?.text ?? null, p?.busy, false, it?.key);
     }
 
     wheels.update(dt);

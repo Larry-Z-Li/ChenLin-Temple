@@ -92,6 +92,7 @@ const server = http.createServer((req, res) => {
   // Headcount only (no names), e.g. curl https://<host>/api/status
   res.setHeader('x-content-type-options', 'nosniff');
   if (req.method === 'POST' && req.url?.startsWith('/api/remove-wish')) return removeWishByHand(req, res);
+  if (req.method === 'POST' && req.url?.startsWith('/api/notice')) return announce(req, res);
   if (req.url === '/api/status') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     // present: those actually in the temple (placed, so others can see them); the limit counts every joined connection
@@ -310,6 +311,17 @@ function endBlessing(id: string, counted: boolean) {
 
 const onBoardExists = (board: string) => [...wishes.values()].some((w) => w.board === board);
 
+/** An update announced to everyone (POST /api/notice?minutes=10&key=…; minutes=0 takes it back): when it's due. */
+let updateAt = 0;
+function announce(req: http.IncomingMessage, res: http.ServerResponse) {
+  const q = new URL(req.url ?? '', 'http://x').searchParams, key = Buffer.from(q.get('key') ?? ''), want = Buffer.from(ADMIN_KEY);
+  if (!ADMIN_KEY || key.length !== want.length || !timingSafeEqual(key, want)) return res.writeHead(403).end();
+  const minutes = Math.min(120, Math.max(0, Number(q.get('minutes') ?? 10) || 0));
+  updateAt = minutes ? Date.now() + minutes * 60_000 : 0;
+  broadcast({ t: 'notice', kind: 'update', in: minutes * 60_000 });
+  res.writeHead(200).end(minutes ? `announced: update in ${minutes} min to ${[...clients.values()].filter((c) => c.info).length} players` : 'withdrawn');
+}
+
 function removeWishByHand(req: http.IncomingMessage, res: http.ServerResponse) {
   const q = new URL(req.url ?? '', 'http://x').searchParams, key = Buffer.from(q.get('key') ?? ''), want = Buffer.from(ADMIN_KEY);
   if (!ADMIN_KEY || key.length !== want.length || !timingSafeEqual(key, want)) return res.writeHead(403).end();
@@ -417,6 +429,7 @@ function handle(c: Client, msg: ClientMsg) {
       wishes: [...wishes.values()].map(pub),
       blessings: Object.fromEntries([...blessings].map(([id, b]) => [id, { by: b.by, spot: b.spot }])),
       flags: hungFlags,
+      notice: updateAt > now ? { kind: 'update', in: updateAt - now } : undefined,
     });
     return; // others hear of them with their first position (see 'move')
   }

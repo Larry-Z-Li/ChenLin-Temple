@@ -311,14 +311,14 @@ export class Hud {
     this.renderMusic();
   }
 
-  setPrompt(text: string | null, busy = false, mash = false) {
+  setPrompt(text: string | null, busy = false, mash = false, key = 'E') {
     if (!text) return this.prompt.classList.add('hidden');
     this.prompt.classList.remove('hidden');
     this.prompt.classList.toggle('busy', busy);
     this.prompt.classList.toggle('mash', mash); // (the great wheel's: gold)
-    if (this.prompt.dataset.text === `${busy}|${text}`) return; // avoid rebuilding every frame (keeps taps reliable)
-    this.prompt.dataset.text = `${busy}|${text}`;
-    this.prompt.replaceChildren(...(busy ? [] : [h('kbd', {}, 'E')]), h('span', {}, text));
+    if (this.prompt.dataset.text === `${busy}|${key}|${text}`) return; // avoid rebuilding every frame (keeps taps reliable)
+    this.prompt.dataset.text = `${busy}|${key}|${text}`;
+    this.prompt.replaceChildren(...(busy ? [] : [h('kbd', {}, key)]), h('span', {}, text));
   }
 
   /** The great wheel's "mash" button: glowing brighter the faster you press (0 … 1). */
@@ -378,6 +378,27 @@ export class Hud {
         h('span', { class: 'fruit-chip', title: t(FRUIT_TYPES[f].nameKey as I18nKey) }, h('span', { class: 'fruit-dot', style: `background:#${FRUIT_TYPES[f].color.toString(16).padStart(6, '0')}` }), `${t(FRUIT_TYPES[f].nameKey as I18nKey)} ×${n}`),
       ),
     );
+  }
+
+  /** The banner up top announcing an update (counting down to it), or null to take it down. */
+  private notice: { el: HTMLElement; text: HTMLElement; at: number; timer: number } | null = null;
+  get noticeOpen() {
+    return !!this.notice;
+  }
+  setUpdateNotice(inMs: number | null) {
+    if (this.notice) clearInterval(this.notice.timer), this.notice.el.remove(), (this.notice = null);
+    if (inMs === null || inMs <= 0) return;
+    const text = h('span', { class: 'notice-text' });
+    const close = h('button', { class: 'notice-close', 'aria-label': t('notice.close'), title: t('notice.close'), onclick: () => this.setUpdateNotice(null) }, '×');
+    const el = h('div', { class: 'notice-banner', role: 'status' }, text, close);
+    document.body.appendChild(el);
+    const at = Date.now() + inMs;
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((at - Date.now()) / 1000));
+      text.textContent = left ? t('notice.update', { t: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` }) : t('notice.updating');
+    };
+    tick();
+    this.notice = { el, text, at, timer: window.setInterval(tick, 1000) };
   }
 
   toast(msg: string, ms = 2800) {
