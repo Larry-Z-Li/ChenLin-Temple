@@ -56,6 +56,9 @@ export class NetClient {
   private retry = 1000;
   private hello: ClientMsg | null = null;
   private localSeq = 0;
+  /** Away: the tab has been hidden a while, so we've let go of the connection (picked up again on return). */
+  private asleep = false;
+  private sleepTimer = 0;
 
   on<K extends keyof NetEvents>(ev: K, fn: NetEvents[K]) {
     if (!this.handlers.has(ev)) this.handlers.set(ev, []);
@@ -74,9 +77,27 @@ export class NetClient {
   connect(name: string, color: string) {
     this.hello = { t: 'hello', v: PROTOCOL_VERSION, name, color };
     this.open();
+    // A tab left hidden (another tab, a minimised window, a locked phone) for 5 minutes lets go of its connection, so
+    // it isn't sent everyone's movements for hours unseen (the server's bandwidth is limited); back on it, we rejoin
+    // at once, where we were. A visible player is never let go, however still (meditating, listening to the chants).
+    document.addEventListener('visibilitychange', () => {
+      clearTimeout(this.sleepTimer);
+      if (document.hidden) {
+        this.sleepTimer = window.setTimeout(() => {
+          if (!document.hidden) return;
+          this.asleep = true;
+          this.ws?.close(1000, 'away');
+        }, 5 * 60_000);
+      } else if (this.asleep) {
+        this.asleep = false;
+        this.retry = 1000;
+        if (!this.ws) this.open();
+      }
+    });
   }
 
   private open() {
+    if (this.asleep) return; // (a reconnect already on its way finds us away: it waits for our return)
     const url = import.meta.env.VITE_WS_URL ?? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
     let ws: WebSocket;
     try {
@@ -101,6 +122,7 @@ export class NetClient {
     ws.onclose = () => {
       this.ws = null;
       this.goOffline();
+      if (this.asleep) return; // (away: we'll reconnect when the tab is looked at again)
       setTimeout(() => this.open(), this.retry);
       this.retry = Math.min(this.retry * 2, 30_000);
     };
