@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { firstTexture } from '../core/loadQueue';
 import { mulberry32 } from '../core/math';
 import { twinkleStars } from './skyChart';
 
@@ -13,7 +14,7 @@ export function buildMilkyWay(scene: THREE.Scene) {
   // ---- the Milky Way: ESO's 360° panorama (ESO/S. Brunier, CC BY 4.0) wrapped round the sky ----
   // It's in galactic coordinates (the band along its middle, the core at its centre): turned so the core stands low
   // in the north, above the halls, and the band climbs the sky on a slant. Added over our dark sky; night only.
-  const pano = new THREE.TextureLoader().load('/assets/sky/milkyway-eso.jpg');
+  const pano = firstTexture('/assets/sky/milkyway-eso.jpg');
   pano.colorSpace = THREE.SRGBColorSpace;
   pano.wrapS = THREE.RepeatWrapping;
   // (looked up per pixel from the direction, not from the sphere's own UVs, so it doesn't smear where they pinch

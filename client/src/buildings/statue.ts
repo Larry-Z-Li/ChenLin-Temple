@@ -1,12 +1,19 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { queueLoad } from '../core/loadQueue';
 import { DEITIES, type DeityId } from '../config/deities';
 import { THEME } from '../config/theme';
 import { assetUrl } from '../content/manifest';
 import { box, mat } from './materials';
 import { interiorLayer } from '../core/interiorCull';
 
-const loader = new GLTFLoader();
+const gltf = new GLTFLoader();
+/** Load a model in its turn (after what you see first; two at a time: see loadQueue). */
+const loader = {
+  load(url: string, onLoad: (g: GLTF) => void, _p?: unknown, onError?: (e: unknown) => void) {
+    queueLoad(() => new Promise<void>((done) => gltf.load(url, (g) => (onLoad(g), done()), undefined, (e) => (onError?.(e), done()))));
+  },
+};
 
 /**
  * An altar position for one deity. No figure is drawn in code: until a model is provided

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { firstTexture } from '../core/loadQueue';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FLAG_COLOURS, FLAG_LINES_N, FLAG_ORDER, FLAG_POLE_H, FLAG_RING_POLES, flagSlots } from '../../../shared/flagRing';
 import { THEME } from '../config/theme';
@@ -46,7 +47,7 @@ export function buildFlagRing(ctx: WorldContext): FlagRing {
 
   // the flags: the wind-horse print, coloured per flag, hanging just under the string and facing along it
   const flagGeo = new THREE.PlaneGeometry(0.3, 0.5).translate(0, -0.27, 0);
-  const print = new THREE.TextureLoader().load(assetUrl('flags', 'lungta.jpg'));
+  const print = firstTexture(assetUrl('flags', 'lungta.jpg'));
   print.colorSpace = THREE.SRGBColorSpace;
   const flagMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: print, roughness: 0.9, side: THREE.DoubleSide });
   let cap = 0;

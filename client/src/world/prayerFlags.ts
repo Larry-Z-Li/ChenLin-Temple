@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { firstTexture } from '../core/loadQueue';
 import { FLAG_LINES, type FlagAnchor } from '../config/layout';
 import { THEME } from '../config/theme';
 import type { StupaSpot } from '../buildings/stupas';
@@ -107,7 +108,7 @@ export function buildPrayerFlags(ctx: WorldContext, stupas: StupaSpot[]) {
   // Each flag carries the wind-horse (lungta) print: black ink on white, so the flag's colour (the
   // instance colour) fills the cloth and the ink stays dark. Portrait, like the woodblock.
   const flagGeo = new THREE.PlaneGeometry(0.3, 0.5).translate(0, -0.27, 0); // hangs just below the string
-  const print = new THREE.TextureLoader().load(assetUrl('flags', 'lungta.jpg'));
+  const print = firstTexture(assetUrl('flags', 'lungta.jpg'));
   print.colorSpace = THREE.SRGBColorSpace;
   print.anisotropy = 4;
   const flags = new THREE.InstancedMesh(flagGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, map: print, roughness: 0.9, side: THREE.DoubleSide }), base.length);
