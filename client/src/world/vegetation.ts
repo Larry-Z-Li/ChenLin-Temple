@@ -27,19 +27,30 @@ class Species {
     this.tints.push(tint);
   }
 
+  /**
+   * One instanced mesh per part per 120 m tile (not one across the whole valley): each tile has its own bounds, so
+   * the trees behind you, or beyond the draw distance (see drawDistance), aren't drawn at all.
+   */
   build(scene: THREE.Scene) {
     if (!this.matrices.length) return;
-    for (const p of this.parts) {
-      const mesh = new THREE.InstancedMesh(p.geo, p.mat, this.matrices.length);
-      this.matrices.forEach((m, i) => {
-        mesh.setMatrixAt(i, m);
-        if (p.tint) mesh.setColorAt(i, this.tints[i]);
-      });
-      mesh.castShadow = p.shadow ?? true;
-      mesh.receiveShadow = true;
-      mesh.computeBoundingSphere();
-      scene.add(mesh);
-    }
+    const TILE = 120, tiles = new Map<string, number[]>(), p0 = new THREE.Vector3();
+    this.matrices.forEach((m, i) => {
+      p0.setFromMatrixPosition(m);
+      const key = `${Math.floor(p0.x / TILE)},${Math.floor(p0.z / TILE)}`;
+      (tiles.get(key) ?? tiles.set(key, []).get(key)!).push(i);
+    });
+    for (const idx of tiles.values())
+      for (const p of this.parts) {
+        const mesh = new THREE.InstancedMesh(p.geo, p.mat, idx.length);
+        idx.forEach((j, i) => {
+          mesh.setMatrixAt(i, this.matrices[j]);
+          if (p.tint) mesh.setColorAt(i, this.tints[j]);
+        });
+        mesh.castShadow = p.shadow ?? true;
+        mesh.receiveShadow = true;
+        mesh.computeBoundingSphere();
+        scene.add(mesh);
+      }
   }
 }
 

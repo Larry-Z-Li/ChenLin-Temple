@@ -123,7 +123,8 @@ const server = http.createServer((req, res) => {
   // rest (models, sounds, pictures) for a day and then only re-checked (an unchanged file answers 304, no body); the
   // page itself always re-checked, so a new deploy is picked up at once.
   const etag = `W/"${size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`, rel = path.relative(STATIC_DIR, file);
-  const cache = rel === 'index.html' ? 'no-cache' : /^assets[\\/][^\\/]+-[A-Za-z0-9_-]{8}\.(js|css)$/.test(rel) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400, stale-while-revalidate=604800';
+  const cache = rel === 'index.html' || rel.endsWith('.json') ? 'no-cache' : // (the page and the lists of chants, models, sutras… always re-checked, so additions show at once)
+    /^assets[\\/][^\\/]+-[A-Za-z0-9_-]{8}\.(js|css)$/.test(rel) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400, stale-while-revalidate=604800';
   const head = { etag, 'last-modified': st.mtime.toUTCString(), 'cache-control': cache };
   if (req.headers['if-none-match'] === etag) return void res.writeHead(304, head).end();
   // Byte ranges: iPhones won't play audio (the chants) from a server that can't send part of a file.

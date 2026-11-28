@@ -23,7 +23,7 @@ import { buildBenches } from './buildings/benches';
 import { buildDecor } from './buildings/decor';
 import { buildDecorations } from './buildings/decorations';
 import { buildNineSyllables } from './buildings/nineSyllables';
-import { buildHall } from './buildings/hall';
+import { buildEaveLanterns, buildHall } from './buildings/hall';
 import { buildHuts } from './buildings/hut';
 import { buildPagodas } from './buildings/pagodas';
 import { buildMapBoard } from './buildings/mapBoard';
@@ -59,6 +59,7 @@ import { buildPrayerFlags } from './world/prayerFlags';
 import { buildSky, setDebugHours, setTempleTimeZone } from './world/sky';
 import { buildTerrain } from './world/terrain';
 import { cullFar, farCulled, updateFarCull } from './core/farCull';
+import { registerDrawDistance, updateDrawDistance } from './core/drawDistance';
 import { mergeRigid, mergeStatic } from './core/staticMerge';
 import { assignInteriors, hallAt, interiorLayer, isGlow, updateInteriors } from './core/interiorCull';
 import { buildSandGarden } from './world/sandGarden';
@@ -131,6 +132,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   staticBuild(() => buildDecor(ctx));
   staticBuild(() => buildBenches(ctx));
   staticBuild(() => HALLS.forEach((def) => buildHall(ctx, def, models, thangkas)));
+  staticBuild(() => buildEaveLanterns(ctx)); // (lanterns all round the halls' eaves: never off, seen from anywhere)
   buildPond(ctx);
   buildCaveFallsWorld(ctx);
   buildStream(ctx);
@@ -374,6 +376,8 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     if (m.fog) (m.fog = false), (m.needsUpdate = true);
   });
   const inside = assignInteriors(scene, new Set(farCulled()));
+  // Things drawn within a fixed distance (lights from anywhere: they aren't meshes): see drawDistance
+  registerDrawDistance(scene, new Set(farCulled()));
   // Statues out of doors (the great stupa's Vairocana): a model of some 150 000 triangles, only drawn within reach
   // (the ones in the halls go with their hall's interior already)
   scene.traverse((o) => {
@@ -546,6 +550,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     cloud.update(dt);
     lights.update(dt, player.pos);
     updateFarCull(dt, camera.position, graphicsLevel() === 'low' ? 1 : 2);
+    updateDrawDistance(dt, camera.position, isTouchDevice ? 230 : graphicsLevel() === 'low' ? 300 : 420); // (meshes: lights go on regardless)
     updateInteriors(camera, graphicsLevel() === 'low' ? 1 : 2);
     if (cloud.riding || bodhiBell.active || gw.controlling || seat.seated) circle.stop();
     circle.update(dt, input);

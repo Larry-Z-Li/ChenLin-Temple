@@ -31,6 +31,25 @@ export interface Lamp {
 
 const lamps: Lamp[] = [];
 
+/**
+ * A lamp inside a hall: lit only while you're in that hall or before its door. Real lights here cast no shadows, so
+ * from round its sides or back a hall's lamps would light the ground through its walls; from the front, light spilling
+ * out of the door is just what you'd expect. (A lamp out of doors: always.)
+ */
+const hallOfLamp = new Map<Lamp, (typeof HALLS)[number] | null>();
+function hallLampLit(l: Lamp, at: THREE.Vector3) {
+  let h = hallOfLamp.get(l);
+  if (h === undefined) {
+    h = HALLS.find((d) => { const [ex, ez] = hallHalf(d); return Math.abs(l.x - d.x) < ex && Math.abs(l.z - d.z) < ez; }) ?? null;
+    hallOfLamp.set(l, h);
+  }
+  if (!h) return true;
+  const [ex, ez] = hallHalf(h), dx = at.x - h.x, dz = at.z - h.z;
+  const f = h.facing === 'east' ? dx : h.facing === 'west' ? -dx : dz, side = h.facing === 'east' || h.facing === 'west' ? dz : dx; // (along the door's way out, and across it)
+  const deep = h.facing === 'east' || h.facing === 'west' ? ex : ez, wide = h.facing === 'east' || h.facing === 'west' ? ez : ex;
+  return Math.abs(side) < wide + 1 && f > -deep - 1 && f < deep + 10;
+}
+
 export function addLamp(l: Lamp) {
   lamps.push(l);
   return l;
@@ -266,7 +285,7 @@ export class LightPool {
     if ((this.acc += dt) > 0.25) {
       this.acc = 0;
       const want = lamps
-        .filter((l) => l.indoor && this.level(l) > 0.01)
+        .filter((l) => l.indoor && this.level(l) > 0.01 && hallLampLit(l, at))
         .map((l) => ({ l, s: Math.hypot(l.x - at.x, l.y - at.y, l.z - at.z) / l.range }))
         .filter((c) => c.s < 3)
         .sort((a, b) => a.s - b.s)

@@ -13,9 +13,9 @@ import { box, cylinder, mat } from './materials';
 import { bellWindow, cutHole, irimoyaRoof, roofTexture } from './japaneseRoof';
 import { buildOfferingTable } from './offeringTable';
 import { buildStatueSlot } from './statue';
-import { nightGlow } from '../world/nightGlow';
+import { haloPoints, nightGlow } from '../world/nightGlow';
 import { buildThangka } from './thangka';
-import { addLampAt } from '../world/lightPool';
+import { addLamp, addLampAt } from '../world/lightPool';
 
 const T = 0.4; // wall thickness
 const PORCH = 1.6; // platform margin around the walls
@@ -28,6 +28,36 @@ const ZEN_WOOD = 0x5a3b26, ZEN_WOOD_DARK = 0x3f2a1c, ZEN_ROOF = 0x5a5752;
  * group, and everything they register with the world (collisions, floors, steps, seats, offering
  * tables, instruments) is turned into place on the way through.
  */
+/** Where the lanterns round every hall's eaves hang (world), gathered as the halls are built. */
+const eaveLanterns: THREE.Vector3[] = [];
+
+/**
+ * The lanterns hung all round the halls' eaves, for every hall at once in a handful of draws: red lanterns like the
+ * front ones (no tassels), glowing after dark and lighting the ground round the hall (the night light map: they
+ * never go off), their glow seen from anywhere. Call after the halls, before the night lights are built.
+ */
+export function buildEaveLanterns(ctx: WorldContext) {
+  if (!eaveLanterns.length) return;
+  const cord = 0.55, bodies: THREE.BufferGeometry[] = [], caps: THREE.BufferGeometry[] = [], cords: THREE.BufferGeometry[] = [], glow: number[] = [], glowCol: number[] = [];
+  eaveLanterns.forEach((p, i) => {
+    const by = p.y - cord - 0.38;
+    bodies.push(new THREE.SphereGeometry(0.32, 14, 10).scale(1, 1.12, 1).translate(p.x, by, p.z));
+    caps.push(new THREE.CylinderGeometry(0.15, 0.15, 0.07, 12).translate(p.x, p.y - cord - 0.015, p.z), new THREE.CylinderGeometry(0.15, 0.15, 0.07, 12).translate(p.x, p.y - cord - 0.745, p.z));
+    cords.push(new THREE.CylinderGeometry(0.012, 0.012, cord, 5).translate(p.x, p.y - cord / 2, p.z));
+    glow.push(p.x, by, p.z);
+    glowCol.push(1, 0.5, 0.26);
+    if (i % 2 === 0) addLamp({ x: p.x, y: by, z: p.z, color: 0xff7a40, intensity: 3, range: 8, decay: 1.4 });
+  });
+  const gold = mat(THEME.goldLeaf, { metalness: 0.7, roughness: 0.35 });
+  ctx.scene.add(
+    new THREE.Mesh(mergeGeometries(bodies), nightGlow.lanternBody),
+    new THREE.Mesh(mergeGeometries(caps), gold),
+    new THREE.Mesh(mergeGeometries(cords), mat(0x2a1a10)),
+    haloPoints(glow, glowCol, 1.9, 0.55),
+  );
+  eaveLanterns.length = 0;
+}
+
 export function buildHall(ctx: WorldContext, def: HallDef, models: Record<string, string>, thangkas: ThangkaEntry[]) {
   const yaw = hallYaw(def);
   if (!yaw) return buildHallSouth(ctx, def, models, thangkas);
@@ -281,6 +311,16 @@ function buildHallSouth(ctx: WorldContext, def: HallDef, models: Record<string, 
     g.add(l);
     addLampAt(l, { color: 0xff7a40, intensity: 20, range: 11, decay: 1.5 }, new THREE.Vector3(0, -0.93, 0));
     swaying.push({ obj: l, amp: 0.04, speed: 1.1, phase: lx });
+  }
+  // ...and lanterns all round under the eaves, every 4 m or so (clear of the front ones, the door and the corner bells):
+  // gathered here and built for every hall at once (see buildEaveLanterns)
+  if (!isShrine) {
+    const ox = hw + eave - 0.55, oz = hd + eave - 0.55, y = F + H - 0.1, root = ctx.scene as unknown as THREE.Object3D;
+    root.updateMatrixWorld();
+    const put = (lx: number, lz: number) => eaveLanterns.push(root.localToWorld(new THREE.Vector3(hx + lx, y, hz + lz)));
+    const along = (len: number, at: (t: number) => void) => { const n = Math.max(2, Math.round((len * 2) / 4)); for (let i = 1; i < n; i++) at(-len + (i * 2 * len) / n); };
+    along(ox, (t) => { put(t, -oz); if (Math.abs(t) > 3 && lanternXs.every((lx) => Math.abs(lx - t) > 2)) put(t, oz); }); // back, and front
+    along(oz, (t) => { put(-ox, t); put(ox, t); }); // the sides
   }
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     const b = buildWindBell();
