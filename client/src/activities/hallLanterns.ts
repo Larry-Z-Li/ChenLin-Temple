@@ -49,6 +49,8 @@ export class HallLanterns {
   private pending: string | null = null;
   /** Wish id whose title/text/colour you're saving (so a deny toast lands here). */
   private editing: string | null = null;
+  /** Ids the server says this address owns (Edit / no Report) — not matched by display name. */
+  private owned = new Set<string>();
   /** Lanterns you've reported this visit. */
   private reported = new Set<string>();
   private hidden = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -175,19 +177,21 @@ export class HallLanterns {
     this.panel = h('div', { class: 'wish-overlay hidden', onclick: (e: MouseEvent) => e.target === this.panel && this.close() });
     ui.append(this.panel);
 
-    const mine = (w: Wish) => (w.board === 'hall' ? 'baosheng' : w.board) === hallId; // 'hall': saved before every hall had a wall
+    const onWall = (w: Wish) => (w.board === 'hall' ? 'baosheng' : w.board) === hallId; // 'hall': saved before every hall had a wall
     net.on('welcome', (msg) => {
+      this.owned = new Set(msg.myWishes);
       for (const id of [...this.wishes.keys()]) this.remove(id);
-      for (const w of msg.wishes) if (mine(w)) this.add(w);
+      for (const w of msg.wishes) if (onWall(w)) this.add(w);
       this.refresh();
     });
     net.on('wishAdded', (w) => {
-      if (!mine(w)) return;
+      if (!onWall(w)) return;
       this.add(w);
       this.refresh();
       const yours = this.pending !== null && w.title === this.pending && w.name === this.myName;
       if (this.chalices && !yours) this.shakes.set(w.slot, performance.now()); // lit: it swirls (yours when the camera gets there)
       if (yours) {
+        this.owned.add(w.id);
         this.pending = null;
         this.close(); // hung: back to the hall (the "six months" note comes after the bell)
         markHung();
@@ -195,7 +199,7 @@ export class HallLanterns {
       }
     });
     net.on('wishUpdated', (w) => {
-      if (!mine(w)) return;
+      if (!onWall(w)) return;
       this.update(w);
       if (this.editing === w.id) {
         this.editing = null;
@@ -204,6 +208,7 @@ export class HallLanterns {
       } else this.refresh();
     });
     net.on('wishRemoved', (id) => {
+      this.owned.delete(id);
       this.remove(id);
       this.refresh();
     });
@@ -441,12 +446,12 @@ export class HallLanterns {
     }, () => this.openGrid(side));
   }
 
-  /** A claimed lantern: the wish, how often it's been blessed, and 祝福願望 (or Edit, if it's yours). */
+  /** A claimed lantern: the wish, how often it's been blessed, and 祝福願望 (or Edit, if this address owns it). */
   private openWish(id: string) {
     const w = this.wishes.get(id);
     if (!w) return;
     this.view = { wish: id };
-    const side = wallOf(w.slot), holder = this.blessing.holder(id), mine = w.name === this.myName;
+    const side = wallOf(w.slot), holder = this.blessing.holder(id), mine = this.owned.has(w.id);
     const report = mine ? null : (h('button', { class: 'wish-report', disabled: this.reported.has(w.id), i18n: this.reported.has(w.id) ? 'wish.reported' : 'wish.report' }) as HTMLButtonElement);
     report?.addEventListener('click', () => {
       this.reported.add(w.id);
@@ -486,7 +491,7 @@ export class HallLanterns {
   /** Change the title, wish text or light colour on a lantern you hung. */
   private editWish(id: string) {
     const w = this.wishes.get(id);
-    if (!w || w.name !== this.myName) return;
+    if (!w || !this.owned.has(id)) return;
     this.view = null;
     showWishForm(
       this.panel,

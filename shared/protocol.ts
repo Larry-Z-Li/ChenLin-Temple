@@ -2,7 +2,7 @@
 import type { GreatWheelState } from './greatWheel';
 import { isBlocked } from './moderation';
 
-export const PROTOCOL_VERSION = 14;
+export const PROTOCOL_VERSION = 15;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -167,6 +167,8 @@ export type ServerMsg =
       /** hallId -> today's offerings */
       offerings: Record<string, Offering[]>;
       wishes: Wish[];
+      /** Wish ids this connection owns (same address hash as when they were hung) — for Edit, not the display name. */
+      myWishes: string[];
       /** Lanterns off their walls being blessed: wish id → who has it, and at which spot. */
       blessings: Record<string, { by: string; spot: number }>;
       /** The prayer flags hung on the ring round the temples: [line, slot, colour]. */
