@@ -1,5 +1,5 @@
 import type { Fruit } from '../../../shared/protocol';
-import { graphicsLevel, isTouchDevice, saveSettings, settings } from '../config/settings';
+import { graphicsLevel, isTouchDevice, saveSettings, setSessionGraphics, settings } from '../config/settings';
 import { FRUIT_TYPES } from '../config/theme';
 import { LOCALES, getLocale, setLocale, t, type I18nKey } from '../i18n';
 import type { NetStatus } from '../net/netClient';
@@ -82,6 +82,7 @@ export class Hud {
     const gfx = (level: 'high' | 'low', key: I18nKey) =>
       h('button', { class: 'seg-btn', i18n: key, onclick: () => {
         settings.graphics = level;
+        setSessionGraphics(null); // manual pick: drop the auto probe override
         saveSettings();
         this.renderGraphics();
         cb.onGraphics();

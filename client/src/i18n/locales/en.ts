@@ -162,6 +162,7 @@ const en = {
   'settings.show': 'Show',
   'settings.hide': 'Hide',
   'settings.autoLow': 'This device was struggling, so graphics are now on Low. You can change it in Settings.',
+  'settings.autoHigh': 'This device is keeping up — graphics are now on High.',
   'settings.timeOfDay': 'Time of day',
   'settings.templeTime': 'Temple clock',
   'settings.alwaysDay': 'Always day',

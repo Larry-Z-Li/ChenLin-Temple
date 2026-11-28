@@ -164,6 +164,7 @@ const zhHant: Record<I18nKey, string> = {
   'settings.show': '顯示',
   'settings.hide': '隱藏',
   'settings.autoLow': '此裝置較吃力，已改為低畫質。可在設定中更改。',
+  'settings.autoHigh': '此裝置運行順暢，已改為高畫質。',
   'settings.timeOfDay': '時間',
   'settings.templeTime': '寺院時間',
   'settings.alwaysDay': '永遠白天',

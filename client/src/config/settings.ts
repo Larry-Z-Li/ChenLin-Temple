@@ -7,10 +7,15 @@ export interface Settings {
   lang: string;
   /** True once the visitor picks a language themselves; until then the default locale applies. */
   langChosen: boolean;
-  /** 'auto' = low on phones/tablets, high elsewhere. */
+  /**
+   * 'auto' = phones boot low (then may probe up to high); desktop starts high and may fall to low.
+   * Manual 'high' / 'low' skip the probe.
+   */
   graphics: 'auto' | 'high' | 'low';
-  /** Set when 'auto' found this device too slow for high (kept, so the next visit starts low). */
+  /** Set when 'auto' found this device too slow for high (kept, so it won't probe again). */
   autoLow: boolean;
+  /** Set when a phone's high probe settled successfully (next visit still boots low, then promotes sooner). */
+  autoHigh: boolean;
   /** Frame rate and draw calls under the headcount (also `?fps` in the address). */
   showFps: boolean;
   /** 'temple' = sky follows the temple's clock (day and night); 'day' = always daytime. */
@@ -25,6 +30,8 @@ export interface Settings {
 }
 
 const KEY = 'temple.settings.v1';
+/** Session flag: high probe started but not settled — if the tab dies, next boot sticks to low. */
+const PROBE_KEY = 'temple.highProbe';
 
 const DEFAULTS: Settings = {
   name: '',
@@ -33,6 +40,7 @@ const DEFAULTS: Settings = {
   langChosen: false,
   graphics: 'auto',
   autoLow: false,
+  autoHigh: false,
   showFps: false,
   timeOfDay: 'temple',
   musicOn: true,
@@ -73,7 +81,52 @@ export function saveSettings() {
 
 export const isTouchDevice = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
+/** This visit only: after a successful/failed probe, or cleared on manual High/Low. */
+let sessionLevel: 'high' | 'low' | null = null;
+
+export function setSessionGraphics(level: 'high' | 'low' | null) {
+  sessionLevel = level;
+}
+
+/** Last visit died mid-probe → remember low and don't try high again. */
+(function reclaimFailedHighProbe() {
+  try {
+    if (sessionStorage.getItem(PROBE_KEY) !== '1') return;
+    sessionStorage.removeItem(PROBE_KEY);
+    settings.autoHigh = false;
+    settings.autoLow = true;
+    saveSettings();
+  } catch {
+    /* sessionStorage blocked */
+  }
+})();
+
+/** Call just before enabling high on a phone so a tab kill sticks to low next time. */
+export function beginHighProbe() {
+  try {
+    sessionStorage.setItem(PROBE_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Probe finished without a kill: persist the outcome and clear the crash flag. */
+export function endHighProbe(ok: boolean) {
+  try {
+    sessionStorage.removeItem(PROBE_KEY);
+  } catch {
+    /* ignore */
+  }
+  settings.autoHigh = ok;
+  settings.autoLow = !ok;
+  saveSettings();
+}
+
 export function graphicsLevel(): 'high' | 'low' {
-  // Auto stays low on phones: stepping down after the fact is too late if the first high pass OOMs the tab.
-  return settings.graphics === 'auto' ? (isTouchDevice || settings.autoLow ? 'low' : 'high') : settings.graphics;
+  if (settings.graphics === 'high') return 'high';
+  if (settings.graphics === 'low') return 'low';
+  if (sessionLevel) return sessionLevel;
+  // Auto: phones always boot low (OOM-safe); desktop starts high unless a past visit stuck autoLow.
+  if (settings.autoLow || isTouchDevice) return 'low';
+  return 'high';
 }
