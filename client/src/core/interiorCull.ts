@@ -48,6 +48,9 @@ export function interiorLayer(o: THREE.Object3D): number {
   return 0;
 }
 
+/** A glow (a sprite or points drawn additively: a lamp's halo): light, not a thing, so never hidden by distance. */
+export const isGlow = (o: THREE.Object3D) => ((o as THREE.Sprite).isSprite || (o as THREE.Points).isPoints) && ((o as THREE.Sprite).material as THREE.Material)?.blending === THREE.AdditiveBlending;
+
 /**
  * Once the world is built (and merged): put every interior thing on its hall's layer. `skip` holds
  * things that wander (deer, cats) — they must not vanish with a hall they happened to start in.
@@ -55,11 +58,14 @@ export function interiorLayer(o: THREE.Object3D): number {
 export function assignInteriors(scene: THREE.Scene, skip: Set<THREE.Object3D>) {
   scene.updateMatrixWorld(true);
   let n = 0;
-  const visit = (o: THREE.Object3D) => {
+  // (something can name its hall: `userData.interiorAt = [x, z]`, it and all within it; e.g. a lantern wall hung
+  // right against the hall's back wall, whose bounds would otherwise touch the wall and count as outdoors)
+  const visit = (o: THREE.Object3D, forced = 0) => {
     if (skip.has(o) || (o as THREE.Light).isLight) return;
-    const k = interiorLayer(o);
+    const at = o.userData.interiorAt as [number, number] | undefined, f = at ? hallAt(at[0], at[1]) : forced;
+    const k = f || interiorLayer(o);
     if (k) (o.layers.set(k), n++);
-    for (const c of o.children) visit(c);
+    for (const c of o.children) visit(c, f);
   };
   visit(scene);
   return n;

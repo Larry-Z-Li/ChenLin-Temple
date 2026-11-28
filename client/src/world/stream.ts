@@ -45,6 +45,7 @@ export function nearestOnStream(x: number, z: number) {
  * from the river's few straight legs.
  */
 const RPAD = 30, CELL = 12;
+const cellKey = (cx: number, cz: number) => (cx + 4096) * 8192 + (cz + 4096);
 const rivers = RIVERS.map((def) => {
   const curve = new THREE.CatmullRomCurve3(def.points.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
   const fine = curve.getSpacedPoints(Math.max(2, Math.ceil(curve.getLength() / 2))).map((v) => [v.x, v.z] as [number, number]);
@@ -58,11 +59,11 @@ const rivers = RIVERS.map((def) => {
   };
   const segs = legs(fine), coarse = legs(def.points);
   const length = segs.reduce((a, g) => a + g.len, 0), coarseLength = coarse.reduce((a, g) => a + g.len, 0);
-  const grid = new Map<string, number[]>();
+  const grid = new Map<number, number[]>(); // (cells keyed by a number, not a string: this is asked hundreds of times a frame)
   segs.forEach((g, i) => {
     const cx0 = Math.floor(Math.min(g.x0, g.x0 + g.dx) / CELL), cx1 = Math.floor(Math.max(g.x0, g.x0 + g.dx) / CELL);
     const cz0 = Math.floor(Math.min(g.z0, g.z0 + g.dz) / CELL), cz1 = Math.floor(Math.max(g.z0, g.z0 + g.dz) / CELL);
-    for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) (grid.get(`${cx},${cz}`) ?? grid.set(`${cx},${cz}`, []).get(`${cx},${cz}`)!).push(i);
+    for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) { const key = cellKey(cx, cz); (grid.get(key) ?? grid.set(key, []).get(key)!).push(i); }
   });
   const xs = def.points.map((p) => p[0]), zs = def.points.map((p) => p[1]);
   return { def, segs, coarse, grid, length, coarseLength, minX: Math.min(...xs) - RPAD, maxX: Math.max(...xs) + RPAD, minZ: Math.min(...zs) - RPAD, maxZ: Math.max(...zs) + RPAD };
@@ -117,7 +118,7 @@ export function nearestRiver(x: number, z: number) {
   const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
   for (const r of rivers) {
     if (x < r.minX || x > r.maxX || z < r.minZ || z > r.maxZ) continue;
-    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const k of r.grid.get(`${cx + i},${cz + j}`) ?? []) test(r, r.segs[k], k, 1);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const ks = r.grid.get(cellKey(cx + i, cz + j)); if (ks) for (const k of ks) test(r, r.segs[k], k, 1); }
   }
   if (best.d <= CELL) return best;
   for (const r of rivers) { // further off: the straight legs are near enough

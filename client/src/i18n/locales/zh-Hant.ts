@@ -142,6 +142,8 @@ const zhHant: Record<I18nKey, string> = {
   'notice.update': '寺院將於 {t} 後更新，屆時會自動重新連線，不會遺失任何東西。',
   'notice.updating': '正在更新⋯⋯稍後會自動重新連線。',
   'notice.close': '關閉',
+  'notice.reload': '寺院已更新，{s} 秒後重新載入⋯⋯',
+  'notice.reloadNow': '立即重新載入',
   'merit.rank': '階位',
   'merit.novice': '初學',
   'merit.merit': '功德',

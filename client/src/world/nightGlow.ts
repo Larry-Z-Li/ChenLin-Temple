@@ -3,6 +3,10 @@ import { glowTexture } from '../core/textures';
 
 type NightFn = (night: number) => void;
 const tracked: NightFn[] = [];
+/** The lamps' own bodies (lantern shells, lit windows, glowing paper): out of the fog after dark (see update). */
+type Foggable = THREE.Material & { fog: boolean };
+const lampBodies: Foggable[] = [];
+let lampsClear = false;
 
 /** Shared materials for things that glow more after dark (updated once per frame by the sky). */
 export const nightGlow = {
@@ -16,11 +20,25 @@ export const nightGlow = {
   track(fn: NightFn) {
     tracked.push(fn);
   },
+  /** A material that glows after dark: by night it's drawn clear of the fog, like the lights of a city seen from afar. */
+  lamp<M extends Foggable>(m: M): M {
+    lampBodies.push(m);
+    return m;
+  },
   update(night: number) {
+    // after dark every lamp shines through the fog, however far (by day they're fogged like everything else); the
+    // switch recompiles their shaders, so it happens only as night falls or lifts
+    const clear = night > 0.45;
+    if (clear !== lampsClear) {
+      lampsClear = clear;
+      for (const m of [this.lanternBody, this.stoneWindow, this.paper, ...lampBodies]) (m.fog = !clear), (m.needsUpdate = true);
+    }
     this.lanternBody.emissiveIntensity = 0.35 + 1.4 * night;
     this.lanternHalo.opacity = 0.55 * night;
+    this.lanternHalo.visible = night > 0.01; // (by day the glows aren't drawn at all: each is a draw call)
     this.stoneWindow.emissiveIntensity = 0.9 + 2.2 * night;
     this.stoneHalo.opacity = 0.6 * night;
+    this.stoneHalo.visible = night > 0.01;
     this.paper.emissiveIntensity = 0.3 + 1.6 * night;
     for (const fn of tracked) fn(night);
   },
@@ -32,7 +50,7 @@ export const nightGlow = {
  * attribute (white is fine; the instance colour tints it).
  */
 export function colourGlowMaterial(params: THREE.MeshStandardMaterialParameters, glow: (night: number) => number) {
-  const m = new THREE.MeshStandardMaterial({ ...params, vertexColors: true, emissive: 0xffffff });
+  const m = nightGlow.lamp(new THREE.MeshStandardMaterial({ ...params, vertexColors: true, emissive: 0xffffff }));
   m.onBeforeCompile = (shader) => {
     shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n\ttotalEmissiveRadiance *= vColor.rgb;');
   };

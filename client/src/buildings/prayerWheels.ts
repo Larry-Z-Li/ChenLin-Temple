@@ -90,6 +90,8 @@ export class PrayerWheels {
   private pPos: Float32Array;
   private pCol: Float32Array;
   private pVel: Float32Array;
+  /** How many motes are alive (none: the particle pass is skipped). */
+  private live = 0;
   private pLife: Float32Array;
   private pMax: Float32Array;
   private pNext = 0;
@@ -126,12 +128,13 @@ export class PrayerWheels {
         const drumMat = new THREE.MeshStandardMaterial({ map: drumMap, metalness: 0.55, roughness: 0.4, emissive: new THREE.Color(0xffc45a), emissiveIntensity: 0 });
         const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.66, 24), [drumMat, capMat, capMat]);
         drum.position.set(row.x, y0 + DRUM_Y, z);
-        drum.castShadow = true;
+        drum.userData.dynamic = true; // (it turns: kept out of the static merge, which takes everything else here)
         ctx.scene.add(drum);
         ctx.scene.add(cylinder(0.025, 0.025, 1.4, mat(0x3a2a1a), row.x, y0 + 0.55, z, 6));
 
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffd27a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
         glow.position.copy(drum.position);
+        glow.visible = false;
         ctx.scene.add(glow);
 
         const wheel: Wheel = { id: `wheel-${row.id}-${i}`, x: row.x, z, drum, drumMat, glow, speed: 0, charge: 0, emitAcc: 0, spinner: null, turns: 0 };
@@ -170,9 +173,11 @@ export class PrayerWheels {
       const drum = new THREE.Mesh(new THREE.CylinderGeometry(MR, MR, MH, 40), [drumMat, capMat, capMat]);
       drum.position.set(hw.x, y0 + 0.42 + MH / 2, hw.z);
       drum.castShadow = true;
+      drum.userData.dynamic = true;
       ctx.scene.add(drum);
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffd27a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
       glow.position.copy(drum.position);
+      glow.visible = false;
       ctx.scene.add(glow);
       const wheel: Wheel = { id: `wheel-${hw.id}`, x: hw.x, z: hw.z, drum, drumMat, glow, speed: 0, charge: 0, emitAcc: 0, spinner: null, turns: 0, size: M };
       this.wheels.set(wheel.id, wheel);
@@ -236,6 +241,7 @@ export class PrayerWheels {
       const level = 1 - Math.exp(-w.charge / 20); // 0..1, grows the longer (and faster) it turns
       w.drumMat.emissiveIntensity = level * 1.2;
       w.glow.material.opacity = level * 0.75;
+      w.glow.visible = level > 0.01; // (a resting wheel's glow isn't drawn at all)
       w.glow.scale.setScalar((0.6 + level * 3.2) * (w.size ?? 1));
       if (level > 0.01) {
         w.emitAcc += dt * (level * 6 + w.speed * level * 14);
@@ -245,7 +251,8 @@ export class PrayerWheels {
         }
       }
     }
-    // Particles: rise in a gentle spiral, fade out (additive → darker = more transparent).
+    // Particles: rise in a gentle spiral, fade out (additive → darker = more transparent). None alive: nothing to do.
+    if (!this.live) return;
     const n = this.pLife.length;
     for (let i = 0; i < n; i++) {
       if (this.pLife[i] <= 0) continue;
@@ -253,6 +260,7 @@ export class PrayerWheels {
       const k = i * 3;
       if (this.pLife[i] <= 0) {
         this.pPos[k + 1] = -9999;
+        this.live--;
         continue;
       }
       this.pPos[k] += this.pVel[k] * dt;
@@ -270,6 +278,7 @@ export class PrayerWheels {
 
   private emit(w: Wheel, level: number) {
     const i = this.pNext;
+    if (this.pLife[i] <= 0) this.live++;
     this.pNext = (this.pNext + 1) % this.pLife.length;
     const a = Math.random() * Math.PI * 2, k = i * 3;
     const sz = w.size ?? 1;

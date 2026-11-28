@@ -13,6 +13,8 @@ export default defineConfig({
   // the free CDN for public GitHub repos, pinned to this very commit, instead of using up the server's bandwidth.
   // Elsewhere (npm run dev) it's empty and everything comes from our own server.
   define: {
+    // which build this is (the deployed commit; '' in development): a tab from an older one reloads itself (see game.ts)
+    __BUILD__: JSON.stringify(process.env.RENDER_GIT_COMMIT ?? ''),
     __ASSET_CDN__: JSON.stringify(
       process.env.RENDER_GIT_REPO_SLUG && process.env.RENDER_GIT_COMMIT
         ? `https://cdn.jsdelivr.net/gh/${process.env.RENDER_GIT_REPO_SLUG}@${process.env.RENDER_GIT_COMMIT}/client/public/assets`

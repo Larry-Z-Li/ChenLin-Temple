@@ -139,7 +139,10 @@ export function buildLanterns(ctx: WorldContext) {
   ctx.scene.add(bodies, trims, haloPoints(haloPos, haloCol, 1.5, 0.6));
 
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
+  let lastSway = -1;
   ctx.updaters.push((_dt, time) => {
+    if (time - lastSway < 1 / 30) return; // (a gentle sway: 30 times a second is plenty)
+    lastSway = time;
     for (let i = 0; i < n; i++) {
       const ph = phases[i];
       q.setFromEuler(e.set(Math.sin(time * 1.3 + ph) * 0.05, ph, Math.sin(time * 1.05 + ph * 1.7) * 0.06));

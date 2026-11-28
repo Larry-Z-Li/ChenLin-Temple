@@ -26,10 +26,10 @@ export function buildCourtLights(ctx: WorldContext) {
   // one fixture, at its own origin: the bezel turned on a lathe (in at the lens, a low rounded rim, out to a thin
   // edge on the paving), two screw heads in it, and the lens down in the well
   const bezel = mergeGeometries([
-    new THREE.LatheGeometry([[0.118, 0.004], [0.122, 0.024], [0.135, 0.03], [0.2, 0.031], [0.228, 0.024], [0.242, 0.01], [0.246, 0.0]].map(([r, y]) => new THREE.Vector2(r, y)), 32),
+    new THREE.LatheGeometry([[0.118, 0.004], [0.122, 0.024], [0.135, 0.03], [0.2, 0.031], [0.228, 0.024], [0.242, 0.01], [0.246, 0.0]].map(([r, y]) => new THREE.Vector2(r, y)), 12), // (108 of them: 12 sides read as round at 50 cm)
     ...[0.75, 0.75 + Math.PI].map((a) => new THREE.CylinderGeometry(0.011, 0.011, 0.008, 6).translate(Math.cos(a) * 0.19, 0.034, Math.sin(a) * 0.19)),
   ]);
-  const lens = new THREE.CircleGeometry(0.118, 24).rotateX(-Math.PI / 2).translate(0, 0.008, 0);
+  const lens = new THREE.CircleGeometry(0.118, 12).rotateX(-Math.PI / 2).translate(0, 0.008, 0);
 
   const bezels: THREE.BufferGeometry[] = [], lenses: THREE.BufferGeometry[] = [], glow: number[] = [], glowCol: number[] = [];
   const rings = [GREAT_STUPA.base / 2 + 3.2, STUPA_COURT.half - 5.5], step = 3.4;

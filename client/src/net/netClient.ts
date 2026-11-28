@@ -35,6 +35,8 @@ export interface NetEvents {
   /** A prayer flag given to Garuda, and where it will hang. */
   flag: (line: number, slot: number, color: number, by: string) => void;
   notice: (kind: 'update', inMs: number) => void;
+  /** The server runs a newer build than this tab (or turned our version away): reload. */
+  outdated: () => void;
   fed: (deer: string, by: string, fruit: Fruit) => void;
   pickDenied: (fruit: string, reason: 'gone' | 'full') => void;
   offered: (hall: string, offering: Offering, by: string) => void;
@@ -119,9 +121,11 @@ export class NetClient {
       }
       this.handle(msg);
     };
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       this.ws = null;
       this.goOffline();
+      // turned away for our version: if the server's is newer, reload into it; if older (it's mid-deploy), just retry
+      if (e.code === 4000 && Number(/^v(\d+)$/.exec(e.reason)?.[1] ?? 0) > PROTOCOL_VERSION) return this.emit('outdated');
       if (this.asleep) return; // (away: we'll reconnect when the tab is looked at again)
       setTimeout(() => this.open(), this.retry);
       this.retry = Math.min(this.retry * 2, 30_000);

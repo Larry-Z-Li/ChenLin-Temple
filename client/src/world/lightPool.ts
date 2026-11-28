@@ -51,7 +51,7 @@ const HALF = STUPA_RIDGE.rMax + 30; // the valley and the ridge walk
 /** Ground heights under the lamps are stored in a second map (R = (y + H_LO) / H_SPAN) so light stays near the ground anywhere. */
 const H_LO = 50, H_SPAN = 300;
 const box = new THREE.Vector4(BASIN.x - HALF, BASIN.z - HALF, HALF * 2, HALF * 2);
-const MAX_FLOODS = 24;
+const MAX_FLOODS = 16; // (15 in use: 10 halls, the stupa, 4 pagodas; every lit material carries and uploads these)
 const NIGHT = {
   nightLightMap: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) as THREE.Texture },
   nightBox: { value: box },

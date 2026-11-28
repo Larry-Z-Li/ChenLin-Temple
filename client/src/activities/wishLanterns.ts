@@ -36,17 +36,18 @@ export function lanternGeometries() {
  * (trim); and its flame (body: tinted per instance, lit in the wish's colour, hidden while unlit).
  */
 export function chaliceGeometries() {
-  const lathe = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 24);
+  // (98 on every hall's wall: kept light, about 700 triangles; at 20 cm across, 12 sides read as round)
+  const lathe = (pts: [number, number][]) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 12);
   const stones = Array.from({ length: 6 }, (_, i) => {
     const a = (i / 6) * Math.PI * 2;
-    return paint(new THREE.SphereGeometry(0.014, 6, 4).translate(Math.cos(a) * 0.064, 0.215, Math.sin(a) * 0.064), i % 2 ? 0xb5452f : 0x2aa79b);
+    return paint(new THREE.SphereGeometry(0.014, 4, 3).translate(Math.cos(a) * 0.064, 0.215, Math.sin(a) * 0.064), i % 2 ? 0xb5452f : 0x2aa79b);
   });
   return {
     body: whiteColors(new THREE.SphereGeometry(0.03, 10, 8).scale(1, 2.6, 1).translate(0, 0.47, 0)),
     trim: mergeGeometries([
       paint(lathe([[0.001, 0], [0.16, 0], [0.165, 0.03], [0.13, 0.05], [0.14, 0.08], [0.1, 0.13], [0.06, 0.15], [0.045, 0.19], [0.068, 0.215], [0.045, 0.24], [0.04, 0.265], [0.075, 0.285], [0.16, 0.34], [0.19, 0.385], [0.196, 0.405], [0.172, 0.405], [0.168, 0.385], [0.001, 0.385]]), THEME.goldLeaf),
-      paint(new THREE.TorusGeometry(0.176, 0.011, 6, 32).rotateX(Math.PI / 2).translate(0, 0.35, 0), 0xc9ccd2), // silver band
-      paint(new THREE.CylinderGeometry(0.166, 0.166, 0.01, 24).translate(0, 0.39, 0), 0xf0dc9a), // the butter
+      paint(new THREE.TorusGeometry(0.176, 0.011, 4, 12).rotateX(Math.PI / 2).translate(0, 0.35, 0), 0xc9ccd2), // silver band
+      paint(new THREE.CylinderGeometry(0.166, 0.166, 0.01, 12).translate(0, 0.39, 0), 0xf0dc9a), // the butter
       paint(new THREE.CylinderGeometry(0.004, 0.004, 0.04, 4).translate(0, 0.41, 0), 0x2a1a10), // wick
       ...stones,
     ]),

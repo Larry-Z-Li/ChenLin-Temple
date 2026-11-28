@@ -406,7 +406,7 @@ function releaseSeat(c: Client) {
 
 function handle(c: Client, msg: ClientMsg) {
   if (!c.info) {
-    if (msg.t !== 'hello' || msg.v !== PROTOCOL_VERSION) return c.ws.close(4000, 'bad hello');
+    if (msg.t !== 'hello' || msg.v !== PROTOCOL_VERSION) return c.ws.close(4000, `v${PROTOCOL_VERSION}`); // (says which version it speaks: a newer one tells an old tab to reload)
     const joined = [...clients.values()].filter((o) => o.info).length;
     if (joined >= MAX_PLAYERS) {
       send(c, { t: 'full' });
@@ -437,6 +437,7 @@ function handle(c: Client, msg: ClientMsg) {
       blessings: Object.fromEntries([...blessings].map(([id, b]) => [id, { by: b.by, spot: b.spot }])),
       flags: hungFlags,
       notice: updateAt > now ? { kind: 'update', in: updateAt - now } : undefined,
+      build: process.env.RENDER_GIT_COMMIT || undefined,
     });
     return; // others hear of them with their first position (see 'move')
   }

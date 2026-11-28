@@ -118,7 +118,10 @@ export function buildPrayerFlags(ctx: WorldContext, stupas: StupaSpot[]) {
   ctx.scene.add(flags);
 
   const swing = new THREE.Quaternion(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), xAxis = new THREE.Vector3(1, 0, 0);
+  let lastFlutter = -1;
   ctx.updaters.push((_dt, time) => {
+    if (time - lastFlutter < 1 / 30) return; // (30 times a second is plenty for a flag in the wind)
+    lastFlutter = time;
     base.forEach((f, i) => {
       // Lean downwind with a gust-y flutter.
       const angle = 0.3 + 0.32 * Math.sin(time * 2.3 + f.phase) + 0.12 * Math.sin(time * 5.7 + f.phase * 1.7);

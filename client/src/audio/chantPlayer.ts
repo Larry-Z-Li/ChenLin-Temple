@@ -11,6 +11,8 @@ export class ChantPlayer {
   loop = true;
   private el = (() => {
     const el = new Audio();
+    // (the chants come from the CDN, another site: without this, the browser feeds the Web Audio volume below silence)
+    el.crossOrigin = 'anonymous';
     el.addEventListener('error', () => { // (from the CDN and it failed: the same chant from our own server)
       const own = ownServerUrl(el.src), wasPlaying = !el.paused || el.autoplay;
       if (!own) return;

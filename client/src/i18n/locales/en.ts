@@ -140,6 +140,8 @@ const en = {
   'notice.update': "The temple will be updated in {t}. You'll reconnect by yourself; nothing is lost.",
   'notice.updating': "Updating now… you'll be reconnected in a moment.",
   'notice.close': 'Close',
+  'notice.reload': 'The temple has been updated. Reloading in {s} s…',
+  'notice.reloadNow': 'Reload now',
   'merit.rank': 'Rank',
   'merit.novice': 'Novice',
   'merit.merit': 'Merit',

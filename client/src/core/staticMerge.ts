@@ -19,7 +19,7 @@ export function mergeStatic(
   roots: THREE.Object3D[],
   opts: { skip: Set<THREE.Object3D>; keepForRaycast: Set<THREE.Object3D>; /** Never merge across these (e.g. a hall's inside and outside). */ zone?: (m: THREE.Mesh) => number },
 ) {
-  const CELL = 96;
+  const CELL = 160; // (bigger squares, fewer pieces: each piece is a draw call, which phones pay for dearly)
   const found: { m: THREE.Mesh; root: THREE.Object3D }[] = [];
   const perRoot = new Map<THREE.Object3D, number>();
   const visit = (o: THREE.Object3D, root: THREE.Object3D) => {

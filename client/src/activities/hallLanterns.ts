@@ -80,6 +80,7 @@ export class HallLanterns {
     root.position.set(hall.x, 0, hall.z);
     root.rotation.y = hallYaw(hall);
     root.updateMatrixWorld();
+    root.userData.interiorAt = [hall.x, hall.z]; // (inside its hall: drawn only near it, like the statues)
     ctx.scene.add(root);
     const W = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(root.matrixWorld);
     // Each grid casts real light into the hall, brighter as it fills.

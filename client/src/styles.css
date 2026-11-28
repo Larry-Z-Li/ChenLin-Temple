@@ -334,7 +334,7 @@ body:not(.touch) .merit-pop { font-size: 60px; } /* bigger on a computer */
 @keyframes merit-bump { 0% { box-shadow: 0 0 0 rgba(255, 210, 120, 0); } 30% { box-shadow: 0 0 22px rgba(255, 210, 120, 0.75); } 100% { box-shadow: 0 0 0 rgba(255, 210, 120, 0); } }
 
 /* An update announced to everyone: a banner across the top, counting down (× or X closes it) */
-.notice-banner { position: fixed; z-index: 60; top: 12px; left: 50%; translate: -50% 0; display: flex; align-items: center; gap: 12px; max-width: min(92vw, 640px); padding: 10px 10px 10px 18px; border-radius: 12px; background: rgba(110, 24, 18, 0.92); border: 1px solid rgba(232, 199, 106, 0.6); color: #f6e7c4; font: 600 15px var(--sans); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); animation: notice-in 0.4s ease-out; }
+.notice-banner { position: fixed; z-index: 60; top: 12px; left: 50%; translate: -50% 0; display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(calc(100vw - 24px), 640px); box-sizing: border-box; padding: 10px 10px 10px 18px; border-radius: 12px; background: rgba(110, 24, 18, 0.92); border: 1px solid rgba(232, 199, 106, 0.6); color: #f6e7c4; font: 600 15px var(--sans); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); animation: notice-in 0.4s ease-out; }
 .notice-text { flex: 1; line-height: 1.35; }
 .notice-close { flex: none; width: 28px; height: 28px; border-radius: 8px; border: 0; background: rgba(255, 255, 255, 0.12); color: inherit; font: 600 18px/1 var(--sans); cursor: pointer; }
 .notice-close:hover { background: rgba(255, 255, 255, 0.22); }
@@ -347,3 +347,4 @@ body.touch .quick-actions .icon-btn, body.touch .seat-btn { display: flex; flex-
 body.touch .quick-actions .icon-btn .ico, body.touch .seat-btn .ico { flex: none; width: 18px; height: 18px; }
 /* Phones: the mala's ◀ ▶ side by side, close under the thumb */
 body.touch .bead-btns { gap: 10px; }
+.notice-reload { flex: none; padding: 6px 12px; border-radius: 8px; border: 0; background: #f6e7c4; color: #6e1812; font: 600 13px var(--sans); cursor: pointer; }

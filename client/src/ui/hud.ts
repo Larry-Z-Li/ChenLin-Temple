@@ -322,8 +322,12 @@ export class Hud {
   }
 
   /** The great wheel's "mash" button: glowing brighter the faster you press (0 … 1). */
+  private mashShown = '';
   setMash(level: number) {
-    this.prompt.style.setProperty('--mash', level.toFixed(2));
+    const v = level.toFixed(2);
+    if (v === this.mashShown) return; // (a style write every frame makes the page restyle every frame)
+    this.mashShown = v;
+    this.prompt.style.setProperty('--mash', v);
   }
 
   /** …and a bounce for each press. */
@@ -399,6 +403,28 @@ export class Hud {
     };
     tick();
     this.notice = { el, text, at, timer: window.setInterval(tick, 1000) };
+  }
+
+  /**
+   * The temple has been updated under this tab: a banner counting down, then a reload (at once if the tab is hidden;
+   * never while a wish is being written, so nothing typed is lost). "Reload now" skips the wait.
+   */
+  private reloading = false;
+  reloadForUpdate() {
+    if (this.reloading) return;
+    this.reloading = true;
+    const text = h('span', { class: 'notice-text' });
+    const now = h('button', { class: 'notice-reload', onclick: () => location.reload() }, t('notice.reloadNow'));
+    document.body.appendChild(h('div', { class: 'notice-banner', role: 'status' }, text, now));
+    let left = 20;
+    const writing = () => !!document.querySelector('.wish-overlay:not(.hidden)');
+    const tick = () => {
+      if (document.hidden && !writing()) return location.reload();
+      text.textContent = t('notice.reload', { s: String(Math.max(0, left)) });
+      if (left-- <= 0 && !writing()) location.reload();
+    };
+    tick();
+    setInterval(tick, 1000);
   }
 
   toast(msg: string, ms = 2800) {

@@ -58,9 +58,9 @@ import { buildLeaves } from './world/leaves';
 import { buildPrayerFlags } from './world/prayerFlags';
 import { buildSky, setDebugHours, setTempleTimeZone } from './world/sky';
 import { buildTerrain } from './world/terrain';
-import { farCulled, updateFarCull } from './core/farCull';
+import { cullFar, farCulled, updateFarCull } from './core/farCull';
 import { mergeRigid, mergeStatic } from './core/staticMerge';
-import { assignInteriors, hallAt, interiorLayer, updateInteriors } from './core/interiorCull';
+import { assignInteriors, hallAt, interiorLayer, isGlow, updateInteriors } from './core/interiorCull';
 import { buildSandGarden } from './world/sandGarden';
 import { buildVegetation } from './world/vegetation';
 import { Wildlife } from './world/wildlife';
@@ -80,9 +80,10 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   document.body.classList.add('intro');
 
   // ---------- Renderer / scene ----------
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  // (phones: no multisampling, a plainer shadow filter; their dense screens hide the edges, and their GPUs need the time)
+  const renderer = new THREE.WebGLRenderer({ antialias: !isTouchDevice, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = isTouchDevice ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   appEl.append(renderer.domElement);
@@ -161,7 +162,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const pixelRatio = () => Math.min(window.devicePixelRatio, SCALES[scaleStep]);
   const applyGraphics = () => {
     const low = graphicsLevel() === 'low';
-    lights.setActive(low ? 4 : 8);
+    lights.setActive(low || isTouchDevice ? 4 : 8); // (every real light is paid for in every lit pixel: phones get 4)
     renderer.setPixelRatio(pixelRatio()), (SKY_PX.value = renderer.getPixelRatio());
     renderer.shadowMap.enabled = !low;
     sky.sun.castShadow = !low;
@@ -248,7 +249,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
 
   // Prayer wheels: tap E beside one to push it. Local pushes apply instantly; the server
   // echoes everyone's pushes with the authoritative speed.
-  const wheels = new PrayerWheels(ctx, (w) => net.pushWheel(w.id));
+  const wheels = staticBuild(() => new PrayerWheels(ctx, (w) => net.pushWheel(w.id))); // (their galleries and pavilions merged with the rest; the drums turn)
   /** Use what's at hand (E, or a tap on the prompt); a prayer wheel's gold button bounces with each push. */
   const useInteraction = (key?: string) => {
     const id = ctx.interactions.current?.id;
@@ -263,6 +264,9 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   // an update announced to everyone: a banner up top, counting down (a fresh server, after it, has none)
   net.on('notice', (_kind, inMs) => hud.setUpdateNotice(inMs));
   net.on('welcome', (msg) => hud.setUpdateNotice(msg.notice?.in ?? null));
+  // a newer build on the server than this tab: reload into it (an old tab would see, and show others, a world that's moved on)
+  net.on('welcome', (msg) => { if (__BUILD__ && msg.build && msg.build !== __BUILD__) hud.reloadForUpdate(); });
+  net.on('outdated', () => hud.reloadForUpdate());
   gw.onSpin = () => addMerit(10); // 功德 for every full turn of the great wheel you help turn
   net.on('push', (id, by, speed) => wheels.setSpeed(id, speed, false, by === net.id ? 'self' : by)); // whoever pushed last owns its turns
   // 功德: 1 for every 5 turns of a wheel you set going; incense 10, a fruit offered 1, a deer fed 1,
@@ -362,7 +366,19 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const merged = noMerge ? { before: 0, after: 0 } : mergeStatic(scene, staticRoots, { skip: new Set(ctx.detailMeshes), keepForRaycast: new Set(ctx.cameraBlockers), zone: interiorLayer });
   let rigid = 0;
   if (!noMerge) scene.traverse((o) => o.userData.rigid && (rigid += mergeRigid(o)));
+  // Lights render at any distance: every glow (a lamp's halo) is drawn clear of the fog. The things themselves keep the
+  // fog and the interiors' culling distance, so far off the temple is its lights.
+  scene.traverse((o) => {
+    if (!isGlow(o)) return;
+    const m = (o as THREE.Sprite).material as THREE.Material & { fog: boolean };
+    if (m.fog) (m.fog = false), (m.needsUpdate = true);
+  });
   const inside = assignInteriors(scene, new Set(farCulled()));
+  // Statues out of doors (the great stupa's Vairocana): a model of some 150 000 triangles, only drawn within reach
+  // (the ones in the halls go with their hall's interior already)
+  scene.traverse((o) => {
+    if (o.name.startsWith('statue-') && o.layers.mask === 1) cullFar(o, 70, o.getWorldPosition(new THREE.Vector3()));
+  });
   // Dev preview only: where you are, in the corner (to point at places when talking it over).
   // (also on the live site for the test names: "flytest" flies and shows this, "model" goes to the model gallery)
   const makeXYZ = () => document.body.appendChild(Object.assign(document.createElement('div'), { style: 'position:fixed;left:8px;bottom:8px;z-index:9999;font:12px/1.2 ui-monospace,monospace;color:#fff;background:rgba(0,0,0,.45);padding:3px 6px;border-radius:4px;pointer-events:none' }));
@@ -550,8 +566,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     mapAcc += dt;
     if (mapAcc > 0.1) {
       mapAcc = 0;
-      minimap.draw(player.pos, player.yaw, remotes.positions());
-      bigMap.draw(player.pos, player.yaw, remotes.positions());
+      if (!isTouchDevice || bigMap.isOpen) { // (phones don't show the corner map: only the big one, when it's open)
+        const others = remotes.positions();
+        if (!isTouchDevice) minimap.draw(player.pos, player.yaw, others);
+        bigMap.draw(player.pos, player.yaw, others);
+      }
     }
     renderer.render(scene, camera);
     playedFor += dt;

@@ -2,7 +2,7 @@
 import type { GreatWheelState } from './greatWheel';
 import { isBlocked } from './moderation';
 
-export const PROTOCOL_VERSION = 13;
+export const PROTOCOL_VERSION = 14;
 export const SNAPSHOT_HZ = 10;
 export const MAX_NAME_LEN = 20;
 /** The temple's own clock: day/night and the midnight offering reset follow this time zone. */
@@ -171,6 +171,8 @@ export type ServerMsg =
       flags?: [number, number, number][];
       /** An update announced and still to come. */
       notice?: { kind: 'update'; in: number };
+      /** The build the server runs (its commit): a client from another reloads itself. */
+      build?: string;
     }
   /** A prayer flag given to Garuda: where it will hang (`by` gave it). */
   | { t: 'flag'; line: number; slot: number; color: number; by: string }

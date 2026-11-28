@@ -12,12 +12,13 @@ export function buildLeaves(ctx: WorldContext, camera: THREE.Camera) {
   ctx.scene.add(mesh);
   ctx.detailMeshes.push(mesh);
 
-  const indoors = (x: number, z: number, y: number) =>
-    HALLS.some((h) => Math.abs(x - h.x) < hallHalf(h)[0] + 2.5 && Math.abs(z - h.z) < hallHalf(h)[1] + 2.5 && y < PLATFORM_H + h.wallHeight + 6);
+  // (the halls' boxes worked out once: this is asked for every leaf every frame)
+  const boxes = HALLS.map((h) => { const [ex, ez] = hallHalf(h); return { x: h.x, z: h.z, ex: ex + 2.5, ez: ez + 2.5, top: PLATFORM_H + h.wallHeight + 6 }; });
+  const indoors = (x: number, z: number, y: number) => boxes.some((b) => Math.abs(x - b.x) < b.ex && Math.abs(z - b.z) < b.ez && y < b.top);
 
   const leaves = Array.from({ length: N }, (_, i) => {
     mesh.setColorAt(i, palette[i % palette.length]);
-    return { p: new THREE.Vector3(), rot: new THREE.Euler(), spin: new THREE.Vector3(), phase: Math.random() * 10, alive: false };
+    return { p: new THREE.Vector3(), rot: new THREE.Euler(), spin: new THREE.Vector3(), phase: Math.random() * 10, alive: false, g: 0 };
   });
   const spawn = (l: (typeof leaves)[number], anywhere: boolean) => {
     for (let tries = 0; tries < 6; tries++) {
@@ -26,6 +27,7 @@ export function buildLeaves(ctx: WorldContext, camera: THREE.Camera) {
       const y = g + (anywhere ? Math.random() * 12 : 9 + Math.random() * 5);
       if (indoors(x, z, y)) continue;
       l.p.set(x, y, z);
+      l.g = g; // (the ground where it set off: only once it's down near that is the ground under it looked up)
       l.rot.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
       l.spin.set((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
       l.alive = true;
@@ -50,7 +52,7 @@ export function buildLeaves(ctx: WorldContext, camera: THREE.Camera) {
       l.rot.y += l.spin.y * dt;
       l.rot.z += l.spin.z * dt;
       const far = Math.hypot(l.p.x - camera.position.x, l.p.z - camera.position.z) > 32;
-      if (far || l.p.y < ctx.ground.heightAt(l.p.x, l.p.z) || indoors(l.p.x, l.p.z, l.p.y)) l.alive = false;
+      if (far || (l.p.y < l.g + 1.5 && l.p.y < ctx.ground.heightAt(l.p.x, l.p.z)) || indoors(l.p.x, l.p.z, l.p.y)) l.alive = false;
       mesh.setMatrixAt(i, m.compose(l.p, q.setFromEuler(l.rot), one));
     });
     first = false;
