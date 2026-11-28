@@ -82,9 +82,10 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
 
   // ---------- Renderer / scene ----------
   // (phones: no multisampling, a plainer shadow filter; their dense screens hide the edges, and their GPUs need the time)
-  const renderer = new THREE.WebGLRenderer({ antialias: !isTouchDevice, powerPreference: 'high-performance' });
+  // (multisampling on phones too: their tiled GPUs do it almost for nothing, and without it every edge is jagged)
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.type = isTouchDevice ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   appEl.append(renderer.domElement);
@@ -159,12 +160,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   // High / low graphics: pixel ratio, shadows, grass & flowers, how many lamps really light.
   // On high the resolution adapts (see measure): sharpness gives way first, before shadows or lights.
   const SCALES = [2, 1.75, 1.5, 1.25, 1];
-  // (phones, on low graphics, start at 1.5× and find their own level like everyone else: no longer stuck at a soft 1×)
-  let scaleStep = isTouchDevice ? 2 : 0;
+  let scaleStep = 0; // (every device starts sharp, and finds its own level)
   const pixelRatio = () => Math.min(window.devicePixelRatio, SCALES[scaleStep]);
   const applyGraphics = () => {
     const low = graphicsLevel() === 'low';
-    lights.setActive(low || isTouchDevice ? 4 : 8); // (every real light is paid for in every lit pixel: phones get 4)
+    lights.setActive(low ? 4 : 8);
     renderer.setPixelRatio(pixelRatio()), (SKY_PX.value = renderer.getPixelRatio());
     renderer.shadowMap.enabled = !low;
     sky.sun.castShadow = !low;
@@ -450,6 +450,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   // Measured twice a second; a hidden / stalled tab doesn't count.
   let fpsFrames = 0, fpsT = performance.now(), slowFor = 0, playedFor = 0, livedFor = 0, sagFor = 0, easyFor = 0, easyNeed = 10;
   let warmFor = 0, holdFor = 0, probeFailFor = 0, probing = false;
+  let trial: { from: number; fps: number; t: number; frames: number } | null = null, floorStep = SCALES.length - 1;
   let probeDone = settings.graphics !== 'auto' || !isTouchDevice || settings.autoLow;
   const measure = () => {
     fpsFrames++;
@@ -464,8 +465,23 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     if (span <= 2) {
       sagFor = fps < 42 ? sagFor + span : 0;
       easyFor = fps > 57 ? easyFor + span : 0;
-      const step = sagFor >= 1.5 && pixelRatio() > 1 ? 1 : easyFor >= easyNeed && scaleStep > 0 ? -1 : 0;
+      // A step down in resolution is on trial: if the next few seconds aren't a tenth faster, the pixels weren't what
+      // held it back (too many things to draw, say), so it goes back up and won't go that low again this visit.
+      if (trial) {
+        trial.t += span;
+        trial.frames += fps * span;
+        if (trial.t >= 3) {
+          if (trial.frames / trial.t < trial.fps * 1.1) {
+            scaleStep = floorStep = trial.from;
+            renderer.setPixelRatio(pixelRatio()), (SKY_PX.value = renderer.getPixelRatio());
+          }
+          trial = null;
+          sagFor = easyFor = 0;
+        }
+      }
+      const step = !trial && sagFor >= 1.5 && pixelRatio() > 1 && scaleStep < floorStep ? 1 : easyFor >= easyNeed && scaleStep > 0 ? -1 : 0;
       if (step) {
+        if (step > 0) trial = { from: scaleStep, fps, t: 0, frames: 0 };
         scaleStep += step;
         renderer.setPixelRatio(pixelRatio()), (SKY_PX.value = renderer.getPixelRatio());
         sagFor = easyFor = 0;
@@ -508,7 +524,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
         }
         return void (slowFor = 0);
       }
-      if (pixelRatio() > 1) return void (slowFor = 0);
+      if (pixelRatio() > 1 && scaleStep < floorStep) return void (slowFor = 0); // (resolution can still give: try that first)
     }
     if (span > 2 || phase !== 'play' || playedFor < 8 || settings.graphics !== 'auto' || graphicsLevel() === 'low') return void (slowFor = 0);
     slowFor = fps < 40 ? slowFor + span : Math.max(0, slowFor - span);
@@ -550,7 +566,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     cloud.update(dt);
     lights.update(dt, player.pos);
     updateFarCull(dt, camera.position, graphicsLevel() === 'low' ? 1 : 2);
-    updateDrawDistance(dt, camera.position, isTouchDevice ? 230 : graphicsLevel() === 'low' ? 300 : 420); // (meshes: lights go on regardless)
+    updateDrawDistance(dt, camera.position, graphicsLevel() === 'low' ? 500 : 650); // (meshes, the same on every device; far enough that from the ridge the whole temple shows; lights go on regardless)
     updateInteriors(camera, graphicsLevel() === 'low' ? 1 : 2);
     if (cloud.riding || bodhiBell.active || gw.controlling || seat.seated) circle.stop();
     circle.update(dt, input);

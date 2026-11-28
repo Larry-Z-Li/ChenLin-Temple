@@ -3,7 +3,7 @@ import { buildSkyChart, twinkleStars } from './skyChart';
 import { buildSkyClouds } from './skyClouds';
 import { buildMilkyWay } from './milkyWay';
 import { DEFAULT_TEMPLE_TZ } from '../../../shared/protocol';
-import { isTouchDevice, settings } from '../config/settings';
+import { settings } from '../config/settings';
 import { lerp, mulberry32, smoothstep } from '../core/math';
 import { glowTexture } from '../core/textures';
 import { nightGlow } from './nightGlow';
@@ -131,7 +131,7 @@ export function buildSky(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
 
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.8);
   sun.castShadow = true;
-  sun.shadow.mapSize.setScalar(isTouchDevice ? 1024 : 2048); // (phones: a quarter of the shadow map to draw each frame)
+  sun.shadow.mapSize.setScalar(2048);
   const s = 75; // the shadow box is 150 m across, slid ahead of the camera (see follow)
   Object.assign(sun.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: 400 });
   sun.shadow.bias = -0.0004;
