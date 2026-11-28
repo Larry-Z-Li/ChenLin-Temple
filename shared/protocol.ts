@@ -136,6 +136,8 @@ export type ClientMsg =
   | { t: 'strike'; inst: string }
   /** `side`: the hall's left (0) or right (1) wall. */
   | { t: 'wish'; title: string; text: string; color: number; board?: WishBoard; side?: number; slot?: number }
+  /** Change the title, wish text, or light colour of a lantern you hung. */
+  | { t: 'wishEdit'; id: string; title: string; text: string; color: number }
   /** Take a lantern down to bless it (and, done, hang it back: the blessing counts). */
   | { t: 'bless'; id: string; done?: boolean }
   /** Flag a lantern as unkind; enough different people and it comes down. */
@@ -195,6 +197,8 @@ export type ServerMsg =
   | { t: 'strike'; inst: string; by: string }
   | { t: 'wishAdded'; wish: Wish }
   | { t: 'wishRemoved'; id: string }
+  /** Title, wish or light colour changed on an existing lantern. */
+  | { t: 'wishUpdated'; wish: Wish }
   /** A lantern taken down to be blessed (by) or hung back (by null, with its new count). */
   | { t: 'blessing'; id: string; by: string | null; spot: number; prayers?: number }
   | { t: 'wishDenied'; reason: WishDenyReason }

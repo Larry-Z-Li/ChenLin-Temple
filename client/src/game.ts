@@ -31,7 +31,7 @@ import { PrayerWheels } from './buildings/prayerWheels';
 import { GreatWheels } from './buildings/greatWheel';
 import { buildStupas } from './buildings/stupas';
 import { BASIN, BODHI_TREE, CHERRY_GROVE, GREAT_STUPA, HALLS, hallHalf, PAGODAS, PLAZA, SPAWN, TRAVEL_SPOTS } from './config/layout';
-import { graphicsLevel, isTouchDevice, saveSettings, settings } from './config/settings';
+import { beginHighProbe, endHighProbe, graphicsLevel, isTouchDevice, saveSettings, setSessionGraphics, settings } from './config/settings';
 import { loadModelMap, loadThangkas } from './content/manifest';
 import { buildModelGallery } from './world/modelGallery';
 import { buildCourtLights } from './world/courtLights';
@@ -442,9 +442,11 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
   const lookDir = new THREE.Vector3();
   let landYaw = SPAWN.yaw;
 
-  // Frame rate: the optional counter, and 'auto' graphics stepping down to low (and remembering it)
-  // when this device can't keep up on high. Measured twice a second; a hidden tab doesn't count.
-  let fpsFrames = 0, fpsT = performance.now(), slowFor = 0, playedFor = 0, sagFor = 0, easyFor = 0, easyNeed = 10;
+  // Frame rate: adaptive pixel ratio; phones on 'auto' boot low then probe high; desktop 'auto' may fall to low.
+  // Measured twice a second; a hidden / stalled tab doesn't count.
+  let fpsFrames = 0, fpsT = performance.now(), slowFor = 0, playedFor = 0, livedFor = 0, sagFor = 0, easyFor = 0, easyNeed = 10;
+  let warmFor = 0, holdFor = 0, probeFailFor = 0, probing = false;
+  let probeDone = settings.graphics !== 'auto' || !isTouchDevice || settings.autoLow;
   const measure = () => {
     fpsFrames++;
     const now = performance.now(), span = (now - fpsT) / 1000;
@@ -454,7 +456,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
     fpsT = now;
     hud.setFps(fps, renderer.info.render.calls);
     // Any graphics: drop the render resolution a step when the frame rate sags, raise it again when
-    // there's room. Only once it's at 1× does 'auto' fall back to low graphics.
+    // there's room. Only once it's at 1× does desktop 'auto' fall back to low graphics.
     if (span <= 2) {
       sagFor = fps < 42 ? sagFor + span : 0;
       easyFor = fps > 57 ? easyFor + span : 0;
@@ -466,12 +468,50 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
         if (step > 0) easyNeed = Math.min(120, easyNeed * 2); // stepped up too soon: wait longer next time
         if (step > 0) return void (slowFor = 0);
       }
+      // Touch 'auto': after Low is stable, try High; remember the outcome (crash mid-probe → autoLow next visit).
+      if (!probeDone && settings.graphics === 'auto') {
+        const warmNeed = settings.autoHigh ? 1.5 : 3;
+        const holdNeed = settings.autoHigh ? 4 : 6;
+        if (!probing) {
+          warmFor = fps > 55 ? warmFor + span : 0;
+          if (livedFor >= warmNeed && warmFor >= warmNeed) {
+            probing = true;
+            holdFor = probeFailFor = 0;
+            beginHighProbe();
+            setSessionGraphics('high');
+            applyGraphics();
+            hud.renderGraphics();
+          }
+        } else {
+          if (fps < 40) probeFailFor += span;
+          else (probeFailFor = Math.max(0, probeFailFor - span)), (holdFor += span);
+          if (probeFailFor >= 3) {
+            probing = false;
+            probeDone = true;
+            setSessionGraphics('low');
+            endHighProbe(false);
+            applyGraphics();
+            hud.renderGraphics();
+            hud.toast(t('settings.autoLow'));
+          } else if (holdFor >= holdNeed) {
+            const first = !settings.autoHigh;
+            probing = false;
+            probeDone = true;
+            endHighProbe(true);
+            hud.renderGraphics();
+            if (first) hud.toast(t('settings.autoHigh'));
+          }
+        }
+        return void (slowFor = 0);
+      }
       if (pixelRatio() > 1) return void (slowFor = 0);
     }
     if (span > 2 || phase !== 'play' || playedFor < 8 || settings.graphics !== 'auto' || graphicsLevel() === 'low') return void (slowFor = 0);
     slowFor = fps < 40 ? slowFor + span : Math.max(0, slowFor - span);
     if (slowFor < 6) return;
     settings.autoLow = true;
+    settings.autoHigh = false;
+    setSessionGraphics('low');
     saveSettings();
     applyGraphics();
     hud.renderGraphics();
@@ -491,6 +531,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       bigMap.draw(player.pos, player.yaw, remotes.positions()); // the start page's map button
       updateInteriors(camera, graphicsLevel() === 'low' ? 1 : 2);
       renderer.render(scene, camera);
+      livedFor += dt;
       measure();
       return;
     }
@@ -573,6 +614,7 @@ export async function startGame(appEl: HTMLElement, uiEl: HTMLElement) {
       }
     }
     renderer.render(scene, camera);
+    livedFor += dt;
     playedFor += dt;
     measure();
   });
