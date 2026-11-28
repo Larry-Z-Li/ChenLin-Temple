@@ -545,6 +545,22 @@ function handle(c: Client, msg: ClientMsg) {
       broadcast({ t: 'wishAdded', wish: pub(wish) });
       break;
     }
+    case 'wishEdit': {
+      const w = typeof msg.id === 'string' ? wishes.get(msg.id) : undefined;
+      if (!w || w.owner !== c.who) return;
+      const title = sanitizeText(msg.title, WISH_TITLE_MAX), text = sanitizeText(msg.text, WISH_TEXT_MAX);
+      if (!title) return send(c, { t: 'wishDenied', reason: 'empty' });
+      if (isBlocked(`${title} ${text}`)) return send(c, { t: 'wishDenied', reason: 'blocked' });
+      if (!underLimit(`wish-edit:${c.who}`, 30, 3600_000)) return send(c, { t: 'wishDenied', reason: 'busy' });
+      noteHit(`wish-edit:${c.who}`);
+      const color = Number.isInteger(msg.color) && msg.color >= 0 && msg.color < WISH_COLOURS ? msg.color : w.color;
+      w.title = title;
+      w.text = text;
+      w.color = color;
+      saveWishes();
+      broadcast({ t: 'wishUpdated', wish: pub(w) });
+      break;
+    }
     case 'bless': {
       const w = typeof msg.id === 'string' ? wishes.get(msg.id) : undefined;
       if (!w || w.board === 'garden') return;

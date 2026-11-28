@@ -55,14 +55,24 @@ export function chaliceGeometries() {
 
 export const lanternHex = (color: number) => LOTUS_COLOURS[color] ?? LOTUS_COLOURS[0];
 
-/** The writing form (title, wish, colour) shown in `panel`; `onHang` gets the trimmed title (non-empty). */
-export function showWishForm(panel: HTMLElement, hud: Hud, headingKey: I18nKey, onHang: (title: string, text: string, color: number) => void, close: () => void) {
-  let color = 0;
-  const title = h('input', { class: 'wish-input', maxlength: String(WISH_TITLE_MAX), placeholder: t('wish.title') }) as HTMLInputElement;
-  const text = h('textarea', { class: 'wish-input wish-text', maxlength: String(WISH_TEXT_MAX), placeholder: t('wish.text'), rows: '4' }) as HTMLTextAreaElement;
+/**
+ * The writing form (title, wish, colour) shown in `panel`; `onHang` gets the trimmed title (non-empty).
+ * Pass `opts` to edit an existing lantern (prefilled fields, Save instead of Hang).
+ */
+export function showWishForm(
+  panel: HTMLElement,
+  hud: Hud,
+  headingKey: I18nKey,
+  onHang: (title: string, text: string, color: number) => void,
+  close: () => void,
+  opts?: { title?: string; text?: string; color?: number; submitKey?: I18nKey },
+) {
+  let color = Math.max(0, Math.min(LOTUS_COLOURS.length - 1, opts?.color ?? 0));
+  const title = h('input', { class: 'wish-input', maxlength: String(WISH_TITLE_MAX), placeholder: t('wish.title'), value: opts?.title ?? '' }) as HTMLInputElement;
+  const text = Object.assign(h('textarea', { class: 'wish-input wish-text', maxlength: String(WISH_TEXT_MAX), placeholder: t('wish.text'), rows: '4' }) as HTMLTextAreaElement, { value: opts?.text ?? '' });
   const swatches = LOTUS_COLOURS.map((c, i) =>
     h('button', {
-      class: `wish-swatch${i === 0 ? ' on' : ''}`,
+      class: `wish-swatch${i === color ? ' on' : ''}`,
       style: `background:#${c.toString(16).padStart(6, '0')}`,
       onclick: (e: MouseEvent) => {
         color = i;
@@ -85,7 +95,7 @@ export function showWishForm(panel: HTMLElement, hud: Hud, headingKey: I18nKey, 
       h('div', { class: 'wish-swatches' }, ...swatches),
       h('div', { class: 'wish-actions' },
         h('button', { class: 'pill-btn', i18n: 'wish.cancel', onclick: close }),
-        h('button', { class: 'primary-btn', i18n: 'wish.hang', onclick: submit }),
+        h('button', { class: 'primary-btn', i18n: opts?.submitKey ?? 'wish.hang', onclick: submit }),
       ),
     ),
   );

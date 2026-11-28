@@ -47,6 +47,8 @@ export class HallLanterns {
   private hooks: THREE.Vector3[] = [];
   private panel: HTMLElement;
   private pending: string | null = null;
+  /** Wish id whose title/text/colour you're saving (so a deny toast lands here). */
+  private editing: string | null = null;
   /** Lanterns you've reported this visit. */
   private reported = new Set<string>();
   private hidden = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -191,14 +193,28 @@ export class HallLanterns {
         this.onHung(this.shotFor(w.slot));
       }
     });
+    net.on('wishUpdated', (w) => {
+      if (!mine(w)) return;
+      this.update(w);
+      if (this.editing === w.id) {
+        this.editing = null;
+        this.hud.toast(t('wish.saved'));
+        this.openWish(w.id);
+      } else this.refresh();
+    });
     net.on('wishRemoved', (id) => {
       this.remove(id);
       this.refresh();
     });
     net.on('wishDenied', (reason) => {
+      const toast = () => this.hud.toast(t(reason === 'full' ? 'hallWish.full' : reason === 'empty' ? 'wish.empty' : (`wish.${reason}` as 'wish.slow' | 'wish.blocked' | 'wish.limit' | 'wish.busy' | 'wish.taken')));
+      if (this.editing !== null) {
+        this.editing = null;
+        return toast();
+      }
       if (this.pending === null) return; // another wall's
       this.pending = null;
-      this.hud.toast(t(reason === 'full' ? 'hallWish.full' : reason === 'empty' ? 'wish.empty' : (`wish.${reason}` as const)));
+      toast();
     });
 
     // Gentle sway (lit lanterns only); every frame while one is shaking or swirling.
@@ -324,6 +340,18 @@ export class HallLanterns {
     this.relight();
   }
 
+  /** Title, wish or light colour changed on a lantern already on this wall. */
+  private update(w: Wish) {
+    if (!this.wishes.has(w.id) || w.slot < 0 || w.slot >= HALL_WISH_SLOTS) return;
+    this.wishes.set(w.id, w);
+    this.bySlot.set(w.slot, w);
+    const c = new THREE.Color(lanternHex(w.color));
+    this.bodies.setColorAt(w.slot, c);
+    this.bodies.instanceColor!.needsUpdate = true;
+    // Off the wall for a blessing: keep the halo dark until it's hung back.
+    this.halo(w.slot, this.blessing.holder(w.id) ? new THREE.Color(0, 0, 0) : c);
+  }
+
   private remove(id: string) {
     const w = this.wishes.get(id);
     if (!w) return;
@@ -412,13 +440,13 @@ export class HallLanterns {
     }, () => this.openGrid(side));
   }
 
-  /** A claimed lantern: the wish, how often it's been blessed, and 祝福願望. */
+  /** A claimed lantern: the wish, how often it's been blessed, and 祝福願望 (or Edit, if it's yours). */
   private openWish(id: string) {
     const w = this.wishes.get(id);
     if (!w) return;
     this.view = { wish: id };
-    const side = wallOf(w.slot), holder = this.blessing.holder(id);
-    const report = w.name === this.myName ? null : (h('button', { class: 'wish-report', disabled: this.reported.has(w.id), i18n: this.reported.has(w.id) ? 'wish.reported' : 'wish.report' }) as HTMLButtonElement);
+    const side = wallOf(w.slot), holder = this.blessing.holder(id), mine = w.name === this.myName;
+    const report = mine ? null : (h('button', { class: 'wish-report', disabled: this.reported.has(w.id), i18n: this.reported.has(w.id) ? 'wish.reported' : 'wish.report' }) as HTMLButtonElement);
     report?.addEventListener('click', () => {
       this.reported.add(w.id);
       this.net.reportWish(w.id);
@@ -434,6 +462,9 @@ export class HallLanterns {
       const route: BlessRoute = { hook: this.root.localToWorld(this.chalices ? this.hooks[w.slot].clone() : this.hooks[w.slot].clone().add(new THREE.Vector3(0, -0.5 * this.scale, 0))), scale: this.scale, kind: this.chalices ? 'chalice' : 'lantern', start: r.start, to: (spot) => this.spotAt(spot, r.side) };
       this.blessing.start(w.id, lanternHex(w.color), route);
     });
+    const edit = mine
+      ? (h('button', { class: 'pill-btn', i18n: 'wish.edit', onclick: () => this.editWish(w.id) }) as HTMLButtonElement)
+      : null;
     this.panel.replaceChildren(
       h('div', { class: 'wish-card' },
         h('div', { class: 'wish-heading' }, `${t('lantern.number', { n: (w.slot % PER_WALL) + 1 })} · ${w.title}`),
@@ -443,11 +474,30 @@ export class HallLanterns {
         report,
         h('div', { class: 'wish-actions' },
           h('button', { class: 'pill-btn', i18n: 'lantern.back', onclick: () => this.openGrid(side) }),
+          edit,
           bless,
         ),
       ),
     );
     this.panel.classList.remove('hidden');
+  }
+
+  /** Change the title, wish text or light colour on a lantern you hung. */
+  private editWish(id: string) {
+    const w = this.wishes.get(id);
+    if (!w || w.name !== this.myName) return;
+    this.view = null;
+    showWishForm(
+      this.panel,
+      this.hud,
+      'hallWish.heading',
+      (title, text, color) => {
+        this.editing = id;
+        this.net.editWish(id, title, text, color, w);
+      },
+      () => this.openWish(id),
+      { title: w.title, text: w.text, color: w.color, submitKey: 'wish.save' },
+    );
   }
 }
 

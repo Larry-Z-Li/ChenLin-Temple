@@ -30,6 +30,7 @@ export interface NetEvents {
   strike: (inst: string, by: string) => void;
   wishAdded: (wish: Wish) => void;
   wishRemoved: (id: string) => void;
+  wishUpdated: (wish: Wish) => void;
   blessing: (id: string, by: string | null, spot: number, prayers?: number) => void;
   wishDenied: (reason: WishDenyReason) => void;
   /** A prayer flag given to Garuda, and where it will hang. */
@@ -131,6 +132,7 @@ export class NetClient {
       case 'strike': return this.emit('strike', msg.inst, msg.by);
       case 'wishAdded': return this.emit('wishAdded', msg.wish);
       case 'wishRemoved': return this.emit('wishRemoved', msg.id);
+      case 'wishUpdated': return this.emit('wishUpdated', msg.wish);
       case 'blessing': return this.emit('blessing', msg.id, msg.by, msg.spot, msg.prayers);
       case 'wishDenied': return this.emit('wishDenied', msg.reason);
       case 'flag': return this.emit('flag', msg.line, msg.slot, msg.color, msg.by);
@@ -195,6 +197,11 @@ export class NetClient {
   /** Offline the lantern goes up locally (lost on reload). */
   hangWish(title: string, text: string, color: number, name: string, slot: number, board: WishBoard = 'garden', side?: number) {
     if (!this.send({ t: 'wish', title, text, color, board, side, slot })) this.emit('wishAdded', { id: `l${++this.localSeq}`, board, slot, title, text, color, name, at: Date.now() });
+  }
+
+  /** Change title, wish text or light colour on a lantern you hung (offline: applied locally). */
+  editWish(id: string, title: string, text: string, color: number, prev: Wish) {
+    if (!this.send({ t: 'wishEdit', id, title, text, color })) this.emit('wishUpdated', { ...prev, title, text, color });
   }
 
   /** Flag a lantern as unkind (the server takes it down after enough different people do). */
