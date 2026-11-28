@@ -32,24 +32,34 @@ export interface ThangkaEntry {
 
 const cache = new Map<string, Promise<unknown>>();
 
+/** Bust browser/CDN caches when a new deploy ships (empty in local dev). */
+const bust = (url: string) => (__BUILD__ ? `${url}?v=${encodeURIComponent(__BUILD__)}` : url);
+
 async function getJson<T>(url: string, fallback: T): Promise<T> {
-  if (!cache.has(url)) {
+  const keyed = bust(url);
+  if (!cache.has(keyed)) {
     cache.set(
-      url,
-      fetch(url)
+      keyed,
+      // no-store: don't reuse a stale index.json from disk cache after a deploy
+      fetch(keyed, { cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : fallback))
         .catch(() => fallback),
     );
   }
-  return cache.get(url) as Promise<T>;
+  return cache.get(keyed) as Promise<T>;
 }
 
 const BASE = `${import.meta.env.BASE_URL}assets`;
 /** The heavy folders, fetched from the CDN when there is one (see vite.config.ts); the rest from our own server. */
 const CDN_FOLDERS = new Set(['models', 'chants']);
-export const assetUrl = (folder: string, file: string) => (__ASSET_CDN__ && CDN_FOLDERS.has(folder) ? `${__ASSET_CDN__}/${folder}/${file}` : `${BASE}/${folder}/${file}`);
+export const assetUrl = (folder: string, file: string) =>
+  bust(__ASSET_CDN__ && CDN_FOLDERS.has(folder) ? `${__ASSET_CDN__}/${folder}/${file}` : `${BASE}/${folder}/${file}`);
 /** For a file that failed from the CDN: the same file from our own server (null if it wasn't a CDN one). */
-export const ownServerUrl = (url: string) => (__ASSET_CDN__ && url.startsWith(__ASSET_CDN__) ? BASE + url.slice(__ASSET_CDN__.length) : null);
+export const ownServerUrl = (url: string) => {
+  if (!__ASSET_CDN__ || !url.startsWith(__ASSET_CDN__)) return null;
+  const path = url.slice(__ASSET_CDN__.length).split('?')[0];
+  return bust(BASE + path);
+};
 
 export const loadSutras = () => getJson<{ items: SutraEntry[] }>(`${BASE}/sutras/index.json`, { items: [] }).then((m) => m.items ?? []);
 export const loadChants = () => getJson<{ items: AudioEntry[] }>(`${BASE}/chants/index.json`, { items: [] }).then((m) => m.items ?? []);

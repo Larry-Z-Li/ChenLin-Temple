@@ -67,6 +67,14 @@ const TEMPLE_TZ = process.env.TEMPLE_TZ ?? DEFAULT_TEMPLE_TZ;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = path.resolve(here, '../../client/dist');
+/** Same id the client baked in (vite writes dist/build-id); used so old tabs reload after a deploy. */
+const BUILD_ID = (() => {
+  try {
+    return fs.readFileSync(path.join(STATIC_DIR, 'build-id'), 'utf8').trim() || undefined;
+  } catch {
+    return process.env.RENDER_GIT_COMMIT || undefined;
+  }
+})();
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -123,7 +131,9 @@ const server = http.createServer((req, res) => {
   // rest (models, sounds, pictures) for a day and then only re-checked (an unchanged file answers 304, no body); the
   // page itself always re-checked, so a new deploy is picked up at once.
   const etag = `W/"${size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`, rel = path.relative(STATIC_DIR, file);
-  const cache = rel === 'index.html' || rel.endsWith('.json') ? 'no-cache' : // (the page and the lists of chants, models, sutras… always re-checked, so additions show at once)
+  // JSON manifests: no-store so a new chant/sutra list isn't stuck behind a disk cache after deploy.
+  // Hashed JS/CSS: immutable. Other assets (audio, models): a day, then re-check (URLs also carry ?v=build).
+  const cache = rel === 'index.html' || rel.endsWith('.json') ? 'no-store' :
     /^assets[\\/][^\\/]+-[A-Za-z0-9_-]{8}\.(js|css)$/.test(rel) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400, stale-while-revalidate=604800';
   const head = { etag, 'last-modified': st.mtime.toUTCString(), 'cache-control': cache };
   if (req.headers['if-none-match'] === etag) return void res.writeHead(304, head).end();
@@ -435,10 +445,11 @@ function handle(c: Client, msg: ClientMsg) {
       picked: pickedAgo,
       offerings: liveOfferings(now),
       wishes: [...wishes.values()].map(pub),
+      myWishes: [...wishes.values()].filter((w) => w.owner === c.who).map((w) => w.id),
       blessings: Object.fromEntries([...blessings].map(([id, b]) => [id, { by: b.by, spot: b.spot }])),
       flags: hungFlags,
       notice: updateAt > now ? { kind: 'update', in: updateAt - now } : undefined,
-      build: process.env.RENDER_GIT_COMMIT || undefined,
+      build: BUILD_ID,
     });
     return; // others hear of them with their first position (see 'move')
   }
